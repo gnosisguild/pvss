@@ -1,1 +1,3 @@
 prover.toml
+target/
+**/.DS_Store
