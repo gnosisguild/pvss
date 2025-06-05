@@ -1,3 +1,3 @@
-pub mod polynomial;
-pub mod pk_constants;
-pub mod pk_circuit;
+pub mod constants;
+pub mod crypto;
+pub mod math;
