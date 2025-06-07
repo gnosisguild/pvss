@@ -14,5 +14,5 @@ pub global R1_UP_BOUNDS: [u64; 2] = [9729, 9729];
 pub global R2_BOUNDS: [u64; 2] = [2251799812767744, 2251799813160960];
 
 /// Security dimension in PVW encryption
-pub global K:u32 = 2;
-pub global N_PARTIES:u32 = 3;
+pub global K: u32 = 2;
+pub global N_PARTIES: u32 = 3;

@@ -12,4 +12,3 @@ pub global R1_UP_BOUNDS: [u64; 2] = [9729, 9729];
 pub global R2_BOUNDS: [u64; 2] = [2251799812767744, 2251799813160960];
 /// List of scalars `qis` such that `qis[i]` is the modulus of the i-th CRT basis of `q` (ciphertext space modulus).
 pub global QIS: [Field; 2] = [4503599625535489, 4503599626321921];
-
