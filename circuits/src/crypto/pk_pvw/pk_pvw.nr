@@ -54,21 +54,17 @@ impl PvwPublicKeyCircuit {
         let gamma = Poseidon2::hash(input, size);
 
         // Evaluate a at gamma (3D array)
-        let a_at_gamma =
-            self.a.map(|matrix| matrix.map(|row| row.map(|poly| poly.eval(gamma))));
+        let a_at_gamma = self.a.map(|matrix| matrix.map(|row| row.map(|poly| poly.eval(gamma))));
 
         let e_at_gamma = self.e.map(|row| row.map(|poly| poly.eval(gamma)));
 
         let sk_at_gamma = self.sk.map(|row| row.map(|poly| poly.eval(gamma)));
 
-        let b_at_gamma =
-            self.b.map(|matrix| matrix.map(|row| row.map(|poly| poly.eval(gamma))));
+        let b_at_gamma = self.b.map(|matrix| matrix.map(|row| row.map(|poly| poly.eval(gamma))));
 
-        let r1_at_gamma =
-            self.r1.map(|matrix| matrix.map(|row| row.map(|poly| poly.eval(gamma))));
+        let r1_at_gamma = self.r1.map(|matrix| matrix.map(|row| row.map(|poly| poly.eval(gamma))));
 
-        let r2_at_gamma =
-            self.r2.map(|matrix| matrix.map(|row| row.map(|poly| poly.eval(gamma))));
+        let r2_at_gamma = self.r2.map(|matrix| matrix.map(|row| row.map(|poly| poly.eval(gamma))));
 
         // cyclo poly is equal to x^N + 1
         let cyclo_at_gamma = gamma.pow_32(N as Field) + 1;
