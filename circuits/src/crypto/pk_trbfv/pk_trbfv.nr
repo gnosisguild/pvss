@@ -1,4 +1,6 @@
-use crate::constants::{EEK_BOUND, L, N, QIS, R1_LOW_BOUNDS, R1_UP_BOUNDS, R2_BOUNDs, SK_BOUND};
+use crate::crypto::pk_trbfv::constants::{
+    EEK_BOUND, L, N, QIS, R1_LOW_BOUNDS, R1_UP_BOUNDS, R2_BOUNDS, SK_BOUND,
+};
 use crate::math::polynomial::Polynomial;
 use poseidon::poseidon2::Poseidon2;
 
@@ -7,22 +9,23 @@ pub struct BfvPublicKeyCircuit {
     a: [Polynomial<N>; L],
     eek: Polynomial<N>,
     sk: Polynomial<N>,
-    r1is: [Polynomial<2 * N - 2>; L],
-    r2is: [Polynomial<2 * N - 2>; L],
+    r1is: [Polynomial<2 * N - 1>; L],
+    r2is: [Polynomial<2 * N - 1>; L],
     pk0is: [Polynomial<N>; L],
     pk1is: [Polynomial<N>; L],
 }
 
 impl BfvPublicKeyCircuit {
-
     pub fn new(
         a: [Polynomial<N>; L],
         eek: Polynomial<N>,
         sk: Polynomial<N>,
+        r1is: [Polynomial<2 * N - 1>; L],
+        r2is: [Polynomial<2 * N - 1>; L],
         pk0is: [Polynomial<N>; L],
         pk1is: [Polynomial<N>; L],
     ) -> Self {
-        BfvPublicKeyCircuit { a, eek, sk, pk0is, pk1is }
+        BfvPublicKeyCircuit { a, eek, sk, r1is, r2is, pk0is, pk1is }
     }
 
     pub fn correct_bfv_public_key(self) {
@@ -32,7 +35,7 @@ impl BfvPublicKeyCircuit {
 
         for i in 0..L {
             self.r1is[i].range_check_2bounds(R1_UP_BOUNDS[i], R1_LOW_BOUNDS[i]);
-            self.r2is[i].range_check_1bound(R2_BOUNDs[i]);
+            self.r2is[i].range_check_1bound(R2_BOUNDS[i]);
         }
 
         // @todo: generate the input using the safe API
