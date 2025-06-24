@@ -1,7 +1,8 @@
 [workspace]
 members = [
     "example"
-, "public_key"]
+, "public_key"
+, "polynomial"]
 resolver = "2"
 
 [workspace.package]
@@ -11,6 +12,7 @@ edition = "2021"
 [workspace.dependencies]
 example = { package = "example", path = "./example" }
 public_key = { package = "public_key", path = "./public_key" }
+polynomial = { package = "e3-greco-polynomial", path = "./polynomial" }
 rand = "0.8.5"
 fhe = { git = "https://github.com/gnosisguild/fhe.rs", branch = "feature/lbfv" }
 serde = { version = "1.0.208", features = ["derive"] }
