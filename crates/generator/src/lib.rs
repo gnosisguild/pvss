@@ -11,15 +11,15 @@ pub mod utils;
 pub mod vectors;
 
 // Re-export main types that currently work
-pub use bfv::{BfvConfig, BfvHelper};
+pub use bfv::{BfvConfig, BfvHelper, EncryptionData};
+pub use bounds::InputValidationBounds;
 pub use cli::CliConfig;
 pub use generators::{noir::NoirGenerator, toml::TomlGenerator};
+pub use vectors::InputValidationVectors;
 
 use num_traits::Num;
 use polynomial::BigInt;
 use std::path::PathBuf;
-
-use crate::{bounds::PVSSBounds, vectors::PVSSVectors};
 
 /// Configuration for output generation
 #[derive(Clone, Debug)]
@@ -40,8 +40,8 @@ impl Default for GeneratorConfig {
 /// Results from generation process
 #[derive(Debug)]
 pub struct GenerationResults {
-    pub vectors: PVSSVectors,
-    pub bounds: PVSSBounds,
+    pub vectors: InputValidationVectors,
+    pub bounds: InputValidationBounds,
     pub noir_file: Option<PathBuf>,
     pub toml_file: Option<PathBuf>,
 }
@@ -57,18 +57,21 @@ pub fn generate_all_outputs(
 
     // Create BFV helper and generate encryption
     let helper = BfvHelper::new(bfv_config)?;
-    let pvss_data = helper.generate_sample()?;
+    let encryption_data = helper.generate_sample_encryption()?;
 
     // Compute input validation vectors
-    let vectors = PVSSVectors::compute(
-        &pvss_data.e_ek,
-        &pvss_data.secret_key,
-        &pvss_data.public_key,
+    let vectors = InputValidationVectors::compute(
+        &encryption_data.plaintext,
+        &encryption_data.u_rns,
+        &encryption_data.e0_rns,
+        &encryption_data.e1_rns,
+        &encryption_data.ciphertext,
+        &encryption_data.public_key,
         &helper.params,
     )?;
 
     // Compute bounds
-    let bounds = PVSSBounds::compute(&helper.params, 0)?;
+    let bounds = InputValidationBounds::compute(&helper.params, encryption_data.plaintext.level())?;
 
     // Get ZKP modulus
     let zkp_modulus = BigInt::from_str_radix(
@@ -125,12 +128,15 @@ pub fn test_vectors_computation() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let helper = BfvHelper::new(config)?;
-    let encryption_data = helper.generate_sample()?;
+    let encryption_data = helper.generate_sample_encryption()?;
 
     // Try to compute vectors - this will show us the exact errors
-    let _vectors = PVSSVectors::compute(
-        &encryption_data.e_ek,
-        &encryption_data.secret_key,
+    let _vectors = InputValidationVectors::compute(
+        &encryption_data.plaintext,
+        &encryption_data.u_rns,
+        &encryption_data.e0_rns,
+        &encryption_data.e1_rns,
+        &encryption_data.ciphertext,
         &encryption_data.public_key,
         &helper.params,
     )?;
@@ -150,10 +156,11 @@ pub fn test_bounds_computation() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let helper = BfvHelper::new(config)?;
-    let encryption_data = helper.generate_sample()?;
+    let encryption_data = helper.generate_sample_encryption()?;
 
     // Try to compute bounds
-    let _bounds = PVSSBounds::compute(&helper.params, 0)?;
+    let _bounds =
+        InputValidationBounds::compute(&helper.params, encryption_data.plaintext.level())?;
 
     println!("Bounds computation successful!");
     Ok(())

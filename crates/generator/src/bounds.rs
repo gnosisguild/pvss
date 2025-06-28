@@ -12,56 +12,69 @@ use polynomial::{
 };
 use std::sync::Arc;
 
-use crate::vectors::PVSSVectors;
+use crate::vectors::InputValidationVectors;
 
-/// The `PVSSBounds` struct holds the bounds for various vectors and polynomials used in the input validation process.
+/// The `InputValidationBounds` struct holds the bounds for various vectors and polynomials used in the input validation process.
 /// These bounds are calculated from a set of BFV encryption parameters and represent limits on the values of different fields
 /// to ensure that the inputs remain within valid ranges during operations.
 #[derive(Clone, Debug)]
-pub struct PVSSBounds {
+pub struct InputValidationBounds {
     // Original fields for backward compatibility
-    pub e_ek: BigInt,
+    pub u: BigInt,
+    pub e: BigInt,
     pub pk: Vec<BigInt>,
     pub r1_low: Vec<BigInt>,
     pub r1_up: Vec<BigInt>,
     pub r2: Vec<BigInt>,
-    pub sk: BigInt,
-    pub a: Vec<BigInt>,
 
     // Additional fields for Noir generation to match old format
     pub moduli: Vec<u64>,
-    pub e_ek_bound: u64,
-    pub sk_bound: u64,
+    pub u_bound: u64,
+    pub e_bound: u64,
     pub pk_bounds: Vec<u64>,
     pub r1_low_bounds: Vec<i64>,
     pub r1_up_bounds: Vec<u64>,
     pub r2_bounds: Vec<u64>,
+    pub q_mod_t: BigInt,
     pub size: usize,
     pub tag: BigUint,
 }
 
-impl PVSSBounds {
-    /// Checks the constraints of the input validation vectors against the bounds stored in `PVSSBounds`.
+impl InputValidationBounds {
+    /// Checks the constraints of the input validation vectors against the bounds stored in `InputValidationBounds`.
     ///
     /// # Arguments
     ///
-    /// * `vecs` - A reference to `PVSSVectors`, which contains the vectors to be validated.
+    /// * `vecs` - A reference to `InputValidationVectors`, which contains the vectors to be validated.
     /// * `p` - The prime modulus used in the encryption scheme.
     ///
     /// This function checks whether the coefficients of the vectors `u`, `e0`, `e1`, `k1`, and others are within
     /// the specified ranges, using both centered and standard range checks. It asserts that the vectors stay within
     /// these predefined bounds.
-    pub fn check_constraints(&self, vecs: &PVSSVectors, p: &BigInt) {
+    pub fn check_constraints(&self, vecs: &InputValidationVectors, p: &BigInt) {
         let vecs_std = vecs.standard_form(p);
 
         // constraint. The coefficients of u, e0, e1 should be in the range [-⌈6σ⌋, ⌈6σ⌋]
         // where ⌈6σ⌋ is the upper bound of the discrete Gaussian distribution
-        assert!(range_check_centered(&vecs.e_ek, &-&self.e_ek, &self.e_ek));
-        assert!(range_check_standard(&vecs_std.e_ek, &self.e_ek, &p));
-        assert!(range_check_standard(&vecs_std.sk, &self.sk, &p));
+        assert!(range_check_centered(&vecs.u, &-&self.u, &self.u));
+        assert!(range_check_centered(&vecs.e0, &-&self.e, &self.e));
+        assert!(range_check_standard(&vecs_std.u, &self.u, &p));
+        assert!(range_check_standard(&vecs_std.e0, &self.e, &p));
 
         // Perform asserts for polynomials depending on each qi
         for i in 0..self.r2.len() {
+            // constraint. The coefficients of ct0i and ct1i should be in the range [-(qi-1)/2, (qi-1)/2]
+            assert!(range_check_centered(
+                &vecs.ct0is[i],
+                &-&self.pk[i],
+                &self.pk[i]
+            ));
+            assert!(range_check_centered(
+                &vecs.ct1is[i],
+                &-&self.pk[i],
+                &self.pk[i]
+            ));
+
             // constraint. The coefficients of pk0i and pk1i should be in range [-(qi-1)/2 , (qi-1)/2]
             assert!(range_check_centered(
                 &vecs.pk0is[i],
@@ -112,17 +125,15 @@ impl PVSSBounds {
     ///
     /// # Returns
     ///
-    /// A new `PVSSBounds` instance containing the bounds for vectors and polynomials
+    /// A new `InputValidationBounds` instance containing the bounds for vectors and polynomials
     /// based on the BFV parameters and the specified level.
     pub fn compute(
         params: &Arc<BfvParameters>,
         level: usize,
-    ) -> Result<PVSSBounds, Box<dyn std::error::Error>> {
+    ) -> Result<InputValidationBounds, Box<dyn std::error::Error>> {
         // Get cyclotomic degree and context at provided level
         let n = BigInt::from(params.degree());
         let t = BigInt::from(params.plaintext());
-
-        //TODO: Ask level = 0 is okay or not
         let ctx = params.ctx_at_level(level)?;
 
         let half_modulus = params.plaintext() / 2;
@@ -197,8 +208,8 @@ impl PVSSBounds {
         }
 
         // Convert BigInt bounds to u64/i64 for Noir generation
-        let e_ek_bound_u64 = u_bound.to_u64().unwrap_or(19);
-        let sk_bound_u64 = e_bound.to_u64().unwrap_or(19);
+        let u_bound_u64 = u_bound.to_u64().unwrap_or(19);
+        let e_bound_u64 = e_bound.to_u64().unwrap_or(19);
 
         let pk_bounds_u64: Vec<u64> = pk_bounds.iter().map(|b| b.to_u64().unwrap_or(0)).collect();
         let r1_low_bounds_i64: Vec<i64> = r1_low_bounds
@@ -240,23 +251,23 @@ impl PVSSBounds {
 
         let tag = BigUint::from_bytes_le(hasher.finalize().as_bytes()) % ctx.modulus().clone();
 
-        Ok(PVSSBounds {
-            e_ek: u_bound.clone(),
-            sk: e_bound.clone(),
-            pk: pk_bounds.clone(),
+        Ok(InputValidationBounds {
+            u: u_bound.clone(),
+            e: e_bound.clone(),
+            pk: pk_bounds,
             r1_low: r1_low_bounds,
             r1_up: r1_up_bounds,
             r2: r2_bounds,
-            a: pk_bounds,
 
             // Additional fields for Noir generation
             moduli: moduli.clone(),
-            e_ek_bound: e_ek_bound_u64,
-            sk_bound: sk_bound_u64,
+            u_bound: u_bound_u64,
+            e_bound: e_bound_u64,
             pk_bounds: pk_bounds_u64,
             r1_low_bounds: r1_low_bounds_i64,
             r1_up_bounds: r1_up_bounds_u64,
             r2_bounds: r2_bounds_u64,
+            q_mod_t,
             size,
             tag,
         })
@@ -284,11 +295,11 @@ mod tests {
         let params = setup_test_params();
 
         // Test at level 0
-        let bounds_l0 = PVSSBounds::compute(&params, 0).unwrap();
+        let bounds_l0 = InputValidationBounds::compute(&params, 0).unwrap();
         assert_eq!(bounds_l0.moduli.len(), 1);
 
         // Test that computing at level 1 returns an error since we only have one modulus
-        let bounds_l1 = PVSSBounds::compute(&params, 1);
+        let bounds_l1 = InputValidationBounds::compute(&params, 1);
         assert!(bounds_l1.is_err());
     }
 
@@ -297,8 +308,8 @@ mod tests {
         let params = setup_test_params();
 
         // Compute bounds twice
-        let bounds1 = PVSSBounds::compute(&params, 0).unwrap();
-        let bounds2 = PVSSBounds::compute(&params, 0).unwrap();
+        let bounds1 = InputValidationBounds::compute(&params, 0).unwrap();
+        let bounds2 = InputValidationBounds::compute(&params, 0).unwrap();
 
         // TAG should be deterministic
         assert_eq!(bounds1.tag, bounds2.tag);
@@ -307,14 +318,14 @@ mod tests {
     #[test]
     fn test_bounds_validation() {
         let params = setup_test_params();
-        let bounds = PVSSBounds::compute(&params, 0).unwrap();
+        let bounds = InputValidationBounds::compute(&params, 0).unwrap();
 
         // Create test vectors within bounds
-        let mut vecs = PVSSVectors::new(1, 2048);
+        let mut vecs = InputValidationVectors::new(1, 2048);
 
         // Fill with values within bounds
-        vecs.e_ek[0] = bounds.e_ek.clone() - BigInt::from(1);
-        vecs.sk[0] = bounds.sk.clone() - BigInt::from(1);
+        vecs.u[0] = bounds.u.clone() - BigInt::from(1);
+        vecs.e0[0] = bounds.e.clone() - BigInt::from(1);
 
         // Test with ZKP modulus
         let p = BigInt::from_str(
@@ -330,13 +341,13 @@ mod tests {
     #[should_panic]
     fn test_bounds_validation_failure() {
         let params = setup_test_params();
-        let bounds = PVSSBounds::compute(&params, 0).unwrap();
+        let bounds = InputValidationBounds::compute(&params, 0).unwrap();
 
         // Create test vectors outside bounds
-        let mut vecs = PVSSVectors::new(1, 2048);
+        let mut vecs = InputValidationVectors::new(1, 2048);
 
         // Fill with values outside bounds
-        vecs.e_ek[0] = bounds.e_ek.clone() + BigInt::from(1); // Exceeds bound
+        vecs.u[0] = bounds.u.clone() + BigInt::from(1); // Exceeds bound
 
         // Test with ZKP modulus
         let p = BigInt::from_str(
@@ -348,13 +359,13 @@ mod tests {
         bounds.check_constraints(&vecs, &p);
     }
 
-    // #[test]
-    // fn test_bounds_conversion() {
-    //     let params = setup_test_params();
-    //     let bounds = PVSSBounds::compute(&params, 0).unwrap();
+    #[test]
+    fn test_bounds_conversion() {
+        let params = setup_test_params();
+        let bounds = InputValidationBounds::compute(&params, 0).unwrap();
 
-    //     // Test that u64/i64 conversions match BigInt values
-    //     assert_eq!(bounds.u_bound, bounds.u.to_u64().unwrap());
-    //     assert_eq!(bounds.e_bound, bounds.e.to_u64().unwrap());
-    // }
+        // Test that u64/i64 conversions match BigInt values
+        assert_eq!(bounds.u_bound, bounds.u.to_u64().unwrap());
+        assert_eq!(bounds.e_bound, bounds.e.to_u64().unwrap());
+    }
 }

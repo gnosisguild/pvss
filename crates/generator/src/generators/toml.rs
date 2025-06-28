@@ -28,12 +28,8 @@ struct ProverTomlFormat {
     pk1is: Vec<ProverVectorsTable>,
     r1is: Vec<ProverVectorsTable>,
     r2is: Vec<ProverVectorsTable>,
-    p1is: Vec<ProverVectorsTable>,
-    p2is: Vec<ProverVectorsTable>,
     u: ProverVectorsTable,
     e0: ProverVectorsTable,
-    e1: ProverVectorsTable,
-    k1: ProverVectorsTable,
 }
 
 impl TomlGenerator {
@@ -108,31 +104,11 @@ impl TomlGenerator {
                     coefficients: to_string_1d_vec(v),
                 })
                 .collect(),
-            p1is: vecs
-                .p1is
-                .iter()
-                .map(|v| ProverVectorsTable {
-                    coefficients: to_string_1d_vec(v),
-                })
-                .collect(),
-            p2is: vecs
-                .p2is
-                .iter()
-                .map(|v| ProverVectorsTable {
-                    coefficients: to_string_1d_vec(v),
-                })
-                .collect(),
             u: ProverVectorsTable {
                 coefficients: to_string_1d_vec(&vecs.u),
             },
             e0: ProverVectorsTable {
                 coefficients: to_string_1d_vec(&vecs.e0),
-            },
-            e1: ProverVectorsTable {
-                coefficients: to_string_1d_vec(&vecs.e1),
-            },
-            k1: ProverVectorsTable {
-                coefficients: to_string_1d_vec(&vecs.k1),
             },
         }
     }

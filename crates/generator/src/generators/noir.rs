@@ -108,49 +108,6 @@ impl NoirGenerator {
         }
         writeln!(file, "];")?;
 
-        // P1 bounds
-        writeln!(file, "/// The coefficients of the polynomials `p1is` should exist in the interval `[-P1_BOUND[i], P1_BOUND[i]]` where `P1_BOUND[i]` is equal to (((qis[i] - 1) / 2) * (N \\cdot B + 2) + B ) / qis[i].")?;
-        write!(
-            file,
-            "pub global P1_BOUNDS: [u64; {}] = [",
-            bounds.moduli.len()
-        )?;
-        for (i, bound) in bounds.p1_bounds.iter().enumerate() {
-            if i > 0 {
-                write!(file, ", ")?;
-            }
-            write!(file, "{}", bound)?;
-        }
-        writeln!(file, "];")?;
-
-        // P2 bounds
-        writeln!(file, "/// The coefficients of the polynomials `p2is` should exist in the interval `[-P2_BOUND[i], P2_BOUND[i]]` where `P2_BOUND[i]` is equal to (qis[i] - 1) / 2.")?;
-        write!(
-            file,
-            "pub global P2_BOUNDS: [u64; {}] = [",
-            bounds.moduli.len()
-        )?;
-        for (i, bound) in bounds.p2_bounds.iter().enumerate() {
-            if i > 0 {
-                write!(file, ", ")?;
-            }
-            write!(file, "{}", bound)?;
-        }
-        writeln!(file, "];")?;
-
-        // K1 bounds
-        writeln!(file, "/// The coefficients of `k1` should exist in the interval `[K1_LOW_BOUND, K1_UP_BOUND]` where `K1_LOW_BOUND` is equal to `(-(t-1))/2` and K1_UP_BOUND` is equal to `(t-1)/2`.")?;
-        writeln!(
-            file,
-            "pub global K1_LOW_BOUND: i64 = {};",
-            bounds.k1_low_bound
-        )?;
-        writeln!(
-            file,
-            "pub global K1_UP_BOUND: u64 = {};",
-            bounds.k1_up_bound
-        )?;
-
         // QIS (moduli)
         writeln!(file, "/// List of scalars `qis` such that `qis[i]` is the modulus of the i-th CRT basis of `q` (ciphertext space modulus).")?;
         write!(file, "pub global QIS: [Field; {}] = [", bounds.moduli.len())?;
@@ -159,21 +116,6 @@ impl NoirGenerator {
                 write!(file, ", ")?;
             }
             write!(file, "{}", modulus)?;
-        }
-        writeln!(file, "];")?;
-
-        // K0IS
-        writeln!(file, "/// List of scalars `k0is` such that `k0i[i]` is equal to the negative of the multiplicative inverses of t mod qi.")?;
-        write!(
-            file,
-            "pub global K0IS: [Field; {}] = [",
-            bounds.moduli.len()
-        )?;
-        for (i, k0) in bounds.k0is.iter().enumerate() {
-            if i > 0 {
-                write!(file, ", ")?;
-            }
-            write!(file, "{}", k0)?;
         }
         writeln!(file, "];")?;
 
