@@ -61,9 +61,9 @@ impl NoirGenerator {
         writeln!(file, "/// The coefficients of the polynomial `e` should exist in the interval `[-E_BOUND, E_BOUND]` where `E_BOUND` is the upper bound of the gaussian distribution with Sigma = 3.2.")?;
         writeln!(file, "pub global E_BOUND: u64 = {};", bounds.e_bound)?;
 
-        // U bound
-        writeln!(file, "/// The coefficients of the polynomial `u` should exist in the interval `[-S_BOUND, S_BOUND]`.")?;
-        writeln!(file, "pub global U_BOUND: u64 = {};", bounds.u_bound)?;
+        // SK bound
+        writeln!(file, "/// The coefficients of the polynomial `sk` should exist in the interval `[-S_BOUND, S_BOUND]`.")?;
+        writeln!(file, "pub global U_BOUND: u64 = {};", bounds.sk_bound)?;
 
         // R1 bounds
         writeln!(file, "/// The coefficients of the polynomials `r1is` should exist in the interval `[R1_LOW_BOUNDS[i], R1_UP_BOUNDS[i]]` where R1_LOW_BOUNDS is equal to $\\frac{{\\frac{{-(t - 1)}}{{2}} \\cdot |K_{{0,i}}| - (N \\cdot B +2) \\cdot \\frac{{q_i - 1}}{{2}} + B}}{{q_i}}$ and `R1_UP_BOUNDS[i]` is equal to `$\\frac{{\\frac{{(t - 1)}}{{2}} \\cdot |K_{{0,i}}| + (N \\cdot +2) \\cdot \\frac{{q_i - 1}}{{2}} + B}}{{q_i}}$ .")?;

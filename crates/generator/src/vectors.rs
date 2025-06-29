@@ -3,7 +3,7 @@
 //! This module contains the core data structure and computation logic for generating
 //! input validation vectors required for proving correct BFV encryption in zero-knowledge.
 
-use fhe::bfv::{BfvParameters, Ciphertext, Plaintext, PublicKey};
+use fhe::bfv::{BfvParameters, Ciphertext, PublicKey};
 use fhe_math::rq::{Poly, Representation};
 use itertools::izip;
 use num_bigint::BigInt;
@@ -24,8 +24,8 @@ pub struct InputValidationVectors {
     pub ct1is: Vec<Vec<BigInt>>,
     pub r1is: Vec<Vec<BigInt>>,
     pub r2is: Vec<Vec<BigInt>>,
-    pub u: Vec<BigInt>,
-    pub e0: Vec<BigInt>,
+    pub sk: Vec<BigInt>,
+    pub e: Vec<BigInt>,
 }
 
 impl InputValidationVectors {
@@ -47,8 +47,8 @@ impl InputValidationVectors {
             ct1is: vec![vec![BigInt::zero(); degree]; num_moduli],
             r1is: vec![vec![BigInt::zero(); 2 * (degree - 1) + 1]; num_moduli],
             r2is: vec![vec![BigInt::zero(); degree - 1]; num_moduli],
-            u: vec![BigInt::zero(); degree],
-            e0: vec![BigInt::zero(); degree],
+            sk: vec![BigInt::zero(); degree],
+            e: vec![BigInt::zero(); degree],
         }
     }
 
@@ -69,8 +69,8 @@ impl InputValidationVectors {
             ct1is: reduce_coefficients_2d(&self.ct1is, p),
             r1is: reduce_coefficients_2d(&self.r1is, p),
             r2is: reduce_coefficients_2d(&self.r2is, p),
-            u: reduce_coefficients(&self.u, p),
-            e0: reduce_coefficients(&self.e0, p),
+            sk: reduce_coefficients(&self.sk, p),
+            e: reduce_coefficients(&self.e, p),
         }
     }
 
@@ -83,8 +83,8 @@ impl InputValidationVectors {
         json!({
             "pk0is": to_string_2d_vec(&self.pk0is),
             "pk1is": to_string_2d_vec(&self.pk1is),
-            "u": to_string_1d_vec(&self.u),
-            "e0": to_string_1d_vec(&self.e0),
+            "sk": to_string_1d_vec(&self.sk),
+            "e": to_string_1d_vec(&self.e),
             "r2is": to_string_2d_vec(&self.r2is),
             "r1is": to_string_2d_vec(&self.r1is),
             "ct0is": to_string_2d_vec(&self.ct0is),
@@ -122,8 +122,8 @@ impl InputValidationVectors {
             check_2d_lengths(&self.r1is, num_moduli, 2 * (degree - 1) + 1),
             check_2d_lengths(&self.r2is, num_moduli, degree - 1),
             // 1D vector checks
-            check_1d_lengths(&self.u, degree),
-            check_1d_lengths(&self.e0, degree),
+            check_1d_lengths(&self.sk, degree),
+            check_1d_lengths(&self.e, degree),
         ]
         .iter()
         .all(|&check| check)
@@ -135,38 +135,35 @@ impl InputValidationVectors {
     /// # Arguments
     ///
     /// * `pt` - Plaintext from fhe.rs.
-    /// * `u_rns` - Private polynomial used in ciphertext sampled from secret key distribution.
-    /// * `e0_rns` - Error polynomial used in ciphertext sampled from error distribution.
+    /// * `sk_rns` - Private polynomial used in ciphertext sampled from secret key distribution.
+    /// * `e_rns` - Error polynomial used in ciphertext sampled from error distribution.
     /// * `e1_rns` - Error polynomioal used in cihpertext sampled from error distribution.
     /// * `ct` - Ciphertext from fhe.rs.
     /// * `pk` - Public Key from fhe.rs.
     pub fn compute(
-        pt: &Plaintext,
-        u_rns: &Poly,
-        e0_rns: &Poly,
-        e1_rns: &Poly,
+        sk_rns: &Poly,
+        e_rns: &Poly,
         ct: &Ciphertext,
         pk: &PublicKey,
         params: &Arc<BfvParameters>,
     ) -> Result<InputValidationVectors, Box<dyn std::error::Error>> {
         // Get context, plaintext modulus, and degree
-        let ctx = params.ctx_at_level(pt.level())?;
+        // TODO: Ask level here
+        let ctx = params.ctx_at_level(0)?;
         //let t = Modulus::new(params.plaintext())?;
         let n: u64 = ctx.degree as u64;
 
-        // Extract single vectors of u, e1, and e2 as Vec<BigInt>, center and reverse
-        let mut u_rns_copy = u_rns.clone();
-        let mut e0_rns_copy = e0_rns.clone();
-        let mut e1_rns_copy = e1_rns.clone();
+        // Extract single vectors of u and e1 as Vec<BigInt>, center and reverse
+        let mut sk_rns_copy = sk_rns.clone();
+        let mut e_rns_copy = e_rns.clone();
 
-        u_rns_copy.change_representation(Representation::PowerBasis);
-        e0_rns_copy.change_representation(Representation::PowerBasis);
-        e1_rns_copy.change_representation(Representation::PowerBasis);
+        sk_rns_copy.change_representation(Representation::PowerBasis);
+        e_rns_copy.change_representation(Representation::PowerBasis);
 
-        let u: Vec<BigInt> = unsafe {
+        let sk: Vec<BigInt> = unsafe {
             ctx.moduli_operators()[0]
                 .center_vec_vt(
-                    u_rns_copy
+                    sk_rns_copy
                         .coefficients()
                         .row(0)
                         .as_slice()
@@ -178,10 +175,10 @@ impl InputValidationVectors {
                 .collect()
         };
 
-        let e0: Vec<BigInt> = unsafe {
+        let e: Vec<BigInt> = unsafe {
             ctx.moduli_operators()[0]
                 .center_vec_vt(
-                    e0_rns_copy
+                    e_rns_copy
                         .coefficients()
                         .row(0)
                         .as_slice()
@@ -266,18 +263,18 @@ impl InputValidationVectors {
                 // Calculate ct0i_hat = pk0 * ui + e0i
                 let ct0i_hat = {
                     let pk0i_poly = Polynomial::new(pk0i.clone());
-                    let u_poly = Polynomial::new(u.clone());
-                    let pk0i_times_u = pk0i_poly.mul(&u_poly);
+                    let sk_poly = Polynomial::new(sk.clone());
+                    let pk0i_times_u = pk0i_poly.mul(&sk_poly);
                     assert_eq!((pk0i_times_u.coefficients().len() as u64) - 1, 2 * (n - 1));
 
-                    let e0_poly = Polynomial::new(e0.clone());
+                    let e_poly = Polynomial::new(e.clone());
 
                     // TODO: Ask if this assertion needed or not
                     // let ki_poly = Polynomial::new(ki.clone());
                     // let e0_plus_ki = e0_poly.add(&ki_poly);
                     // assert_eq!((e0_plus_ki.coefficients().len() as u64) - 1, n - 1);
 
-                    pk0i_times_u.add(&e0_poly).coefficients().to_vec()
+                    pk0i_times_u.add(&e_poly).coefficients().to_vec()
                 };
                 assert_eq!((ct0i_hat.len() as u64) - 1, 2 * (n - 1));
 
@@ -372,8 +369,8 @@ impl InputValidationVectors {
         }
 
         // Set final result vectors
-        res.u = u;
-        res.e0 = e0;
+        res.sk = sk;
+        res.e = e;
 
         Ok(res)
     }
@@ -421,8 +418,8 @@ mod tests {
         let std_form = vecs.standard_form(&p);
 
         // Check that all vectors are properly reduced
-        assert!(std_form.u.iter().all(|x| x < &p));
-        assert!(std_form.e0.iter().all(|x| x < &p));
+        assert!(std_form.sk.iter().all(|x| x < &p));
+        assert!(std_form.e.iter().all(|x| x < &p));
     }
 
     #[test]
@@ -436,12 +433,10 @@ mod tests {
 
         // Use extended encryption to get the polynomial data
         let mut rng = StdRng::seed_from_u64(0);
-        let (_ct, u_rns, e0_rns, e1_rns) = pk.try_encrypt_extended(&pt, &mut rng).unwrap();
+        let (_ct, sk_rns, e_rns, _e1_rns) = pk.try_encrypt_extended(&pt, &mut rng).unwrap();
 
         // Compute vectors
-        let vecs =
-            InputValidationVectors::compute(&pt, &u_rns, &e0_rns, &e1_rns, &_ct, &pk, &params)
-                .unwrap();
+        let vecs = InputValidationVectors::compute(&sk_rns, &e_rns, &_ct, &pk, &params).unwrap();
 
         // Check dimensions
         assert!(vecs.check_correct_lengths(1, params.degree()));
@@ -454,8 +449,7 @@ mod tests {
 
         // Check all required fields are present
         let required_fields = [
-            "pk0is", "pk1is", "u", "e0", "e1", "k1", "r2is", "r1is", "p2is", "p1is", "k0is",
-            "ct0is", "ct1is",
+            "pk0is", "pk1is", "r2is", "r1is", "ct0is", "ct1is", "sk", "e",
         ];
 
         for field in required_fields.iter() {

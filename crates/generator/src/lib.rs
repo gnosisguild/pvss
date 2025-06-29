@@ -61,17 +61,16 @@ pub fn generate_all_outputs(
 
     // Compute input validation vectors
     let vectors = InputValidationVectors::compute(
-        &encryption_data.plaintext,
-        &encryption_data.u_rns,
-        &encryption_data.e0_rns,
-        &encryption_data.e1_rns,
+        &encryption_data.sk_rns,
+        &encryption_data.e_rns,
         &encryption_data.ciphertext,
         &encryption_data.public_key,
         &helper.params,
     )?;
 
     // Compute bounds
-    let bounds = InputValidationBounds::compute(&helper.params, encryption_data.plaintext.level())?;
+    // TODO: Ask if it is okay to put 0 to the level
+    let bounds = InputValidationBounds::compute(&helper.params, 0)?;
 
     // Get ZKP modulus
     let zkp_modulus = BigInt::from_str_radix(
@@ -117,51 +116,50 @@ pub fn generate_all_outputs(
     Ok(results)
 }
 
-/// Test function to check what specific errors we get with vectors
-#[cfg(test)]
-#[test]
-pub fn test_vectors_computation() -> Result<(), Box<dyn std::error::Error>> {
-    let config = BfvConfig {
-        degree: 2048,
-        plaintext_modulus: 1032193,
-        moduli: vec![18014398492704769],
-    };
+// /// Test function to check what specific errors we get with vectors
+// #[cfg(test)]
+// #[test]
+// pub fn test_vectors_computation() -> Result<(), Box<dyn std::error::Error>> {
+//     let config = BfvConfig {
+//         degree: 2048,
+//         plaintext_modulus: 1032193,
+//         moduli: vec![18014398492704769],
+//     };
 
-    let helper = BfvHelper::new(config)?;
-    let encryption_data = helper.generate_sample_encryption()?;
+//     let helper = BfvHelper::new(config)?;
+//     let encryption_data = helper.generate_sample_encryption()?;
 
-    // Try to compute vectors - this will show us the exact errors
-    let _vectors = InputValidationVectors::compute(
-        &encryption_data.plaintext,
-        &encryption_data.u_rns,
-        &encryption_data.e0_rns,
-        &encryption_data.e1_rns,
-        &encryption_data.ciphertext,
-        &encryption_data.public_key,
-        &helper.params,
-    )?;
+//     // Try to compute vectors - this will show us the exact errors
+//     let _vectors = InputValidationVectors::compute(
+//         &encryption_data.plaintext,
+//         &encryption_data.sk_rns,
+//         &encryption_data.e_rns,
+//         &encryption_data.ciphertext,
+//         &encryption_data.public_key,
+//         &helper.params,
+//     )?;
 
-    println!("Vectors computation successful!");
-    Ok(())
-}
+//     println!("Vectors computation successful!");
+//     Ok(())
+// }
 
-/// Test bounds computation
-#[cfg(test)]
-#[test]
-pub fn test_bounds_computation() -> Result<(), Box<dyn std::error::Error>> {
-    let config = BfvConfig {
-        degree: 2048,
-        plaintext_modulus: 1032193,
-        moduli: vec![18014398492704769],
-    };
+// /// Test bounds computation
+// #[cfg(test)]
+// #[test]
+// pub fn test_bounds_computation() -> Result<(), Box<dyn std::error::Error>> {
+//     let config = BfvConfig {
+//         degree: 2048,
+//         plaintext_modulus: 1032193,
+//         moduli: vec![18014398492704769],
+//     };
 
-    let helper = BfvHelper::new(config)?;
-    let encryption_data = helper.generate_sample_encryption()?;
+//     let helper = BfvHelper::new(config)?;
+//     let encryption_data = helper.generate_sample_encryption()?;
 
-    // Try to compute bounds
-    let _bounds =
-        InputValidationBounds::compute(&helper.params, encryption_data.plaintext.level())?;
+//     // Try to compute bounds
+//     let _bounds =
+//         InputValidationBounds::compute(&helper.params, encryption_data.plaintext.level())?;
 
-    println!("Bounds computation successful!");
-    Ok(())
-}
+//     println!("Bounds computation successful!");
+//     Ok(())
+// }

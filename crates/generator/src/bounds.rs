@@ -20,7 +20,7 @@ use crate::vectors::InputValidationVectors;
 #[derive(Clone, Debug)]
 pub struct InputValidationBounds {
     // Original fields for backward compatibility
-    pub u: BigInt,
+    pub sk: BigInt,
     pub e: BigInt,
     pub pk: Vec<BigInt>,
     pub r1_low: Vec<BigInt>,
@@ -29,7 +29,7 @@ pub struct InputValidationBounds {
 
     // Additional fields for Noir generation to match old format
     pub moduli: Vec<u64>,
-    pub u_bound: u64,
+    pub sk_bound: u64,
     pub e_bound: u64,
     pub pk_bounds: Vec<u64>,
     pub r1_low_bounds: Vec<i64>,
@@ -56,10 +56,10 @@ impl InputValidationBounds {
 
         // constraint. The coefficients of u, e0, e1 should be in the range [-⌈6σ⌋, ⌈6σ⌋]
         // where ⌈6σ⌋ is the upper bound of the discrete Gaussian distribution
-        assert!(range_check_centered(&vecs.u, &-&self.u, &self.u));
-        assert!(range_check_centered(&vecs.e0, &-&self.e, &self.e));
-        assert!(range_check_standard(&vecs_std.u, &self.u, &p));
-        assert!(range_check_standard(&vecs_std.e0, &self.e, &p));
+        assert!(range_check_centered(&vecs.sk, &-&self.sk, &self.sk));
+        assert!(range_check_centered(&vecs.e, &-&self.e, &self.e));
+        assert!(range_check_standard(&vecs_std.sk, &self.sk, &p));
+        assert!(range_check_standard(&vecs_std.e, &self.e, &p));
 
         // Perform asserts for polynomials depending on each qi
         for i in 0..self.r2.len() {
@@ -151,7 +151,7 @@ impl InputValidationBounds {
                 .to_i64()
                 .ok_or_else(|| "Failed to convert variance to i64".to_string())?,
         );
-        let u_bound = gauss_bound.clone();
+        let sk_bound = gauss_bound.clone();
         let e_bound = gauss_bound.clone();
 
         //Note we have two different variables for lower bound and upper bound, as in the case
@@ -208,7 +208,7 @@ impl InputValidationBounds {
         }
 
         // Convert BigInt bounds to u64/i64 for Noir generation
-        let u_bound_u64 = u_bound.to_u64().unwrap_or(19);
+        let sk_bound_u64 = sk_bound.to_u64().unwrap_or(19);
         let e_bound_u64 = e_bound.to_u64().unwrap_or(19);
 
         let pk_bounds_u64: Vec<u64> = pk_bounds.iter().map(|b| b.to_u64().unwrap_or(0)).collect();
@@ -252,7 +252,7 @@ impl InputValidationBounds {
         let tag = BigUint::from_bytes_le(hasher.finalize().as_bytes()) % ctx.modulus().clone();
 
         Ok(InputValidationBounds {
-            u: u_bound.clone(),
+            sk: sk_bound.clone(),
             e: e_bound.clone(),
             pk: pk_bounds,
             r1_low: r1_low_bounds,
@@ -261,7 +261,7 @@ impl InputValidationBounds {
 
             // Additional fields for Noir generation
             moduli: moduli.clone(),
-            u_bound: u_bound_u64,
+            sk_bound: sk_bound_u64,
             e_bound: e_bound_u64,
             pk_bounds: pk_bounds_u64,
             r1_low_bounds: r1_low_bounds_i64,
@@ -324,8 +324,8 @@ mod tests {
         let mut vecs = InputValidationVectors::new(1, 2048);
 
         // Fill with values within bounds
-        vecs.u[0] = bounds.u.clone() - BigInt::from(1);
-        vecs.e0[0] = bounds.e.clone() - BigInt::from(1);
+        vecs.sk[0] = bounds.sk.clone() - BigInt::from(1);
+        vecs.e[0] = bounds.e.clone() - BigInt::from(1);
 
         // Test with ZKP modulus
         let p = BigInt::from_str(
@@ -347,7 +347,7 @@ mod tests {
         let mut vecs = InputValidationVectors::new(1, 2048);
 
         // Fill with values outside bounds
-        vecs.u[0] = bounds.u.clone() + BigInt::from(1); // Exceeds bound
+        vecs.sk[0] = bounds.sk.clone() + BigInt::from(1); // Exceeds bound
 
         // Test with ZKP modulus
         let p = BigInt::from_str(
@@ -365,7 +365,7 @@ mod tests {
         let bounds = InputValidationBounds::compute(&params, 0).unwrap();
 
         // Test that u64/i64 conversions match BigInt values
-        assert_eq!(bounds.u_bound, bounds.u.to_u64().unwrap());
+        assert_eq!(bounds.sk_bound, bounds.sk.to_u64().unwrap());
         assert_eq!(bounds.e_bound, bounds.e.to_u64().unwrap());
     }
 }
