@@ -22,8 +22,6 @@ struct ProverVectorsTable {
 /// Structure for the complete Prover.toml format
 #[derive(Serialize)]
 struct ProverTomlFormat {
-    ct0is: Vec<ProverVectorsTable>,
-    ct1is: Vec<ProverVectorsTable>,
     pk0is: Vec<ProverVectorsTable>,
     pk1is: Vec<ProverVectorsTable>,
     r1is: Vec<ProverVectorsTable>,
@@ -63,29 +61,15 @@ impl TomlGenerator {
     /// Convert InputValidationVectors to ProverTomlFormat
     fn to_prover_toml_format(&self, vecs: &InputValidationVectors) -> ProverTomlFormat {
         ProverTomlFormat {
-            ct0is: vecs
+            pk0is: vecs
                 .ct0is
                 .iter()
                 .map(|v| ProverVectorsTable {
                     coefficients: to_string_1d_vec(v),
                 })
                 .collect(),
-            ct1is: vecs
-                .ct1is
-                .iter()
-                .map(|v| ProverVectorsTable {
-                    coefficients: to_string_1d_vec(v),
-                })
-                .collect(),
-            pk0is: vecs
-                .pk0is
-                .iter()
-                .map(|v| ProverVectorsTable {
-                    coefficients: to_string_1d_vec(v),
-                })
-                .collect(),
             pk1is: vecs
-                .pk1is
+                .ct1is
                 .iter()
                 .map(|v| ProverVectorsTable {
                     coefficients: to_string_1d_vec(v),

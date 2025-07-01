@@ -59,13 +59,13 @@ impl BfvHelper {
     pub fn generate_sample_encryption(&self) -> Result<EncryptionData, Box<dyn std::error::Error>> {
         let mut rng = StdRng::seed_from_u64(0);
         // Generate keys
-        let sk = SecretKey::random(&self.params, &mut rng);
+        let secret_key = SecretKey::random(&self.params, &mut rng);
         // Use new extended to get all the values needed
-        let (pk, _ct, sk_rns, e_rns) = PublicKey::new_extended(&sk, &mut rng)?;
+        let (pk, _ct, sk_rns, e_rns) = PublicKey::new_extended(&secret_key, &mut rng)?;
         Ok(EncryptionData {
             ciphertext: _ct,
             public_key: pk,
-            secret_key: sk,
+            secret_key: secret_key,
             sk_rns,
             e_rns,
         })

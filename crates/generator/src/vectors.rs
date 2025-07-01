@@ -148,9 +148,7 @@ impl InputValidationVectors {
         params: &Arc<BfvParameters>,
     ) -> Result<InputValidationVectors, Box<dyn std::error::Error>> {
         // Get context, plaintext modulus, and degree
-        // TODO: Ask level here
         let ctx = params.ctx_at_level(0)?;
-        //let t = Modulus::new(params.plaintext())?;
         let n: u64 = ctx.degree as u64;
 
         // Extract single vectors of u and e1 as Vec<BigInt>, center and reverse
@@ -261,11 +259,8 @@ impl InputValidationVectors {
                 reduce_and_center_coefficients_mut(&mut pk0i, &qi_bigint);
                 reduce_and_center_coefficients_mut(&mut pk1i, &qi_bigint);
 
-                // Calculate ct0i_hat = pk0 * ui + e0i
                 // Calcualte ct0i_hat = pk1 * sk + e
-
                 let ct0i_hat = {
-                    // TODO: pk0 or pk1? make it negative?
                     let pk0i_poly = Polynomial::new(pk1i.clone());
                     let sk_poly = Polynomial::new(sk.clone());
                     let pk0i_times_u = pk0i_poly.mul(&sk_poly);

@@ -38,28 +38,9 @@ impl NoirGenerator {
         writeln!(file, "/// `L` is the dimension size of the polynomials.")?;
         writeln!(file, "pub global L: u32 = {};", bounds.moduli.len())?;
 
-        // Q_MOD_T
-        writeln!(file, "/// `q_mod_t` is the remainder of the ciphertext modulus `q` divided by the plaintext modulus `t`.")?;
-        writeln!(file, "pub global Q_MOD_T: Field = {};", bounds.q_mod_t)?;
-
-        // PK bounds
-        writeln!(file, "/// The coefficients of the polynomial `pk0is` and `pk1is` should exist in the interval `[-PK_BOUND, PK_BOUND]`.")?;
-        write!(
-            file,
-            "pub global PK_BOUND: [u64; {}] = [",
-            bounds.moduli.len()
-        )?;
-        for (i, bound) in bounds.pk_bounds.iter().enumerate() {
-            if i > 0 {
-                write!(file, ", ")?;
-            }
-            write!(file, "{}", bound)?;
-        }
-        writeln!(file, "];")?;
-
         // E bound
         writeln!(file, "/// The coefficients of the polynomial `e` should exist in the interval `[-E_BOUND, E_BOUND]` where `E_BOUND` is the upper bound of the gaussian distribution with Sigma = 3.2.")?;
-        writeln!(file, "pub global E_BOUND: u64 = {};", bounds.e_bound)?;
+        writeln!(file, "pub global EEK_BOUND: u64 = {};", bounds.e_bound)?;
 
         // SK bound
         writeln!(file, "/// The coefficients of the polynomial `sk` should exist in the interval `[-S_BOUND, S_BOUND]`.")?;
