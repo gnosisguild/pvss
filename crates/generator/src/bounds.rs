@@ -22,7 +22,7 @@ pub struct InputValidationBounds {
     // Original fields for backward compatibility
     pub sk: BigInt,
     pub e: BigInt,
-    pub pk: Vec<BigInt>,
+    pub a: BigInt,
     pub r1_low: Vec<BigInt>,
     pub r1_up: Vec<BigInt>,
     pub r2: Vec<BigInt>,
@@ -31,7 +31,7 @@ pub struct InputValidationBounds {
     pub moduli: Vec<u64>,
     pub sk_bound: u64,
     pub e_bound: u64,
-    pub pk_bounds: Vec<u64>,
+    pub a_bound: u64,
     pub r1_low_bounds: Vec<i64>,
     pub r1_up_bounds: Vec<u64>,
     pub r2_bounds: Vec<u64>,
@@ -61,33 +61,23 @@ impl InputValidationBounds {
         assert!(range_check_standard(&vecs_std.sk, &self.sk, &p));
         assert!(range_check_standard(&vecs_std.e, &self.e, &p));
 
+        // constraint. The coefficients of pk0i and pk1i should be in range [-(qi-1)/2 , (qi-1)/2]
+        assert!(range_check_centered(&vecs.a, &-&self.a, &self.a));
+        assert!(range_check_standard(&vecs_std.a, &self.a, &p));
+
         // Perform asserts for polynomials depending on each qi
         for i in 0..self.r2.len() {
             // constraint. The coefficients of ct0i and ct1i should be in the range [-(qi-1)/2, (qi-1)/2]
             assert!(range_check_centered(
                 &vecs.ct0is[i],
-                &-&self.pk[i],
-                &self.pk[i]
+                &-&self.r2[i],
+                &self.r2[i]
             ));
             assert!(range_check_centered(
                 &vecs.ct1is[i],
-                &-&self.pk[i],
-                &self.pk[i]
+                &-&self.r2[i],
+                &self.r2[i]
             ));
-
-            // constraint. The coefficients of pk0i and pk1i should be in range [-(qi-1)/2 , (qi-1)/2]
-            assert!(range_check_centered(
-                &vecs.pk0is[i],
-                &-&self.pk[i],
-                &self.pk[i]
-            ));
-            assert!(range_check_centered(
-                &vecs.pk1is[i],
-                &-&self.pk[i],
-                &self.pk[i]
-            ));
-            assert!(range_check_standard(&vecs_std.pk0is[i], &self.pk[i], &p));
-            assert!(range_check_standard(&vecs_std.pk1is[i], &self.pk[i], &p));
 
             // constraint. The coefficients of r2i should be in the range [-(qi-1)/2, (qi-1)/2]
             assert!(range_check_centered(
@@ -167,16 +157,12 @@ impl InputValidationBounds {
 
         // Calculate qi-based bounds
         let num_moduli = ctx.moduli().len();
-        let mut pk_bounds: Vec<BigInt> = vec![BigInt::from(0); num_moduli];
         let mut r2_bounds: Vec<BigInt> = vec![BigInt::from(0); num_moduli];
         let mut r1_low_bounds: Vec<BigInt> = vec![BigInt::from(0); num_moduli];
         let mut r1_up_bounds: Vec<BigInt> = vec![BigInt::from(0); num_moduli];
-        let mut p2_bounds: Vec<BigInt> = vec![BigInt::from(0); num_moduli];
-        let mut p1_bounds: Vec<BigInt> = vec![BigInt::from(0); num_moduli];
 
         // Collect moduli and k0is for Noir generation
         let mut moduli: Vec<u64> = Vec::new();
-        let mut k0is: Vec<u64> = Vec::new();
 
         for (i, qi) in ctx.moduli_operators().iter().enumerate() {
             let qi_bigint = BigInt::from(qi.modulus());
@@ -190,10 +176,6 @@ impl InputValidationBounds {
                     .ok_or_else(|| "Failed to calculate modulus inverse for k0qi".to_string())?,
             );
 
-            // Store k0qi as u64 for Noir
-            k0is.push(k0qi.to_u64().unwrap_or(0));
-
-            pk_bounds[i] = qi_bound.clone();
             r2_bounds[i] = qi_bound.clone();
 
             r1_low_bounds[i] = (&ptxt_low_bound * num_bigint::BigInt::abs(&k0qi)
@@ -202,16 +184,16 @@ impl InputValidationBounds {
             r1_up_bounds[i] = (&ptxt_up_bound * num_bigint::BigInt::abs(&k0qi)
                 + ((&n * &gauss_bound + 2) * &qi_bound + &gauss_bound))
                 / &qi_bigint;
-
-            p2_bounds[i] = qi_bound.clone();
-            p1_bounds[i] = ((&n * &gauss_bound + 2) * &qi_bound + &gauss_bound) / &qi_bigint;
         }
 
+        // A bound and R2 bound are same
+        let a_bound = r2_bounds[0].clone();
+
         // Convert BigInt bounds to u64/i64 for Noir generation
+        let a_bound_u64 = r2_bounds[0].to_u64().unwrap_or(0);
         let sk_bound_u64 = sk_bound.to_u64().unwrap_or(19);
         let e_bound_u64 = e_bound.to_u64().unwrap_or(19);
 
-        let pk_bounds_u64: Vec<u64> = pk_bounds.iter().map(|b| b.to_u64().unwrap_or(0)).collect();
         let r1_low_bounds_i64: Vec<i64> = r1_low_bounds
             .iter()
             .map(|b| b.to_i64().unwrap_or(0))
@@ -225,13 +207,7 @@ impl InputValidationBounds {
         // Compute TAG using proper hashing
         let mut hasher = Hasher::new();
         hasher.update(params.degree().to_le_bytes().as_slice());
-        hasher.update(pk_bounds.len().to_le_bytes().as_slice());
-        hasher.update(
-            &pk_bounds_u64
-                .iter()
-                .flat_map(|num| num.to_le_bytes())
-                .collect::<Vec<u8>>(),
-        );
+        hasher.update(a_bound_u64.clone().to_le_bytes().as_slice());
         hasher.update(
             &ctx.moduli()
                 .iter()
@@ -240,10 +216,11 @@ impl InputValidationBounds {
         );
         let _domain_separator = BigUint::from_bytes_le(hasher.finalize().as_bytes());
 
-        let size = (10 * params.degree() - 4) * pk_bounds.len() + 4 * params.degree();
+        // Using r2_bounds length as a reference to calculate dimension of the polynomials (const L)
+        let size = (10 * params.degree() - 4) * r2_bounds.len() + 4 * params.degree();
         let io_pattern = [
             BigUint::from_usize(size).unwrap(),
-            BigUint::from_usize(2 * pk_bounds.len()).unwrap(),
+            BigUint::from_usize(2 * r2_bounds.len()).unwrap(),
         ]
         .map(|x| x.to_bytes_le());
         hasher.update(io_pattern[0].as_slice());
@@ -254,7 +231,7 @@ impl InputValidationBounds {
         Ok(InputValidationBounds {
             sk: sk_bound.clone(),
             e: e_bound.clone(),
-            pk: pk_bounds,
+            a: a_bound.clone(),
             r1_low: r1_low_bounds,
             r1_up: r1_up_bounds,
             r2: r2_bounds,
@@ -263,7 +240,7 @@ impl InputValidationBounds {
             moduli: moduli.clone(),
             sk_bound: sk_bound_u64,
             e_bound: e_bound_u64,
-            pk_bounds: pk_bounds_u64,
+            a_bound: a_bound_u64,
             r1_low_bounds: r1_low_bounds_i64,
             r1_up_bounds: r1_up_bounds_u64,
             r2_bounds: r2_bounds_u64,

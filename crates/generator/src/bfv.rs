@@ -32,8 +32,8 @@ impl Default for BfvConfig {
 /// Data from a sample BFV encryption
 pub struct EncryptionData {
     pub ciphertext: Ciphertext,
-    pub public_key: PublicKey,
     pub secret_key: SecretKey,
+    pub a: Poly,
     pub sk_rns: Poly,
     pub e_rns: Poly,
 }
@@ -61,11 +61,11 @@ impl BfvHelper {
         // Generate keys
         let secret_key = SecretKey::random(&self.params, &mut rng);
         // Use new extended to get all the values needed
-        let (pk, _ct, sk_rns, e_rns) = PublicKey::new_extended(&secret_key, &mut rng)?;
+        let (ciphertext, a, sk_rns, e_rns) = PublicKey::new_extended(&secret_key, &mut rng)?;
         Ok(EncryptionData {
-            ciphertext: _ct,
-            public_key: pk,
-            secret_key: secret_key,
+            ciphertext,
+            a,
+            secret_key,
             sk_rns,
             e_rns,
         })

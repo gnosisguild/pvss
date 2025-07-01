@@ -63,8 +63,8 @@ pub fn generate_all_outputs(
     let vectors = InputValidationVectors::compute(
         &encryption_data.sk_rns,
         &encryption_data.e_rns,
+        &encryption_data.a,
         &encryption_data.ciphertext,
-        &encryption_data.public_key,
         &helper.params,
     )?;
 

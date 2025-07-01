@@ -325,7 +325,7 @@ checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 [[package]]
 name = "fhe"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=armanc%2Fpvss#b13856f83445a4f032e33525af8f4f99a06753ab"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=armanc%2Fpvss#7a8c8a058d19e4fcaac2bdda1c534dd63829cb22"
 dependencies = [
  "doc-comment",
  "fhe-math",
@@ -348,7 +348,7 @@ dependencies = [
 [[package]]
 name = "fhe-math"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=armanc%2Fpvss#b13856f83445a4f032e33525af8f4f99a06753ab"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=armanc%2Fpvss#7a8c8a058d19e4fcaac2bdda1c534dd63829cb22"
 dependencies = [
  "ethnum",
  "fhe-traits",
@@ -370,7 +370,7 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=armanc%2Fpvss#b13856f83445a4f032e33525af8f4f99a06753ab"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=armanc%2Fpvss#7a8c8a058d19e4fcaac2bdda1c534dd63829cb22"
 dependencies = [
  "rand",
 ]
@@ -378,7 +378,7 @@ dependencies = [
 [[package]]
 name = "fhe-util"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=armanc%2Fpvss#b13856f83445a4f032e33525af8f4f99a06753ab"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=armanc%2Fpvss#7a8c8a058d19e4fcaac2bdda1c534dd63829cb22"
 dependencies = [
  "itertools 0.12.1",
  "num-bigint-dig",
