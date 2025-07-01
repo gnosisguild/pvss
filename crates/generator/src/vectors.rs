@@ -198,6 +198,7 @@ impl InputValidationVectors {
 
         let mut pk0: Poly = pk.c.c[0].clone();
         let mut pk1: Poly = pk.c.c[1].clone();
+
         pk0.change_representation(Representation::PowerBasis);
         pk1.change_representation(Representation::PowerBasis);
 
@@ -261,19 +262,15 @@ impl InputValidationVectors {
                 reduce_and_center_coefficients_mut(&mut pk1i, &qi_bigint);
 
                 // Calculate ct0i_hat = pk0 * ui + e0i
+                // Calcualte ct0i_hat = pk1 * sk + e
+
                 let ct0i_hat = {
-                    let pk0i_poly = Polynomial::new(pk0i.clone());
+                    // TODO: pk0 or pk1? make it negative?
+                    let pk0i_poly = Polynomial::new(pk1i.clone());
                     let sk_poly = Polynomial::new(sk.clone());
                     let pk0i_times_u = pk0i_poly.mul(&sk_poly);
                     assert_eq!((pk0i_times_u.coefficients().len() as u64) - 1, 2 * (n - 1));
-
                     let e_poly = Polynomial::new(e.clone());
-
-                    // TODO: Ask if this assertion needed or not
-                    // let ki_poly = Polynomial::new(ki.clone());
-                    // let e0_plus_ki = e0_poly.add(&ki_poly);
-                    // assert_eq!((e0_plus_ki.coefficients().len() as u64) - 1, n - 1);
-
                     pk0i_times_u.add(&e_poly).coefficients().to_vec()
                 };
                 assert_eq!((ct0i_hat.len() as u64) - 1, 2 * (n - 1));
@@ -350,9 +347,7 @@ impl InputValidationVectors {
                 assert_eq!(&ct0i, &ct0i_calculated);
 
                 // ct1 = a = pk1
-                let ct1i_calculated = pk1i.clone();
-
-                assert_eq!(&ct1i, &ct1i_calculated);
+                assert_eq!(&ct1i, &pk1i);
                 (i, r2i, r1i, ct0i, ct1i, pk0i, pk1i)
             },
         )
@@ -379,8 +374,7 @@ impl InputValidationVectors {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fhe::bfv::{BfvParametersBuilder, Encoding, Plaintext, SecretKey};
-    use fhe_traits::FheEncoder;
+    use fhe::bfv::{BfvParametersBuilder, SecretKey};
     use num_bigint::BigInt;
     use rand::{rngs::StdRng, SeedableRng};
     use std::str::FromStr;
@@ -424,19 +418,13 @@ mod tests {
 
     #[test]
     fn test_vector_computation() {
-        let (params, _sk, pk) = setup_test_params();
-
-        // Create a sample plaintext
-        let mut message_data = vec![3u64; params.degree()];
-        message_data[0] = 1;
-        let pt = Plaintext::try_encode(&message_data, Encoding::poly(), &params).unwrap();
+        let (params, sk, _pk) = setup_test_params();
 
         // Use extended encryption to get the polynomial data
         let mut rng = StdRng::seed_from_u64(0);
-        let (_ct, sk_rns, e_rns, _e1_rns) = pk.try_encrypt_extended(&pt, &mut rng).unwrap();
-
+        let (pk, ct, sk_rns, e_rns) = PublicKey::new_extended(&sk, &mut rng).unwrap();
         // Compute vectors
-        let vecs = InputValidationVectors::compute(&sk_rns, &e_rns, &_ct, &pk, &params).unwrap();
+        let vecs = InputValidationVectors::compute(&sk_rns, &e_rns, &ct, &pk, &params).unwrap();
 
         // Check dimensions
         assert!(vecs.check_correct_lengths(1, params.degree()));

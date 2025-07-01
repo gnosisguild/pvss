@@ -60,11 +60,8 @@ impl BfvHelper {
         let mut rng = StdRng::seed_from_u64(0);
         // Generate keys
         let sk = SecretKey::random(&self.params, &mut rng);
-        let pk = PublicKey::new(&sk, &mut rng);
-
-        // Use extended encryption to get the polynomial data
-        let (_ct, sk_rns, e_rns) = PublicKey::new_extended(&sk, &mut rng)?;
-
+        // Use new extended to get all the values needed
+        let (pk, _ct, sk_rns, e_rns) = PublicKey::new_extended(&sk, &mut rng)?;
         Ok(EncryptionData {
             ciphertext: _ct,
             public_key: pk,
