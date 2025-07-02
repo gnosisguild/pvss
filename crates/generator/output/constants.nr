@@ -16,4 +16,4 @@ pub global QIS: [Field; 1] = [18014398492704769];
 /// Size of the payload.
 pub global SIZE: u32 = 28668;
 /// Constant value for the SAFE sponge algorithm.
-pub global TAG: Field = 5380324561195082;
+pub global TAG: Field = 8208473972549389;

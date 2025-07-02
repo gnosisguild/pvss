@@ -202,7 +202,7 @@ impl InputValidationVectors {
 
         // Extract and convert ciphertext and plaintext polynomials
         let mut ct0 = ct.c[0].clone();
-        let mut ct1 = ct.c[1].clone();
+        let mut ct1 = -ct.c[1].clone();
         ct0.change_representation(Representation::PowerBasis);
         ct1.change_representation(Representation::PowerBasis);
 
