@@ -1,5 +1,5 @@
 [package]
-name = "pk_trbfv"
+name = "pk_circuit"
 type = "bin"
 authors = [""]
 

@@ -164,7 +164,7 @@ impl InputValidationVectors {
 
         // Extract and convert ciphertext and plaintext polynomials
         let mut ct0 = ct.c[0].clone();
-        let mut ct1 = -ct.c[1].clone();
+        let mut ct1 = ct.c[1].clone();
         ct0.change_representation(Representation::PowerBasis);
         ct1.change_representation(Representation::PowerBasis);
 
@@ -290,8 +290,9 @@ impl InputValidationVectors {
 
                     assert_eq!(&ct0i, &ct0i_calculated);
 
-                    // ct1 = a = pk1
-                    assert_eq!(&ct1i, &a);
+                    // ct1i = -a = pk1
+                    let neg_a: Vec<BigInt> = a.iter().map(|a| -a).collect();
+                    assert_eq!(&ct1i, &neg_a);
                     (i, r2i, r1i, ct0i, ct1i)
                 })
                 .collect();

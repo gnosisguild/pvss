@@ -9,7 +9,7 @@ fn main(
     pk1is: [Polynomial<N>; L],
     sk: Polynomial<N>,
     eek: Polynomial<N>,
-    a: [Polynomial<N>; L],
+    a: Polynomial<N>,
     r1is: [Polynomial<(2 * N) - 1>; L],
     r2is: [Polynomial<N - 1>; L],
 ) {
