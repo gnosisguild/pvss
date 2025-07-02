@@ -13,7 +13,7 @@
 //! ## Example
 //!
 //! ```rust
-//! use polynomial::{Polynomial, BigInt};
+//! use e3_pvss_polynomial::{Polynomial, BigInt};
 //!
 //! let poly1 = Polynomial::new(vec![BigInt::from(1), BigInt::from(2), BigInt::from(3)]);
 //! let poly2 = Polynomial::new(vec![BigInt::from(1), BigInt::from(1)]);
@@ -71,7 +71,7 @@ impl Polynomial {
     /// # Examples
     ///
     /// ```rust
-    /// use e3_greco_polynomial::{Polynomial, BigInt};
+    /// use e3_pvss_polynomial::{Polynomial, BigInt};
     ///
     /// // Creates polynomial: 2x^2 + 3x + 1
     /// let poly = Polynomial::new(vec![BigInt::from(2), BigInt::from(3), BigInt::from(1)]);
@@ -89,7 +89,7 @@ impl Polynomial {
     /// # Examples
     ///
     /// ```rust
-    /// use e3_greco_polynomial::Polynomial;
+    /// use e3_pvss_polynomial::Polynomial;
     ///
     /// let zero_poly = Polynomial::zero(3);
     /// ```
@@ -108,7 +108,7 @@ impl Polynomial {
     /// # Examples
     ///
     /// ```rust
-    /// use e3_greco_polynomial::{Polynomial, BigInt};
+    /// use e3_pvss_polynomial::{Polynomial, BigInt};
     ///
     /// let const_poly = Polynomial::constant(BigInt::from(42));
     /// ```
@@ -163,7 +163,7 @@ impl Polynomial {
     /// # Examples
     ///
     /// ```rust
-    /// use e3_greco_polynomial::{Polynomial, BigInt};
+    /// use e3_pvss_polynomial::{Polynomial, BigInt};
     ///
     /// let poly1 = Polynomial::new(vec![BigInt::from(1), BigInt::from(2)]);
     /// let poly2 = Polynomial::new(vec![BigInt::from(3), BigInt::from(4)]);
@@ -545,7 +545,7 @@ pub fn reduce_coefficients_mut(coefficients: &mut [BigInt], p: &BigInt) {
 /// # Examples
 ///
 /// ```
-/// use e3_greco_polynomial::{range_check_centered, BigInt};
+/// use e3_pvss_polynomial::{range_check_centered, BigInt};
 ///
 /// let coeffs = vec![BigInt::from(-2), BigInt::from(0), BigInt::from(2)];
 /// let result = range_check_centered(&coeffs, &BigInt::from(-3), &BigInt::from(3));
@@ -615,7 +615,7 @@ pub fn range_check_standard_2bounds(
 /// # Examples
 ///
 /// ```
-/// use e3_greco_polynomial::{range_check_standard, BigInt};
+/// use e3_pvss_polynomial::{range_check_standard, BigInt};
 ///
 /// let coeffs = vec![BigInt::from(3), BigInt::from(0)];
 /// let result = range_check_standard(&coeffs, &BigInt::from(5), &BigInt::from(7));
