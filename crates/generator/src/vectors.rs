@@ -1,7 +1,8 @@
-//! Input validation vectors for Greco zero-knowledge proofs.
+//! Input validation vectors for PVSS zero-knowledge proofs.
 //!
-//! This module contains the core data structure and computation logic for generating
-//! input validation vectors required for proving correct BFV encryption in zero-knowledge.
+//! This module defines the core data structure and computation logic for generating
+//! input validation vectors used in publicly verifiable secret sharing (PVSS) protocols.
+//! These vectors are used in zero-knowledge proofs to validate correct BFV encryption.
 
 use fhe::bfv::{BfvParameters, Ciphertext};
 use fhe_math::rq::{Poly, Representation};
@@ -15,7 +16,8 @@ use std::sync::Arc;
 
 use crate::utils::{to_string_1d_vec, to_string_2d_vec};
 
-/// Set of vectors for input validation of a ciphertext
+/// Represents a full set of vectors required to validate an encrypted share
+/// within a PVSS scheme using zero-knowledge proofs.
 #[derive(Clone, Debug)]
 pub struct InputValidationVectors {
     pub ct0is: Vec<Vec<BigInt>>,
@@ -28,16 +30,7 @@ pub struct InputValidationVectors {
 }
 
 impl InputValidationVectors {
-    /// Create a new `InputValidationVectors` with the given number of moduli and degree.
-    ///
-    /// # Arguments
-    ///
-    /// * `num_moduli` - The number of moduli, which determines the number of inner vectors in 2D vectors.
-    /// * `degree` - The size of each inner vector in the 2D vectors.
-    ///
-    /// # Returns
-    ///
-    /// Returns a new instance of `InputValidationVectors` with all fields initialized to zero.
+    /// Initializes an empty vector structure with appropriate sizes.
     pub fn new(num_moduli: usize, degree: usize) -> Self {
         InputValidationVectors {
             ct0is: vec![vec![BigInt::zero(); degree]; num_moduli],
@@ -50,15 +43,7 @@ impl InputValidationVectors {
         }
     }
 
-    /// Assign and return all of the centered input validation vectors to the ZKP modulus `p`.
-    ///
-    /// # Arguments
-    ///
-    /// * `p` - ZKP modulus
-    ///
-    /// # Returns
-    ///
-    /// Returns a new `InputValidationVectors` struct with all coefficients reduced modulo `p`.
+    /// Applies modular reduction of all coefficients in the structure using the ZKP modulus `p`.
     pub fn standard_form(&self, p: &BigInt) -> Self {
         InputValidationVectors {
             ct0is: reduce_coefficients_2d(&self.ct0is, p),
@@ -71,11 +56,7 @@ impl InputValidationVectors {
         }
     }
 
-    /// Convert the `InputValidationVectors` to a JSON object.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `serde_json::Value` representing the JSON serialization of the `InputValidationVectors`.
+    /// Serializes the validation vectors to JSON.
     pub fn to_json(&self) -> serde_json::Value {
         json!({
             "a": to_string_1d_vec(&self.a),
@@ -88,25 +69,13 @@ impl InputValidationVectors {
         })
     }
 
-    /// Check whether all members of `self` have the correct length based on the provided `degree` and `num_moduli`.
-    ///
-    /// # Arguments
-    ///
-    /// * `num_moduli` - The expected number of moduli (outer vector length).
-    /// * `degree` - The expected degree (inner vector length).
-    ///
-    /// # Returns
-    ///
-    /// Returns `true` if all vectors have the correct lengths, `false` otherwise.
+    /// Verifies that all vectors conform to the expected sizes for the given parameters.
     pub fn check_correct_lengths(&self, num_moduli: usize, degree: usize) -> bool {
-        // Helper function to check 2D vector lengths
-        let check_2d_lengths =
-            |vec: &Vec<Vec<BigInt>>, expected_outer_len: usize, expected_inner_len: usize| {
-                vec.len() == expected_outer_len && vec.iter().all(|v| v.len() == expected_inner_len)
-            };
+        let check_2d_lengths = |vec: &Vec<Vec<BigInt>>, outer: usize, inner: usize| {
+            vec.len() == outer && vec.iter().all(|v| v.len() == inner)
+        };
 
-        // Helper function to check 1D vector lengths
-        let check_1d_lengths = |vec: &Vec<BigInt>, expected_len: usize| vec.len() == expected_len;
+        let check_1d_lengths = |vec: &Vec<BigInt>, len: usize| vec.len() == len;
 
         // Use all to combine all checks into a single statement
         [
@@ -124,17 +93,10 @@ impl InputValidationVectors {
         .all(|&check| check)
     }
 
-    /// Create the centered validation vectors necessary for creating an input validation proof according to Greco.
-    /// For more information, please see https://eprint.iacr.org/2024/594.
+    /// Computes the full input validation vector structure for PVSS ZK proofs.
     ///
-    /// # Arguments
-    ///
-    /// * `pt` - Plaintext from fhe.rs.
-    /// * `sk_rns` - Private polynomial used in ciphertext sampled from secret key distribution.
-    /// * `e_rns` - Error polynomial used in ciphertext sampled from error distribution.
-    /// * `e1_rns` - Error polynomioal used in cihpertext sampled from error distribution.
-    /// * `ct` - Ciphertext from fhe.rs.
-    /// * `pk` - Public Key from fhe.rs.
+    /// The logic verifies that the ciphertext corresponds to a valid encryption
+    /// and reconstructs its derivation components, such as error polynomials and randomness.
     pub fn compute(
         sk_rns: &Poly,
         e_rns: &Poly,
@@ -366,7 +328,7 @@ mod tests {
             .build_arc()
             .unwrap();
 
-        let mut rng = StdRng::seed_from_u64(0); // Use deterministic seed
+        let mut rng = StdRng::seed_from_u64(0);
         let sk = SecretKey::random(&params, &mut rng);
         let pk = PublicKey::new(&sk, &mut rng);
 
@@ -377,8 +339,8 @@ mod tests {
     fn test_vector_lengths() {
         let vecs = InputValidationVectors::new(1, 2048);
         assert!(vecs.check_correct_lengths(1, 2048));
-        assert!(!vecs.check_correct_lengths(2, 2048)); // Wrong moduli count
-        assert!(!vecs.check_correct_lengths(1, 1024)); // Wrong degree
+        assert!(!vecs.check_correct_lengths(2, 2048));
+        assert!(!vecs.check_correct_lengths(1, 1024));
     }
 
     #[test]
@@ -390,7 +352,6 @@ mod tests {
         .unwrap();
         let std_form = vecs.standard_form(&p);
 
-        // Check that all vectors are properly reduced
         assert!(std_form.sk.iter().all(|x| x < &p));
         assert!(std_form.e.iter().all(|x| x < &p));
     }
@@ -399,22 +360,19 @@ mod tests {
     fn test_vector_computation() {
         let (params, sk, _pk) = setup_test_params();
 
-        // Use extended encryption to get the polynomial data
         let mut rng = StdRng::seed_from_u64(0);
         let (ct, a, sk_rns, e_rns) = PublicKey::new_extended(&sk, &mut rng).unwrap();
-        // Compute vectors
+
         let vecs = InputValidationVectors::compute(&sk_rns, &e_rns, &a, &ct, &params).unwrap();
 
-        // Check dimensions
         assert!(vecs.check_correct_lengths(1, params.degree()));
     }
 
     #[test]
     fn test_vector_json_format() {
-        let vecs = InputValidationVectors::new(1, 4); // Small size for testing
+        let vecs = InputValidationVectors::new(1, 4);
         let json = vecs.to_json();
 
-        // Check all required fields are present
         let required_fields = ["r2is", "r1is", "ct0is", "ct1is", "a", "sk", "e"];
 
         for field in required_fields.iter() {

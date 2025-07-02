@@ -11,8 +11,8 @@ edition = "2021"
 
 [workspace.dependencies]
 example = { package = "example", path = "./example" }
-polynomial = { package = "e3-greco-polynomial", path = "./polynomial" }
-generator = { package = "e3-greco-generator", path = "./generator" }
+polynomial = { package = "e3-pvss-polynomial", path = "./polynomial" }
+generator = { package = "e3-pvss-generator", path = "./generator" }
 rand = "0.8.5"
 fhe = { git = "https://github.com/gnosisguild/fhe.rs", branch = "armanc/pvss" }
 fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", branch = "armanc/pvss" }

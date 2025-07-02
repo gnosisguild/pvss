@@ -253,12 +253,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
 
 [[package]]
-name = "e3-greco-generator"
+name = "e3-PVSS-generator"
 version = "0.1.0"
 dependencies = [
  "blake3",
  "clap",
- "e3-greco-polynomial",
+ "e3-pvss-polynomial",
  "fhe",
  "fhe-math",
  "fhe-traits",
@@ -273,7 +273,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "e3-greco-polynomial"
+name = "e3-pvss-polynomial"
 version = "0.1.0"
 dependencies = [
  "num-bigint",
@@ -325,7 +325,7 @@ checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 [[package]]
 name = "fhe"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=armanc%2Fpvss#7a8c8a058d19e4fcaac2bdda1c534dd63829cb22"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=armanc%2Fpvss#fa59774f572a610847d6bf382fb0abc792ebec72"
 dependencies = [
  "doc-comment",
  "fhe-math",
@@ -348,7 +348,7 @@ dependencies = [
 [[package]]
 name = "fhe-math"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=armanc%2Fpvss#7a8c8a058d19e4fcaac2bdda1c534dd63829cb22"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=armanc%2Fpvss#fa59774f572a610847d6bf382fb0abc792ebec72"
 dependencies = [
  "ethnum",
  "fhe-traits",
@@ -370,7 +370,7 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=armanc%2Fpvss#7a8c8a058d19e4fcaac2bdda1c534dd63829cb22"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=armanc%2Fpvss#fa59774f572a610847d6bf382fb0abc792ebec72"
 dependencies = [
  "rand",
 ]
@@ -378,7 +378,7 @@ dependencies = [
 [[package]]
 name = "fhe-util"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=armanc%2Fpvss#7a8c8a058d19e4fcaac2bdda1c534dd63829cb22"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=armanc%2Fpvss#fa59774f572a610847d6bf382fb0abc792ebec72"
 dependencies = [
  "itertools 0.12.1",
  "num-bigint-dig",

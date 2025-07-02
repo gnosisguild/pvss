@@ -1,7 +1,10 @@
-//! # Greco Generator Library
+//! # PVSS Generator Library
 //!
-//! A library for generating cryptographic parameters and constants for Greco zero-knowledge proofs
-//! in the context of BFV homomorphic encryption.
+//! A library for generating cryptographic parameters and constants for use in
+//! Publicly Verifiable Secret Sharing (PVSS) protocols based on the BFV homomorphic encryption scheme.
+//!
+//! It supports generation of encryption samples, constraint bounds, and Noir-compatible
+//! input formats to support zero-knowledge proof circuits.
 
 pub mod bfv;
 pub mod bounds;
@@ -10,7 +13,7 @@ pub mod generators;
 pub mod utils;
 pub mod vectors;
 
-// Re-export main types that currently work
+// Re-export public types for convenience
 pub use bfv::{BfvConfig, BfvHelper, EncryptionData};
 pub use bounds::InputValidationBounds;
 pub use cli::CliConfig;
@@ -21,7 +24,7 @@ use num_traits::Num;
 use polynomial::BigInt;
 use std::path::PathBuf;
 
-/// Configuration for output generation
+/// Configuration structure for controlling output generation targets
 #[derive(Clone, Debug)]
 pub struct GeneratorConfig {
     pub output_dir: PathBuf,
@@ -37,7 +40,7 @@ impl Default for GeneratorConfig {
     }
 }
 
-/// Results from generation process
+/// Structure containing the results of the generation process
 #[derive(Debug)]
 pub struct GenerationResults {
     pub vectors: InputValidationVectors,
@@ -46,20 +49,21 @@ pub struct GenerationResults {
     pub toml_file: Option<PathBuf>,
 }
 
-/// High-level function to generate all outputs given BFV configuration
+/// High-level wrapper that generates input validation vectors, bounds,
+/// and optionally Noir and TOML files for PVSS input preparation
 pub fn generate_all_outputs(
     bfv_config: BfvConfig,
     generator_config: GeneratorConfig,
 ) -> Result<GenerationResults, Box<dyn std::error::Error>> {
-    // Store values we'll need later before moving bfv_config
+    // Retain relevant values before bfv_config is moved
     let moduli = bfv_config.moduli.clone();
     let degree = bfv_config.degree;
 
-    // Create BFV helper and generate encryption
+    // Create helper and sample an encryption instance
     let helper = BfvHelper::new(bfv_config)?;
     let encryption_data = helper.generate_sample_encryption()?;
 
-    // Compute input validation vectors
+    // Compute validation vectors for input encoding
     let vectors = InputValidationVectors::compute(
         &encryption_data.sk_rns,
         &encryption_data.e_rns,
@@ -68,20 +72,19 @@ pub fn generate_all_outputs(
         &helper.params,
     )?;
 
-    // Compute bounds
-    // TODO: Ask if it is okay to put 0 to the level
+    // Derive bounds from BFV parameters at level 0
     let bounds = InputValidationBounds::compute(&helper.params, 0)?;
 
-    // Get ZKP modulus
+    // Use ZK-friendly modulus (e.g., BN254 scalar field)
     let zkp_modulus = BigInt::from_str_radix(
         "21888242871839275222246405745257275088548364400416034343698204186575808495617",
         10,
     )?;
 
-    // Check constraints
+    // Sanity-check that vectors respect the bounds
     bounds.check_constraints(&vectors, &zkp_modulus);
 
-    // Create output directory
+    // Ensure output directory exists
     std::fs::create_dir_all(&generator_config.output_dir)?;
 
     let mut results = GenerationResults {
@@ -116,50 +119,48 @@ pub fn generate_all_outputs(
     Ok(results)
 }
 
-// /// Test function to check what specific errors we get with vectors
-// #[cfg(test)]
-// #[test]
-// pub fn test_vectors_computation() -> Result<(), Box<dyn std::error::Error>> {
-//     let config = BfvConfig {
-//         degree: 2048,
-//         plaintext_modulus: 1032193,
-//         moduli: vec![18014398492704769],
-//     };
+/// Test function to check what specific errors we get with vectors
+#[cfg(test)]
+#[test]
+pub fn test_vectors_computation() -> Result<(), Box<dyn std::error::Error>> {
+    let config = BfvConfig {
+        degree: 2048,
+        plaintext_modulus: 1032193,
+        moduli: vec![18014398492704769],
+    };
 
-//     let helper = BfvHelper::new(config)?;
-//     let encryption_data = helper.generate_sample_encryption()?;
+    let helper = BfvHelper::new(config)?;
+    let encryption_data = helper.generate_sample_encryption()?;
 
-//     // Try to compute vectors - this will show us the exact errors
-//     let _vectors = InputValidationVectors::compute(
-//         &encryption_data.plaintext,
-//         &encryption_data.sk_rns,
-//         &encryption_data.e_rns,
-//         &encryption_data.ciphertext,
-//         &encryption_data.public_key,
-//         &helper.params,
-//     )?;
+    // Try to compute vectors - this will show us the exact errors
+    let _vectors = InputValidationVectors::compute(
+        &encryption_data.sk_rns,
+        &encryption_data.e_rns,
+        &encryption_data.a,
+        &encryption_data.ciphertext,
+        &helper.params,
+    )?;
 
-//     println!("Vectors computation successful!");
-//     Ok(())
-// }
+    println!("Vectors computation successful!");
+    Ok(())
+}
 
-// /// Test bounds computation
-// #[cfg(test)]
-// #[test]
-// pub fn test_bounds_computation() -> Result<(), Box<dyn std::error::Error>> {
-//     let config = BfvConfig {
-//         degree: 2048,
-//         plaintext_modulus: 1032193,
-//         moduli: vec![18014398492704769],
-//     };
+/// Test bounds computation
+#[cfg(test)]
+#[test]
+pub fn test_bounds_computation() -> Result<(), Box<dyn std::error::Error>> {
+    let config = BfvConfig {
+        degree: 2048,
+        plaintext_modulus: 1032193,
+        moduli: vec![18014398492704769],
+    };
 
-//     let helper = BfvHelper::new(config)?;
-//     let encryption_data = helper.generate_sample_encryption()?;
+    let helper = BfvHelper::new(config)?;
+    let _encryption_data = helper.generate_sample_encryption()?;
 
-//     // Try to compute bounds
-//     let _bounds =
-//         InputValidationBounds::compute(&helper.params, encryption_data.plaintext.level())?;
+    // Try to compute bounds
+    let _bounds = InputValidationBounds::compute(&helper.params, 0)?;
 
-//     println!("Bounds computation successful!");
-//     Ok(())
-// }
+    println!("Bounds computation successful!");
+    Ok(())
+}

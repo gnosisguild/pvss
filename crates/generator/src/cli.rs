@@ -1,13 +1,14 @@
-//! CLI interface for the Greco generator.
+//! CLI interface for the PVSS parameter generator.
 //!
 //! This module provides command-line argument parsing and the main CLI entry point
-//! for the generator binary.
+//! for the generator binary used in Publicly Verifiable Secret Sharing (PVSS) setups
+//! based on BFV encryption schemes.
 
 use crate::{generate_all_outputs, BfvConfig, GeneratorConfig};
 use clap::{Arg, Command};
 use std::path::PathBuf;
 
-/// CLI configuration structure
+/// CLI configuration structure for setting up BFV and generator parameters
 #[derive(Debug, Clone)]
 pub struct CliConfig {
     pub bfv_config: BfvConfig,
@@ -15,11 +16,11 @@ pub struct CliConfig {
 }
 
 impl CliConfig {
-    /// Parse CLI arguments and create configuration
+    /// Parse CLI arguments and create configuration structure
     pub fn from_args() -> Result<Self, Box<dyn std::error::Error>> {
-        let matches = Command::new("e3-greco-generator")
+        let matches = Command::new("pvss-generator")
             .about(
-                "Generates cryptographic parameters and constants for Greco zero-knowledge proofs",
+                "Generates cryptographic parameters and constants for PVSS input validation and circuit integration",
             )
             .arg(
                 Arg::new("degree")
@@ -34,7 +35,7 @@ impl CliConfig {
                     .long("plaintext-modulus")
                     .short('t')
                     .value_name("MODULUS")
-                    .help("Plaintext modulus")
+                    .help("Plaintext modulus used for encoding messages")
                     .default_value("1032193"),
             )
             .arg(
@@ -42,7 +43,7 @@ impl CliConfig {
                     .long("moduli")
                     .short('q')
                     .value_name("MODULI")
-                    .help("Ciphertext moduli (comma-separated)")
+                    .help("Ciphertext moduli used in RNS decomposition (comma-separated list)")
                     .default_value("18014398492704769"),
             )
             .arg(
@@ -50,25 +51,25 @@ impl CliConfig {
                     .long("output-dir")
                     .short('o')
                     .value_name("DIR")
-                    .help("Output directory for generated files")
+                    .help("Directory where generated constants and metadata will be saved")
                     .default_value("output"),
             )
             .arg(
                 Arg::new("no-toml")
                     .long("no-toml")
-                    .help("Skip generating Prover.toml file")
+                    .help("Skip generation of Prover.toml output file")
                     .action(clap::ArgAction::SetTrue),
             )
             .get_matches();
 
-        // Parse degree
+        // Parse polynomial degree
         let degree: usize = matches
             .get_one::<String>("degree")
             .unwrap()
             .parse()
             .map_err(|e| format!("Invalid degree: {}", e))?;
 
-        // Validate degree is power of 2
+        // Ensure degree is power of 2
         if !degree.is_power_of_two() {
             return Err("Degree must be a power of 2".into());
         }
@@ -80,7 +81,7 @@ impl CliConfig {
             .parse()
             .map_err(|e| format!("Invalid plaintext modulus: {}", e))?;
 
-        // Parse moduli
+        // Parse ciphertext moduli from comma-separated string
         let moduli_str = matches.get_one::<String>("moduli").unwrap();
         let moduli: Result<Vec<u64>, _> = moduli_str
             .split(',')
@@ -88,10 +89,10 @@ impl CliConfig {
             .collect();
         let moduli = moduli.map_err(|e| format!("Invalid moduli: {}", e))?;
 
-        // Parse generation flags
+        // Check if Prover.toml generation should be skipped
         let generate_toml = !matches.get_flag("no-toml");
 
-        // Parse output directory
+        // Get output directory path
         let output_dir = PathBuf::from(matches.get_one::<String>("output-dir").unwrap());
 
         let bfv_config = BfvConfig {
@@ -111,12 +112,12 @@ impl CliConfig {
         })
     }
 
-    /// Run the CLI application
+    /// Run the generator CLI based on parsed configuration
     pub fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
-        println!("Greco Generator");
+        println!("PVSS Generator");
         println!("Generating cryptographic parameters...");
 
-        // Display configuration
+        // Display parsed input parameters
         println!("\nConfiguration:");
         println!("- Degree: {}", self.bfv_config.degree);
         println!("- Plaintext modulus: {}", self.bfv_config.plaintext_modulus);
@@ -124,7 +125,7 @@ impl CliConfig {
         println!("- Output directory: {:?}", self.generator_config.output_dir);
         println!("- Generate TOML: {}", self.generator_config.generate_toml);
 
-        // Generate outputs
+        // Perform generation and save to disk
         let results = generate_all_outputs(self.bfv_config.clone(), self.generator_config.clone())?;
 
         println!("\nOutputs:");
@@ -140,7 +141,7 @@ impl CliConfig {
     }
 }
 
-/// Main CLI entry point
+/// Main CLI entry point for PVSS generator
 pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = CliConfig::from_args()?;
     config.run()

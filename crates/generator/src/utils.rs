@@ -1,4 +1,4 @@
-//! Utility functions for the Greco generator.
+//! Utility functions for the PVSS generator.
 //!
 //! This module contains helper functions for string conversion,
 //! serialization, and other common operations.
