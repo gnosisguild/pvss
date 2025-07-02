@@ -1,8 +1,7 @@
-//! # E3 Greco Polynomial Library
+//! # Polynomial Library for PVSS
 //!
-//! This library provides polynomial arithmetic modulo operations
-//! to support Greco constants generation for correct ciphertext encryption
-//! under public key BFV using zero-knowledge proofs.
+//! This library provides polynomial arithmetic and modular operations to support
+//! Publicly Verifiable Secret Sharing (PVSS) schemes using homomorphic encryption.
 //!
 //! ## Features
 //!
@@ -14,7 +13,7 @@
 //! ## Example
 //!
 //! ```rust
-//! use e3_greco_polynomial::{Polynomial, BigInt};
+//! use polynomial::{Polynomial, BigInt};
 //!
 //! let poly1 = Polynomial::new(vec![BigInt::from(1), BigInt::from(2), BigInt::from(3)]);
 //! let poly2 = Polynomial::new(vec![BigInt::from(1), BigInt::from(1)]);
@@ -31,7 +30,7 @@ use serde::{Deserialize, Serialize};
 /// A polynomial represented by its coefficients in descending order of degree.
 ///
 /// The coefficients are stored as `BigInt` to support arbitrary precision arithmetic
-/// required for cryptographic operations.
+/// required for cryptographic operations in PVSS.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Polynomial {

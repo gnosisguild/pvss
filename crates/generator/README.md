@@ -1,6 +1,6 @@
-# Greco Generator
+# PVSS Generator
 
-A Rust library and CLI tool for generating cryptographic parameters and constants for Greco zero-knowledge proofs in BFV homomorphic encryption.
+A Rust library and CLI tool for generating cryptographic parameters and constants for zero-knowledge proofs in PVSS schemes using BFV homomorphic encryption.
 
 ## Features
 
@@ -16,7 +16,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-e3-greco-generator = "0.1.0"
+e3-pvss-generator = "0.1.0"
 ```
 
 ## Quick Start
@@ -38,7 +38,7 @@ cargo run --bin generator -- \
 ### Library Usage
 
 ```rust
-use greco_generator::{BfvConfig, GeneratorConfig, generate_all_outputs};
+use pvss_generator::{BfvConfig, GeneratorConfig, generate_all_outputs};
 
 let bfv_config = BfvConfig {
     degree: 2048,
@@ -72,7 +72,7 @@ Contains BFV parameters, input validation bounds, and per-modulus bounds for con
 
 ### Prover TOML (`Prover.toml`)
 
-Contains input validation vectors (plaintext coefficients, encryption randomness polynomials, ciphertext polynomials) reduced modulo the BN254 scalar field.
+Contains input validation vectors reduced modulo the BN254 scalar field.
 
 ## Library API
 

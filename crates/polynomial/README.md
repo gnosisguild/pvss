@@ -1,6 +1,6 @@
-# Greco Polynomial Library
+# PVSS Polynomial Library
 
-A Rust library providing polynomial arithmetic modulo operations to support Greco constants generation for correct ciphertext encryption under public key BFV using zero-knowledge proofs.
+A Rust library providing polynomial arithmetic modulo operations to support PVSS constants generation.
 
 ## Features
 
@@ -17,20 +17,20 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-e3-greco-polynomial = "0.1.0"
+e3-pvss-polynomial = "0.1.0"
 ```
 
 For serialization support:
 
 ```toml
 [dependencies]
-e3-greco-polynomial = { version = "0.1.0", features = ["serde"] }
+e3-pvss-polynomial = { version = "0.1.0", features = ["serde"] }
 ```
 
 ## Quick Start
 
 ```rust
-use e3_greco_polynomial::{Polynomial, BigInt};
+use e3_pvss_polynomial::{Polynomial, BigInt};
 
 // Create polynomials
 let poly1 = Polynomial::new(vec![BigInt::from(2), BigInt::from(3), BigInt::from(1)]); // 2x² + 3x + 1
@@ -74,7 +74,7 @@ The library provides centered reduction where coefficients are mapped to the sym
 The library defines a `PolynomialError` enum for handling various error conditions:
 
 ```rust
-use e3_greco_polynomial::PolynomialError;
+use e3_pvss_polynomial::PolynomialError;
 
 match poly1.div(&poly2) {
     Ok((quotient, remainder)) => { /* handle success */ }

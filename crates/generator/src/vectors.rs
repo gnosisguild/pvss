@@ -307,6 +307,7 @@ impl InputValidationVectors {
         // Set final result vectors
         res.sk = sk;
         res.e = e;
+        res.a = a;
 
         Ok(res)
     }
@@ -352,6 +353,7 @@ mod tests {
         .unwrap();
         let std_form = vecs.standard_form(&p);
 
+        // Check that all vectors are properly reduced
         assert!(std_form.sk.iter().all(|x| x < &p));
         assert!(std_form.e.iter().all(|x| x < &p));
     }
@@ -360,11 +362,13 @@ mod tests {
     fn test_vector_computation() {
         let (params, sk, _pk) = setup_test_params();
 
+        // Use extended encryption to get the polynomial data
         let mut rng = StdRng::seed_from_u64(0);
         let (ct, a, sk_rns, e_rns) = PublicKey::new_extended(&sk, &mut rng).unwrap();
 
         let vecs = InputValidationVectors::compute(&sk_rns, &e_rns, &a, &ct, &params).unwrap();
 
+        // Check dimensions
         assert!(vecs.check_correct_lengths(1, params.degree()));
     }
 
@@ -373,6 +377,7 @@ mod tests {
         let vecs = InputValidationVectors::new(1, 4);
         let json = vecs.to_json();
 
+        // Check all required fields are present
         let required_fields = ["r2is", "r1is", "ct0is", "ct1is", "a", "sk", "e"];
 
         for field in required_fields.iter() {
