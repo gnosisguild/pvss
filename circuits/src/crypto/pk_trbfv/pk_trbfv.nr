@@ -10,7 +10,7 @@ pub struct BfvPublicKeyCircuit {
     eek: Polynomial<N>,
     sk: Polynomial<N>,
     r1is: [Polynomial<2 * N - 1>; L],
-    r2is: [Polynomial<2 * N - 1>; L],
+    r2is: [Polynomial<N - 1>; L],
     pk0is: [Polynomial<N>; L],
     pk1is: [Polynomial<N>; L],
 }
@@ -21,7 +21,7 @@ impl BfvPublicKeyCircuit {
         eek: Polynomial<N>,
         sk: Polynomial<N>,
         r1is: [Polynomial<2 * N - 1>; L],
-        r2is: [Polynomial<2 * N - 1>; L],
+        r2is: [Polynomial<N - 1>; L],
         pk0is: [Polynomial<N>; L],
         pk1is: [Polynomial<N>; L],
     ) -> Self {
@@ -80,7 +80,7 @@ impl BfvPublicKeyCircuit {
                     + r2i_at_gamma[i] * cyclo_at_gamma
                     + r1i_at_gamma[i] * QIS[i],
             );
-            assert_eq(pk1is_at_gamma[i], -a_at_gamma[i]);
+            assert_eq(pk1is_at_gamma[i], a_at_gamma[i]);
         }
         safe.finish();
     }
