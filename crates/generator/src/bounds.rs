@@ -28,7 +28,7 @@ pub struct InputValidationBounds {
     pub r1_low: Vec<BigInt>,
     /// Upper bound vector for `r1` polynomials
     pub r1_up: Vec<BigInt>,
-    /// Symmetric bound vector for `r2`, `ct0`, and `ct1`
+    /// Symmetric bound vector for `r2`, `pk0`, and `pk1`
     pub r2: Vec<BigInt>,
 
     // Auxiliary fields for circuit generation / serialization
@@ -75,14 +75,14 @@ impl InputValidationBounds {
 
         // Check each modulus-dependent bound for ciphertext and randomness polynomials
         for i in 0..self.r2.len() {
-            // Ciphertext terms ct0i and ct1i must be in symmetric range per modulus
+            // Ciphertext terms pk0i and pk1i must be in symmetric range per modulus
             assert!(range_check_centered(
-                &vecs.ct0is[i],
+                &vecs.pk0is[i],
                 &-&self.r2[i],
                 &self.r2[i]
             ));
             assert!(range_check_centered(
-                &vecs.ct1is[i],
+                &vecs.pk1is[i],
                 &-&self.r2[i],
                 &self.r2[i]
             ));

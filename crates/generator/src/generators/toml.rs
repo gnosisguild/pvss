@@ -62,14 +62,14 @@ impl TomlGenerator {
     fn to_prover_toml_format(&self, vecs: &InputValidationVectors) -> ProverTomlFormat {
         ProverTomlFormat {
             pk0is: vecs
-                .ct0is
+                .pk0is
                 .iter()
                 .map(|v| ProverVectorsTable {
                     coefficients: to_string_1d_vec(v),
                 })
                 .collect(),
             pk1is: vecs
-                .ct1is
+                .pk1is
                 .iter()
                 .map(|v| ProverVectorsTable {
                     coefficients: to_string_1d_vec(v),
