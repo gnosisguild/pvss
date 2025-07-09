@@ -1,7 +1,5 @@
-use crate::crypto::pk_trbfv::constants::{EEK_BOUND, K_BOUND, L, N, QIS, SK_BOUND};
 use crate::math::polynomial::Polynomial;
-use poseidon::poseidon2::Poseidon2;
-use std::field;
+use super::constants::{L, N, N_PARTIES};
 
 // Matrix is a type representing a 2D array of polynomials, parameterized by the number of rows, columns, and polynomial degree.
 type Matrix<let ROWS: u32, let COLS: u32, let N: u32> = [[Polynomial<N>; COLS]; ROWS];
@@ -34,18 +32,18 @@ impl SecretKeySharesCircuit {
 
     pub fn correct_sss(self) {
         for i in 0..N + 1 {
-            let a_i = sk[i];
+            let a_i = self.sk[i];
 
             // Loop over each modulus q_j
             for j in 0..L {
                 let q_j = q[j];
-                let f_i_j = f[i][j]; // Polynomial for coefficient i, modulus j
+                let f_i_j = self.f[i][j]; // Polynomial for coefficient i, modulus j
 
                 // Loop over each party's share
                 for k_party in 0..N_PARTIES {
-                    let x_k = x_coords[k_party];
-                    let y_i_j_k = y[i][j][k_party];
-                    let k_i_j_k = k[i][j][k_party];
+                    let x_k = self.x_coords[k_party];
+                    let y_i_j_k = self.y[i][j][k_party];
+                    let k_i_j_k = self.k[i][j][k_party];
 
                     // Check: f_i_j(x_k) = y_i_j_k + k_i_j_k * q_j
                     let computed_y = f_i_j.eval(x_k);

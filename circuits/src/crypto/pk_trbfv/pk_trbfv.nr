@@ -2,7 +2,6 @@ use crate::crypto::pk_trbfv::constants::{
     EEK_BOUND, L, N, QIS, R1_LOW_BOUNDS, R1_UP_BOUNDS, R2_BOUNDS, SIZE, SK_BOUND, TAG,
 };
 use crate::math::polynomial::Polynomial;
-use poseidon::poseidon2::Poseidon2;
 use safe::safe::SafeSponge;
 //the formulas are in the RNS mode
 pub struct BfvPublicKeyCircuit {
@@ -36,7 +35,7 @@ impl BfvPublicKeyCircuit {
         let (inputs, offset) = flatten(inputs, [self.eek], offset);
         let (inputs, offset) = flatten(inputs, [self.sk], offset);
         let (inputs, offset) = flatten(inputs, self.r1is, offset);
-        let (inputs, offset) = flatten(inputs, self.r2is, offset);
+        let (inputs, _) = flatten(inputs, self.r2is, offset);
 
         inputs
     }
@@ -75,12 +74,12 @@ impl BfvPublicKeyCircuit {
             // Check the correctness of the public key
             assert_eq(
                 pk0is_at_gamma[i],
-                -a_at_gamma[i] * sk_at_gamma
+                a_at_gamma[i] * sk_at_gamma
                     + eek_at_gamma
                     + r2i_at_gamma[i] * cyclo_at_gamma
                     + r1i_at_gamma[i] * QIS[i],
             );
-            assert_eq(pk1is_at_gamma[i], a_at_gamma[i]);
+            assert_eq(pk1is_at_gamma[i], -a_at_gamma[i]);
         }
         safe.finish();
     }
