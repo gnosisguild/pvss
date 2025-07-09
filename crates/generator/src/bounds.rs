@@ -22,8 +22,8 @@ pub struct InputValidationBounds {
     pub sk: BigInt,
     /// Symmetric bound for error distribution: `[-e, e]`
     pub e: BigInt,
-    /// Bound for public key polynomial `a`: `[-a, a]`
-    pub a: BigInt,
+    /// Bounds for public key polynomials `a`
+    pub a: Vec<BigInt>,
     /// Lower bound vector for `r1` polynomials
     pub r1_low: Vec<BigInt>,
     /// Upper bound vector for `r1` polynomials
@@ -38,8 +38,8 @@ pub struct InputValidationBounds {
     pub sk_bound: u64,
     /// Truncated e bound
     pub e_bound: u64,
-    /// Truncated a bound
-    pub a_bound: u64,
+    /// Unsigned a bounds
+    pub a_bounds: Vec<u64>,
     /// Signed r1 lower bounds (for centered checks)
     pub r1_low_bounds: Vec<i64>,
     /// Unsigned r1 upper bounds
@@ -69,12 +69,10 @@ impl InputValidationBounds {
         assert!(range_check_standard(&vecs_std.sk, &self.sk, &p));
         assert!(range_check_standard(&vecs_std.e, &self.e, &p));
 
-        // Check that public key polynomial a is in the correct centered range
-        assert!(range_check_centered(&vecs.a, &-&self.a, &self.a));
-        assert!(range_check_standard(&vecs_std.a, &self.a, &p));
-
         // Check each modulus-dependent bound for ciphertext and randomness polynomials
         for i in 0..self.r2.len() {
+            // Check that public key polynomial a is in the correct centered range
+            assert!(range_check_centered(&vecs.a[i], &-&self.r2[i], &self.r2[i]));
             // Ciphertext terms pk0i and pk1i must be in symmetric range per modulus
             assert!(range_check_centered(
                 &vecs.pk0is[i],
@@ -148,6 +146,8 @@ impl InputValidationBounds {
 
         // Calculate qi-based bounds
         let num_moduli = ctx.moduli().len();
+
+        let mut a_bounds = vec![BigInt::from(0); num_moduli];
         let mut r2_bounds = vec![BigInt::from(0); num_moduli];
         let mut r1_low_bounds = vec![BigInt::from(0); num_moduli];
         let mut r1_up_bounds = vec![BigInt::from(0); num_moduli];
@@ -166,6 +166,7 @@ impl InputValidationBounds {
             );
 
             r2_bounds[i] = qi_bound.clone();
+            a_bounds[i] = qi_bound.clone();
 
             // Compute asymmetric range for r1 bounds per modulus
             r1_low_bounds[i] = (&ptxt_low_bound * k0qi.abs()
@@ -176,14 +177,11 @@ impl InputValidationBounds {
                 / &qi_bigint;
         }
 
-        // a and r2 have the same bound semantics
-        let a_bound = r2_bounds[0].clone();
-
         // Convert bounds to primitive types for serialization into Noir or test fixtures
-        let a_bound_u64 = a_bound.to_u64().unwrap_or(0);
         let sk_bound_u64 = sk_bound.to_u64().unwrap_or(19);
         let e_bound_u64 = e_bound.to_u64().unwrap_or(19);
 
+        let a_bounds_u64: Vec<u64> = a_bounds.iter().map(|b| b.to_u64().unwrap_or(0)).collect();
         let r1_low_bounds_i64 = r1_low_bounds
             .iter()
             .map(|b| b.to_i64().unwrap_or(0))
@@ -197,7 +195,14 @@ impl InputValidationBounds {
         // Compute a hash-based tag to bind parameters to the circuit shape
         let mut hasher = Hasher::new();
         hasher.update(&params.degree().to_le_bytes());
-        hasher.update(&a_bound_u64.to_le_bytes());
+        hasher.update(&a_bounds.len().to_le_bytes().as_slice());
+        hasher.update(
+            &a_bounds_u64
+                .iter()
+                .flat_map(|num| num.to_le_bytes())
+                .collect::<Vec<u8>>(),
+        );
+
         hasher.update(
             &ctx.moduli()
                 .iter()
@@ -221,14 +226,14 @@ impl InputValidationBounds {
         Ok(Self {
             sk: sk_bound,
             e: e_bound,
-            a: a_bound,
+            a: a_bounds,
             r1_low: r1_low_bounds,
             r1_up: r1_up_bounds,
             r2: r2_bounds,
             moduli,
             sk_bound: sk_bound_u64,
             e_bound: e_bound_u64,
-            a_bound: a_bound_u64,
+            a_bounds: a_bounds_u64,
             r1_low_bounds: r1_low_bounds_i64,
             r1_up_bounds: r1_up_bounds_u64,
             r2_bounds: r2_bounds_u64,

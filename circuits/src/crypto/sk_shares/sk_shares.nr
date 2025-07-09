@@ -48,7 +48,7 @@ impl SecretKeySharesCircuit {
                     let k_i_j_k = k[i][j][k_party];
 
                     // Check: f_i_j(x_k) = y_i_j_k + k_i_j_k * q_j
-                    let computed_y = f_i_j.evel(x_k);
+                    let computed_y = f_i_j.eval(x_k);
                     assert_eq(computed_y, y_i_j_k + k_i_j_k * q_j);
                 }
 
