@@ -100,22 +100,22 @@ jobs:
           sudo swapon --show
 
       - name: Compile example circuit
-        working-directory: examples/example
+        working-directory: examples/pk_circuit
         run: nargo compile
 
       - name: Execute example circuit
-        working-directory: examples/example
+        working-directory: examples/pk_circuit
         run: nargo execute
 
       - name: Generate proof
-        working-directory: examples/example
-        run: bb prove -b ./target/example.json -w ./target/example.gz -o ./target
+        working-directory: examples/pk_circuit
+        run: bb prove -b ./target/pk_circuit.json -w ./target/pk_circuit.gz -o ./target
 
       - name: Generate verification key
-        working-directory: examples/example
-        run: bb write_vk -b ./target/example.json -o ./target
+        working-directory: examples/pk_circuit
+        run: bb write_vk -b ./target/pk_circuit.json -o ./target
 
       - name: Verify proof
-        working-directory: examples/example
+        working-directory: examples/pk_circuit
         run: bb verify -k ./target/vk -p ./target/proof
         continue-on-error: false

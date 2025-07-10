@@ -1,7 +1,8 @@
 [workspace]
 members = [
-    "example"
-]
+    "example",
+    "generator"
+, "polynomial"]
 resolver = "2"
 
 [workspace.package]
@@ -10,4 +11,18 @@ edition = "2021"
 
 [workspace.dependencies]
 example = { package = "example", path = "./example" }
+polynomial = { package = "e3-pvss-polynomial", path = "./polynomial" }
+generator = { package = "e3-pvss-generator", path = "./generator" }
 rand = "0.8.5"
+fhe = { git = "https://github.com/gnosisguild/fhe.rs", branch = "armanc/pvss" }
+fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", branch = "armanc/pvss" }
+fhe-math = { git = "https://github.com/gnosisguild/fhe.rs.git", branch = "armanc/pvss" }
+serde = { version = "1.0.208", features = ["derive"] }
+num-bigint = "0.4.6"
+num-traits = "0.2"
+serde_json = "1.0.133"
+ndarray = "0.16.1"
+itertools = "0.14.0"
+rayon = "1.10.0"
+toml = "0.8"
+blake3 = "1.8.2"
