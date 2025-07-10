@@ -4,7 +4,7 @@
 //! input validation vectors used in publicly verifiable secret sharing (PVSS) protocols.
 //! These vectors are used in zero-knowledge proofs to validate correct BFV encryption.
 
-use fhe::bfv::{BfvParameters, Ciphertext};
+use fhe::bfv::{BfvParameters, PublicKey};
 use fhe_math::rq::{Poly, Representation};
 use itertools::izip;
 use num_bigint::BigInt;
@@ -101,7 +101,7 @@ impl InputValidationVectors {
         sk_rns: &Poly,
         e_rns: &Poly,
         a: &Poly,
-        ct: &Ciphertext,
+        public_key: &PublicKey,
         params: &Arc<BfvParameters>,
     ) -> Result<InputValidationVectors, Box<dyn std::error::Error>> {
         // Get context, plaintext modulus, and degree
@@ -162,9 +162,9 @@ impl InputValidationVectors {
                 .collect()
         };
 
-        // Extract and convert ciphertext and plaintext polynomials
-        let mut pk0 = ct.c[0].clone();
-        let mut pk1 = ct.c[1].clone();
+        // Extract and convert ciphertext polynomials
+        let mut pk0 = public_key.c.c[0].clone();
+        let mut pk1 = public_key.c.c[1].clone();
         pk0.change_representation(Representation::PowerBasis);
         pk1.change_representation(Representation::PowerBasis);
 
@@ -209,9 +209,10 @@ impl InputValidationVectors {
                 reduce_and_center_coefficients_mut(&mut pk0i, &qi_bigint);
                 reduce_and_center_coefficients_mut(&mut pk1i, &qi_bigint);
 
-                // Calcualte pk0i_hat = pk1 * sk + e
+                // Calculate pk0i_hat = -a * sk + e
                 let pk0i_hat = {
-                    let pk0i_poly = Polynomial::new(a.clone());
+                    let neg_a: Vec<BigInt> = a.iter().map(|a| -a).collect();
+                    let pk0i_poly = Polynomial::new(neg_a.clone());
                     let sk_poly = Polynomial::new(sk.clone());
                     let pk0i_times_sk = pk0i_poly.mul(&sk_poly);
                     assert_eq!((pk0i_times_sk.coefficients().len() as u64) - 1, 2 * (n - 1));
@@ -291,9 +292,8 @@ impl InputValidationVectors {
 
                 assert_eq!(&pk0i, &pk0i_calculated);
 
-                // pk1i = -a = pk1
-                let neg_a: Vec<BigInt> = a.iter().map(|a| -a).collect();
-                assert_eq!(&pk1i, &neg_a);
+                // pk1i = a = pk1
+                assert_eq!(&pk1i, &a);
                 (i, r2i, r1i, pk0i, pk1i, a.clone())
             })
             .collect();

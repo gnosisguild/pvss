@@ -3,7 +3,7 @@
 //! This module provides utilities for working with BFV encryption parameters,
 //! generating sample encryptions, and managing encryption contexts.
 
-use fhe::bfv::{BfvParameters, BfvParametersBuilder, Ciphertext, PublicKey, SecretKey};
+use fhe::bfv::{BfvParameters, BfvParametersBuilder, PublicKey, SecretKey};
 use fhe_math::rq::Poly;
 use num_bigint::BigInt;
 use num_traits::Num;
@@ -35,8 +35,8 @@ impl Default for BfvConfig {
 /// Output structure representing all components involved in a sample BFV encryption.
 /// Useful for validating inputs or simulating end-to-end encryption.
 pub struct EncryptionData {
-    /// The resulting ciphertext `[c0, c1]`
-    pub ciphertext: Ciphertext,
+    /// The resulting ciphertext `[pk0, pk1]`
+    pub public_key: PublicKey,
     /// The secret key used for encryption
     pub secret_key: SecretKey,
     /// The public polynomial `a` used in the encryption (i.e., `-c1`)
@@ -68,7 +68,7 @@ impl BfvHelper {
         Ok(BfvHelper { params })
     }
 
-    /// Generates a sample ciphertext using a random secret key.
+    /// Generates a sample public key using a random secret key.
     ///
     /// This includes the secret key, encryption polynomial `a = -c1`,
     /// the secret key in RNS + NTT domain, and the error polynomial.
@@ -82,10 +82,10 @@ impl BfvHelper {
         let secret_key = SecretKey::random(&self.params, &mut rng);
 
         // Perform encryption and extract intermediate values (a, sk, e)
-        let (ciphertext, a, sk_rns, e_rns) = PublicKey::new_extended(&secret_key, &mut rng)?;
+        let (public_key, a, sk_rns, e_rns) = PublicKey::new_extended(&secret_key, &mut rng)?;
 
         Ok(EncryptionData {
-            ciphertext,
+            public_key,
             a,
             secret_key,
             sk_rns,

@@ -6,7 +6,7 @@
 use blake3::Hasher;
 use fhe::bfv::BfvParameters;
 use num_bigint::{BigInt, BigUint};
-use num_traits::{FromPrimitive, Signed, ToPrimitive};
+use num_traits::{FromPrimitive, ToPrimitive};
 use polynomial::{
     range_check_centered, range_check_standard, range_check_standard_2bounds, reduce_and_center,
 };
@@ -136,14 +136,6 @@ impl InputValidationBounds {
         let sk_bound = gauss_bound.clone();
         let e_bound = gauss_bound.clone();
 
-        // Plaintext bounds differ if modulus is even
-        let ptxt_up_bound = (t.clone() - 1u32) / 2u32;
-        let ptxt_low_bound = if &t % 2u32 == BigInt::from(1) {
-            (-(&t - 1u32)) / 2u32
-        } else {
-            (-(&t - 1u32)) / 2u32 - 1u32
-        };
-
         // Calculate qi-based bounds
         let num_moduli = ctx.moduli().len();
 
@@ -159,22 +151,13 @@ impl InputValidationBounds {
 
             moduli.push(qi.modulus());
 
-            // Compute k0qi = inv(-t) mod qi for normalization
-            let k0qi = BigInt::from(
-                qi.inv(qi.neg(params.plaintext()))
-                    .ok_or("Failed to compute k0qi")?,
-            );
-
             r2_bounds[i] = qi_bound.clone();
             a_bounds[i] = qi_bound.clone();
 
             // Compute asymmetric range for r1 bounds per modulus
-            r1_low_bounds[i] = (&ptxt_low_bound * k0qi.abs()
-                - ((&n * &gauss_bound + 2u32) * &qi_bound + &gauss_bound))
-                / &qi_bigint;
-            r1_up_bounds[i] = (&ptxt_up_bound * k0qi.abs()
-                + ((&n * &gauss_bound + 2u32) * &qi_bound + &gauss_bound))
-                / &qi_bigint;
+            r1_low_bounds[i] =
+                (-((&n * &gauss_bound + 2u32) * &qi_bound + &gauss_bound)) / &qi_bigint;
+            r1_up_bounds[i] = ((&n * &gauss_bound + 2u32) * &qi_bound + &gauss_bound) / &qi_bigint;
         }
 
         // Convert bounds to primitive types for serialization into Noir or test fixtures

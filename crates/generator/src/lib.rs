@@ -68,7 +68,7 @@ pub fn generate_all_outputs(
         &encryption_data.sk_rns,
         &encryption_data.e_rns,
         &encryption_data.a,
-        &encryption_data.ciphertext,
+        &encryption_data.public_key,
         &helper.params,
     )?;
 
@@ -137,7 +137,7 @@ pub fn test_vectors_computation() -> Result<(), Box<dyn std::error::Error>> {
         &encryption_data.sk_rns,
         &encryption_data.e_rns,
         &encryption_data.a,
-        &encryption_data.ciphertext,
+        &encryption_data.public_key,
         &helper.params,
     )?;
 
