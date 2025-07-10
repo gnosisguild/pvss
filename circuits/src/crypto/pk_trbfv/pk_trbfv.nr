@@ -74,12 +74,12 @@ impl BfvPublicKeyCircuit {
             // Check the correctness of the public key
             assert_eq(
                 pk0is_at_gamma[i],
-                a_at_gamma[i] * sk_at_gamma
+                -a_at_gamma[i] * sk_at_gamma
                     + eek_at_gamma
                     + r2i_at_gamma[i] * cyclo_at_gamma
                     + r1i_at_gamma[i] * QIS[i],
             );
-            assert_eq(pk1is_at_gamma[i], -a_at_gamma[i]);
+            assert_eq(pk1is_at_gamma[i], a_at_gamma[i]);
         }
         safe.finish();
     }
