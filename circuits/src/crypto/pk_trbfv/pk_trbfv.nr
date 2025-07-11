@@ -2,7 +2,7 @@ use crate::crypto::pk_trbfv::constants::{
     EEK_BOUND, L, N, QIS, R1_LOW_BOUNDS, R1_UP_BOUNDS, R2_BOUNDS, SIZE, SK_BOUND, TAG,
 };
 use crate::math::polynomial::Polynomial;
-use poseidon::poseidon2::Poseidon2;
+
 use safe::safe::SafeSponge;
 //the formulas are in the RNS mode
 pub struct BfvPublicKeyCircuit {

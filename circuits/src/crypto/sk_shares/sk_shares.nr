@@ -1,5 +1,5 @@
+use crate::crypto::sk_shares::constants::{L, N, N_PARTIES, QIS, T};
 use crate::math::polynomial::Polynomial;
-use super::constants::{L, N, N_PARTIES, QIS, T};
 
 // Matrix is a type representing a 2D array of polynomials, parameterized by the number of rows, columns, and polynomial degree.
 type Matrix<let ROWS: u32, let COLS: u32, let N: u32> = [[Polynomial<N>; COLS]; ROWS];
