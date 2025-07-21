@@ -1,7 +1,7 @@
 /// `N` is the degree of the cyclotomic polynomial defining the ring `Rq = Zq[X]/(X^N + 1)`.
-pub global N: u32 = 1024;
+pub global N: u32 = 2048;
 /// `L` is the dimension size of the polynomials.
-pub global L: u32 = 2;
+pub global L: u32 = 1;
 /// The coefficients of the polynomial `e` should exist in the interval `[-E_BOUND, E_BOUND]` where `E_BOUND` is the upper bound of the gaussian distribution with Sigma = 3.2.
 pub global E_BOUND: u64 = 19;
 pub global SK_BOUND: u64 = 9;
@@ -12,7 +12,10 @@ pub global R1_LOW_BOUNDS: [i64; 2] = [-9729, -9729];
 pub global R1_UP_BOUNDS: [u64; 2] = [9729, 9729];
 /// The coefficients of the polynomials `r2is` should exist in the interval `[-R2_BOUND[i], R2_BOUND[i]]` where `R2_BOUND[i]` is equal to `(qi-1)/2`.
 pub global R2_BOUNDS: [u64; 2] = [2251799812767744, 2251799813160960];
-
+/// Size of the payload.
+pub global SIZE: u32 = 28668;
+/// Constant value for the SAFE sponge algorithm.
+pub global TAG: Field = 5380324561195082;
 /// Security dimension in PVW encryption
 pub global K: u32 = 2;
 pub global N_PARTIES: u32 = 3;

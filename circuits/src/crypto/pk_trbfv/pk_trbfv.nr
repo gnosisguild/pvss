@@ -2,7 +2,6 @@ use crate::crypto::pk_trbfv::constants::{
     EEK_BOUND, L, N, QIS, R1_LOW_BOUNDS, R1_UP_BOUNDS, R2_BOUNDS, SIZE, SK_BOUND, TAG,
 };
 use crate::math::polynomial::Polynomial;
-
 use safe::safe::SafeSponge;
 //the formulas are in the RNS mode
 pub struct BfvPublicKeyCircuit {
@@ -36,7 +35,7 @@ impl BfvPublicKeyCircuit {
         let (inputs, offset) = flatten(inputs, [self.eek], offset);
         let (inputs, offset) = flatten(inputs, [self.sk], offset);
         let (inputs, offset) = flatten(inputs, self.r1is, offset);
-        let (inputs, offset) = flatten(inputs, self.r2is, offset);
+        let (inputs, _) = flatten(inputs, self.r2is, offset);
 
         inputs
     }
