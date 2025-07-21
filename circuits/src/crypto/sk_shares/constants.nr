@@ -20,3 +20,5 @@ pub global TAG: Field = 5380324561195082;
 /// Security dimension in PVW encryption
 pub global K: u32 = 2;
 pub global N_PARTIES: u32 = 3;
+// Threshold for Shamir's secret sharing
+pub global T: u32 = 2;

@@ -1,2 +1,2 @@
-//pub mod sk_shares;
 pub mod constants;
+pub mod sk_shares;

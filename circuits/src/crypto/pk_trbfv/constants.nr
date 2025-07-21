@@ -12,8 +12,7 @@ pub global R1_UP_BOUNDS: [u64; 1] = [481795];
 /// The coefficients of the polynomials `r2is` should exist in the interval `[-R2_BOUND[i], R2_BOUND[i]]` where `R2_BOUND[i]` is equal to `(qi-1)/2`.
 pub global R2_BOUNDS: [u64; 1] = [9007199246352384];
 /// List of scalars `qis` such that `qis[i]` is the modulus of the i-th CRT basis of `q` (ciphertext space modulus).
-pub global QIS: [Field; 1] = [18014398492704769];
-/// Size of the payload.
+pub global QIS: [Field; 2] = [4503599625535489, 4503599626321921];
+//SIZE = 4 * L * N + 2 * N - 2 * L;
 pub global SIZE: u32 = 28668;
-/// Constant value for the SAFE sponge algorithm.
-pub global TAG: Field = 5380324561195082;
+pub global TAG: Field = 14699256703807541932168660170536;
