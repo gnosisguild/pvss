@@ -35,11 +35,11 @@ impl Default for BfvConfig {
 /// Output structure representing all components involved in a sample BFV encryption.
 /// Useful for validating inputs or simulating end-to-end encryption.
 pub struct EncryptionData {
-    /// The resulting ciphertext `[pk0, pk1]`
+    /// The resulting public key `[pk0, pk1]`
     pub public_key: PublicKey,
     /// The secret key used for encryption
     pub secret_key: SecretKey,
-    /// The public polynomial `a` used in the encryption (i.e., `-c1`)
+    /// The public polynomial `a` used in the public key (pk0 = -a * sk + e)
     pub a: Poly,
     /// The secret key in NTT representation, lifted to RNS
     pub sk_rns: Poly,
