@@ -29,6 +29,7 @@ use std::path::PathBuf;
 pub struct GeneratorConfig {
     pub output_dir: PathBuf,
     pub generate_toml: bool,
+    pub circuit: String,
 }
 
 impl Default for GeneratorConfig {
@@ -36,6 +37,7 @@ impl Default for GeneratorConfig {
         Self {
             output_dir: "output".into(),
             generate_toml: true,
+            circuit: "pk_trbfv".to_string(),
         }
     }
 }
@@ -50,8 +52,26 @@ pub struct GenerationResults {
 }
 
 /// High-level wrapper that generates input validation vectors, bounds,
-/// and optionally Noir and TOML files for PVSS input preparation
+/// and optionally Noir and TOML files for PVSS input preparation.
+///
+/// This function routes to circuit-specific generation functions based on the
+/// circuit name in the generator configuration. Each circuit can have its own
+/// custom generation logic for constants and Prover.toml files.
 pub fn generate_all_outputs(
+    bfv_config: BfvConfig,
+    generator_config: GeneratorConfig,
+) -> Result<GenerationResults, Box<dyn std::error::Error>> {
+    // Route to circuit-specific generation function
+    match generator_config.circuit.as_str() {
+        "pk_trbfv" => generate_pk_trbfv_outputs(bfv_config, generator_config),
+        "pk_pvw" => generate_pk_pvw_outputs(bfv_config, generator_config),
+        "sk_shares" => generate_sk_shares_outputs(bfv_config, generator_config),
+        _ => Err(format!("Unknown circuit: {}", generator_config.circuit).into()),
+    }
+}
+
+/// Generate outputs for pk_trbfv circuit
+fn generate_pk_trbfv_outputs(
     bfv_config: BfvConfig,
     generator_config: GeneratorConfig,
 ) -> Result<GenerationResults, Box<dyn std::error::Error>> {
@@ -84,8 +104,9 @@ pub fn generate_all_outputs(
     // Sanity-check that vectors respect the bounds
     bounds.check_constraints(&vectors, &zkp_modulus);
 
-    // Ensure output directory exists
-    std::fs::create_dir_all(&generator_config.output_dir)?;
+    // Create circuit-specific directory for constants in output directory
+    let circuit_constants_dir = generator_config.output_dir.join(&generator_config.circuit);
+    std::fs::create_dir_all(&circuit_constants_dir)?;
 
     let mut results = GenerationResults {
         vectors: vectors.clone(),
@@ -98,21 +119,143 @@ pub fn generate_all_outputs(
     let noir_generator = NoirGenerator::new();
     // We need to create a context for the noir generator
     let context = fhe_math::rq::Context::new(&moduli, degree)?;
-    let noir_path = noir_generator.generate(
-        &bounds,
-        &helper.params,
-        &context,
-        &generator_config.output_dir,
-    )?;
+    let noir_path =
+        noir_generator.generate(&bounds, &helper.params, &context, &circuit_constants_dir)?;
     results.noir_file = Some(noir_path);
 
     // Generate Prover TOML if requested
     if generator_config.generate_toml {
         let toml_generator = TomlGenerator::new();
-        let toml_path = toml_generator.generate(
-            &vectors.standard_form(&zkp_modulus),
-            &generator_config.output_dir,
-        )?;
+        let toml_path = toml_generator
+            .generate(&vectors.standard_form(&zkp_modulus), &circuit_constants_dir)?;
+        results.toml_file = Some(toml_path);
+    }
+
+    Ok(results)
+}
+
+/// Generate outputs for pk_pvw circuit
+fn generate_pk_pvw_outputs(
+    bfv_config: BfvConfig,
+    generator_config: GeneratorConfig,
+) -> Result<GenerationResults, Box<dyn std::error::Error>> {
+    // Retain relevant values before bfv_config is moved
+    let moduli = bfv_config.moduli.clone();
+    let degree = bfv_config.degree;
+
+    // Create helper and sample an encryption instance
+    let helper = BfvHelper::new(bfv_config)?;
+    let encryption_data = helper.generate_sample_encryption()?;
+
+    // Compute validation vectors for input encoding
+    let vectors = InputValidationVectors::compute(
+        &encryption_data.sk_rns,
+        &encryption_data.e_rns,
+        &encryption_data.a,
+        &encryption_data.public_key,
+        &helper.params,
+    )?;
+
+    // Derive bounds from BFV parameters at level 0
+    let bounds = InputValidationBounds::compute(&helper.params, 0)?;
+
+    // Use ZK-friendly modulus (e.g., BN254 scalar field)
+    let zkp_modulus = BigInt::from_str_radix(
+        "21888242871839275222246405745257275088548364400416034343698204186575808495617",
+        10,
+    )?;
+
+    // Sanity-check that vectors respect the bounds
+    bounds.check_constraints(&vectors, &zkp_modulus);
+
+    // Create circuit-specific directory for constants in output directory
+    let circuit_constants_dir = generator_config.output_dir.join(&generator_config.circuit);
+    std::fs::create_dir_all(&circuit_constants_dir)?;
+
+    let mut results = GenerationResults {
+        vectors: vectors.clone(),
+        bounds: bounds.clone(),
+        noir_file: None,
+        toml_file: None,
+    };
+
+    // Generate Noir constants if requested
+    let noir_generator = NoirGenerator::new();
+    // We need to create a context for the noir generator
+    let context = fhe_math::rq::Context::new(&moduli, degree)?;
+    let noir_path =
+        noir_generator.generate(&bounds, &helper.params, &context, &circuit_constants_dir)?;
+    results.noir_file = Some(noir_path);
+
+    // Generate Prover TOML if requested
+    if generator_config.generate_toml {
+        let toml_generator = TomlGenerator::new();
+        let toml_path = toml_generator
+            .generate(&vectors.standard_form(&zkp_modulus), &circuit_constants_dir)?;
+        results.toml_file = Some(toml_path);
+    }
+
+    Ok(results)
+}
+
+/// Generate outputs for sk_shares circuit
+fn generate_sk_shares_outputs(
+    bfv_config: BfvConfig,
+    generator_config: GeneratorConfig,
+) -> Result<GenerationResults, Box<dyn std::error::Error>> {
+    // Retain relevant values before bfv_config is moved
+    let moduli = bfv_config.moduli.clone();
+    let degree = bfv_config.degree;
+
+    // Create helper and sample an encryption instance
+    let helper = BfvHelper::new(bfv_config)?;
+    let encryption_data = helper.generate_sample_encryption()?;
+
+    // Compute validation vectors for input encoding
+    let vectors = InputValidationVectors::compute(
+        &encryption_data.sk_rns,
+        &encryption_data.e_rns,
+        &encryption_data.a,
+        &encryption_data.public_key,
+        &helper.params,
+    )?;
+
+    // Derive bounds from BFV parameters at level 0
+    let bounds = InputValidationBounds::compute(&helper.params, 0)?;
+
+    // Use ZK-friendly modulus (e.g., BN254 scalar field)
+    let zkp_modulus = BigInt::from_str_radix(
+        "21888242871839275222246405745257275088548364400416034343698204186575808495617",
+        10,
+    )?;
+
+    // Sanity-check that vectors respect the bounds
+    bounds.check_constraints(&vectors, &zkp_modulus);
+
+    // Create circuit-specific directory for constants in output directory
+    let circuit_constants_dir = generator_config.output_dir.join(&generator_config.circuit);
+    std::fs::create_dir_all(&circuit_constants_dir)?;
+
+    let mut results = GenerationResults {
+        vectors: vectors.clone(),
+        bounds: bounds.clone(),
+        noir_file: None,
+        toml_file: None,
+    };
+
+    // Generate Noir constants if requested
+    let noir_generator = NoirGenerator::new();
+    // We need to create a context for the noir generator
+    let context = fhe_math::rq::Context::new(&moduli, degree)?;
+    let noir_path =
+        noir_generator.generate(&bounds, &helper.params, &context, &circuit_constants_dir)?;
+    results.noir_file = Some(noir_path);
+
+    // Generate Prover TOML if requested
+    if generator_config.generate_toml {
+        let toml_generator = TomlGenerator::new();
+        let toml_path = toml_generator
+            .generate(&vectors.standard_form(&zkp_modulus), &circuit_constants_dir)?;
         results.toml_file = Some(toml_path);
     }
 
