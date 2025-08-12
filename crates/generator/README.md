@@ -8,6 +8,7 @@ A Rust library and CLI tool for generating cryptographic parameters and constant
 - **Input Validation**: Vector computation and constraint checking
 - **Multiple Outputs**: Noir constants and Prover TOML file generation
 - **Circuit-Specific Generation**: Separate generation logic for each circuit (pk_trbfv, pk_pvw, sk_shares)
+- **Circuit-Aware Generators**: Noir and TOML generators adapt their output based on the target circuit
 - **CLI Interface**: User-friendly command-line tool with comprehensive options
 - **Library API**: Can be used as a Rust crate in other projects
 
@@ -79,11 +80,17 @@ let results = generate_all_outputs(bfv_config, generator_config)?;
 
 Generated in the circuit-specific directory (e.g., `output/pk_trbfv/constants.nr`).
 Contains BFV parameters, input validation bounds, and per-modulus bounds for constraint checking in Noir circuit format.
+The content varies by circuit:
+
+- **pk_trbfv**: Uses `EEK_BOUND` constant
+- **pk_pvw**: Uses `E_BOUND` constant + `K`, `N_PARTIES` constants
+- **sk_shares**: Uses `E_BOUND` constant + `K`, `N_PARTIES`, `T` constants
 
 ### Prover TOML (`Prover.toml`)
 
 Generated in the circuit-specific directory (e.g., `output/pk_trbfv/Prover.toml`).
 Contains input validation vectors reduced modulo the BN254 scalar field.
+The structure can be customized per circuit if needed.
 
 ## Library API
 

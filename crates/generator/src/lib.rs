@@ -119,8 +119,13 @@ fn generate_pk_trbfv_outputs(
     let noir_generator = NoirGenerator::new();
     // We need to create a context for the noir generator
     let context = fhe_math::rq::Context::new(&moduli, degree)?;
-    let noir_path =
-        noir_generator.generate(&bounds, &helper.params, &context, &circuit_constants_dir)?;
+    let noir_path = noir_generator.generate(
+        &bounds,
+        &helper.params,
+        &context,
+        &circuit_constants_dir,
+        &generator_config.circuit,
+    )?;
     results.noir_file = Some(noir_path);
 
     // Generate Prover TOML if requested
@@ -183,8 +188,13 @@ fn generate_pk_pvw_outputs(
     let noir_generator = NoirGenerator::new();
     // We need to create a context for the noir generator
     let context = fhe_math::rq::Context::new(&moduli, degree)?;
-    let noir_path =
-        noir_generator.generate(&bounds, &helper.params, &context, &circuit_constants_dir)?;
+    let noir_path = noir_generator.generate(
+        &bounds,
+        &helper.params,
+        &context,
+        &circuit_constants_dir,
+        &generator_config.circuit,
+    )?;
     results.noir_file = Some(noir_path);
 
     // Generate Prover TOML if requested
@@ -247,8 +257,13 @@ fn generate_sk_shares_outputs(
     let noir_generator = NoirGenerator::new();
     // We need to create a context for the noir generator
     let context = fhe_math::rq::Context::new(&moduli, degree)?;
-    let noir_path =
-        noir_generator.generate(&bounds, &helper.params, &context, &circuit_constants_dir)?;
+    let noir_path = noir_generator.generate(
+        &bounds,
+        &helper.params,
+        &context,
+        &circuit_constants_dir,
+        &generator_config.circuit,
+    )?;
     results.noir_file = Some(noir_path);
 
     // Generate Prover TOML if requested
