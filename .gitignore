@@ -1,4 +1,4 @@
 target
 Prover.toml
 !examples/**/Prover.toml
-crates/generator/output/constants.nr
+**/output/constants.nr
