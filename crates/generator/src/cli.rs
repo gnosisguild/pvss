@@ -13,6 +13,7 @@ use std::path::PathBuf;
 pub struct CliConfig {
     pub bfv_config: BfvConfig,
     pub generator_config: GeneratorConfig,
+    pub circuit: String,
 }
 
 impl CliConfig {
@@ -21,6 +22,14 @@ impl CliConfig {
         let matches = Command::new("pvss-generator")
             .about(
                 "Generates cryptographic parameters and constants for PVSS input validation and circuit integration",
+            )
+            .arg(
+                Arg::new("circuit")
+                    .long("circuit")
+                    .short('c')
+                    .value_name("CIRCUIT")
+                    .help("Target circuit name (e.g., pk_trbfv, pk_pvw, sk_shares)")
+                    .required(true),
             )
             .arg(
                 Arg::new("degree")
@@ -51,9 +60,10 @@ impl CliConfig {
                     .long("output-dir")
                     .short('o')
                     .value_name("DIR")
-                    .help("Directory where generated constants and metadata will be saved")
+                    .help("Directory where generated constants and Prover.toml will be saved")
                     .default_value("output"),
             )
+
             .arg(
                 Arg::new("no-toml")
                     .long("no-toml")
@@ -95,6 +105,19 @@ impl CliConfig {
         // Get output directory path
         let output_dir = PathBuf::from(matches.get_one::<String>("output-dir").unwrap());
 
+        // Parse circuit name
+        let circuit = matches.get_one::<String>("circuit").unwrap().clone();
+
+        // Validate circuit name
+        let valid_circuits = ["pk_trbfv", "pk_pvw", "sk_shares"];
+        if !valid_circuits.contains(&circuit.as_str()) {
+            return Err(format!(
+                "Invalid circuit: {}. Valid circuits are: {:?}",
+                circuit, valid_circuits
+            )
+            .into());
+        }
+
         let bfv_config = BfvConfig {
             degree,
             plaintext_modulus,
@@ -104,11 +127,13 @@ impl CliConfig {
         let generator_config = GeneratorConfig {
             output_dir,
             generate_toml,
+            circuit: circuit.clone(),
         };
 
         Ok(CliConfig {
             bfv_config,
             generator_config,
+            circuit,
         })
     }
 
@@ -119,6 +144,7 @@ impl CliConfig {
 
         // Display parsed input parameters
         println!("\nConfiguration:");
+        println!("- Circuit: {}", self.circuit);
         println!("- Degree: {}", self.bfv_config.degree);
         println!("- Plaintext modulus: {}", self.bfv_config.plaintext_modulus);
         println!("- Ciphertext moduli: {:?}", self.bfv_config.moduli);

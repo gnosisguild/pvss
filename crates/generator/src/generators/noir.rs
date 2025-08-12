@@ -27,6 +27,7 @@ impl NoirGenerator {
         params: &Arc<BfvParameters>,
         _context: &Context,
         output_dir: &Path,
+        circuit: &str,
     ) -> Result<PathBuf, Box<dyn std::error::Error>> {
         let output_path = output_dir.join("constants.nr");
         let mut file = File::create(&output_path)?;
@@ -38,9 +39,22 @@ impl NoirGenerator {
         writeln!(file, "/// `L` is the dimension size of the polynomials.")?;
         writeln!(file, "pub global L: u32 = {};", bounds.moduli.len())?;
 
-        // E bound
-        writeln!(file, "/// The coefficients of the polynomial `e` should exist in the interval `[-E_BOUND, E_BOUND]` where `E_BOUND` is the upper bound of the gaussian distribution with Sigma = 3.2.")?;
-        writeln!(file, "pub global EEK_BOUND: u64 = {};", bounds.e_bound)?;
+        // Circuit-specific constants
+        match circuit {
+            "pk_trbfv" => {
+                // E bound for pk_trbfv (uses EEK_BOUND)
+                writeln!(file, "/// The coefficients of the polynomial `e` should exist in the interval `[-E_BOUND, E_BOUND]` where `E_BOUND` is the upper bound of the gaussian distribution with Sigma = 3.2.")?;
+                writeln!(file, "pub global EEK_BOUND: u64 = {};", bounds.e_bound)?;
+            }
+            "pk_pvw" | "sk_shares" => {
+                // E bound for pk_pvw and sk_shares (uses E_BOUND)
+                writeln!(file, "/// The coefficients of the polynomial `e` should exist in the interval `[-E_BOUND, E_BOUND]` where `E_BOUND` is the upper bound of the gaussian distribution with Sigma = 3.2.")?;
+                writeln!(file, "pub global E_BOUND: u64 = {};", bounds.e_bound)?;
+            }
+            _ => {
+                return Err(format!("Unknown circuit: {}", circuit).into());
+            }
+        }
 
         // SK bound
         writeln!(file, "/// The coefficients of the polynomial `sk` should exist in the interval `[-S_BOUND, S_BOUND]`.")?;
@@ -107,6 +121,22 @@ impl NoirGenerator {
         // TAG constant
         writeln!(file, "/// Constant value for the SAFE sponge algorithm.")?;
         writeln!(file, "pub global TAG: Field = {};", bounds.tag)?;
+
+        // Circuit-specific additional constants
+        match circuit {
+            "pk_pvw" | "sk_shares" => {
+                writeln!(file, "/// Security dimension in PVW encryption")?;
+                writeln!(file, "pub global K: u32 = 2;")?;
+                writeln!(file, "pub global N_PARTIES: u32 = 3;")?;
+            }
+            _ => {}
+        }
+
+        // Additional constants for sk_shares
+        if circuit == "sk_shares" {
+            writeln!(file, "// Threshold for Shamir's secret sharing")?;
+            writeln!(file, "pub global T: u32 = 2;")?;
+        }
 
         Ok(output_path)
     }
