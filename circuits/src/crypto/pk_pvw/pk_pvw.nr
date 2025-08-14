@@ -1,3 +1,8 @@
+/// Verifies PVW public key correctness across all moduli
+///
+/// For each modulus q_l, verifies the relation:
+/// b_{l,i} = -a_l * s_i + e_i + r2_{l,i}*(X^N+1) + r1_{l,i}*q_l
+///
 use crate::crypto::pk_pvw::constants::{
     E_BOUND, K, L, N, N_PARTIES, QIS, R1_LOW_BOUNDS, R1_UP_BOUNDS, R2_BOUNDS, SK_BOUND,
 };
@@ -67,7 +72,7 @@ impl PvwPublicKeyCircuit {
         let r2_at_gamma = self.r2.map(|matrix| matrix.map(|row| row.map(|poly| poly.eval(gamma))));
 
         // cyclo poly is equal to x^N + 1
-        let cyclo_at_gamma = gamma.pow_32(N as Field) + 1;
+        let cyclotomic_poly_at_gamma = gamma.pow_32(N as Field) + 1;
 
         // Check the correctness of the public key
         //b_{l,i} = -a_l * s_i + e_i + r2_{l,i}*(X^N+1) + r1_{l,i}*q_l
@@ -91,7 +96,7 @@ impl PvwPublicKeyCircuit {
                     // Compute the right-hand side of the equation
                     let rhs = -a_times_s[k] // - (a_l * s_i)[k]
                         + e_at_gamma[i][k] // + e_i[k]
-                        + r2_at_gamma[l][i][k] * cyclo_at_gamma // + r2_{l,i}[k] * (X^N + 1)
+                        + r2_at_gamma[l][i][k] * cyclotomic_poly_at_gamma // + r2_{l,i}[k] * (X^N + 1)
                         + r1_at_gamma[l][i][k] * QIS[l]; // + r1_{l,i}[k] * q_l
 
                     // Check equality with b_{l,i}[k]
