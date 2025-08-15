@@ -19,18 +19,28 @@ pub struct SssInputs {
     pub k_dim: usize,
     pub degree: usize, // number of coefficients minus 1 (N)
     // Witness payloads
-    pub sk: Vec<BigInt>,          // [N+1] secret polynomial coefficients
-    pub f: Vec<Vec<Vec<BigInt>>>, // [N+1][L] each polynomial has T coeffs over Z_{q_j}
-    pub y: Vec<Vec<Vec<BigInt>>>, // [N+1][L][N_PARTIES]
-    pub r: Vec<Vec<Vec<BigInt>>>, // [N+1][L][N_PARTIES]
-    pub d: Vec<Vec<BigInt>>,      // [N+1][L]
+    pub sk: Vec<BigInt>, // [N+1] secret polynomial coefficients (constant-first)
+    pub f: Vec<Vec<Vec<BigInt>>>, // [N][L] each polynomial has T coeffs over Z_{q_j} (constant-first)
+    pub y: Vec<Vec<Vec<BigInt>>>, // [N][L][N_PARTIES]
+    pub r: Vec<Vec<Vec<BigInt>>>, // [N][L][N_PARTIES]
+    pub d: Vec<Vec<BigInt>>,      // [N][L]
     pub x_coords: Vec<BigInt>,    // [N_PARTIES]
+}
+
+// Euclidean division: a = q*n + r with 0 <= r < n
+fn div_rem_euclid(a: &BigInt, n: &BigInt) -> (BigInt, BigInt) {
+    let mut r = a % n;
+    if r.sign() == Sign::Minus {
+        r += n;
+    }
+    let q = (a - &r) / n;
+    (q, r)
 }
 
 pub fn compute_sss_inputs(
     n_parties: usize,
     k_dim: usize,
-    degree: usize, // N (sk has N+1 coeffs)
+    degree: usize, // N (sk has N+1 coeffs; we output i=0..N-1 to match Noir loop 0..N)
     moduli: &[u64],
     t: usize, // threshold (poly degree = T-1)
     mut rng: ThreadRng,
@@ -38,7 +48,7 @@ pub fn compute_sss_inputs(
     assert!(t >= 1, "T must be ≥ 1");
     assert!(t <= n_parties, "threshold T must be ≤ number of parties");
 
-    // Build PVW params only to sample a secret polynomial conveniently
+    // use PVW just to sample a secret polynomial
     let (variance, bound1, bound2) =
         PvwParameters::suggest_correct_parameters(n_parties, k_dim, degree, moduli)
             .unwrap_or((1, 100, 200));
@@ -62,10 +72,10 @@ pub fn compute_sss_inputs(
         );
     }
 
-    // Standard Shamir x-locations: 1..n
+    // x = 1..n
     let x_coords: Vec<BigInt> = (1..=n_parties).map(|k| BigInt::from(k as u64)).collect();
 
-    // Sample a secret polynomial (length N+1)
+    // secret poly (length N+1), constant-first
     let sk_bn: Vec<BigUint> = Vec::from(&pvw_params.sample_secret_polynomial(&mut rng)?);
     let sk: Vec<BigInt> = sk_bn.iter().map(|x| x.to_bigint().unwrap()).collect();
 
@@ -75,29 +85,30 @@ pub fn compute_sss_inputs(
     let mut r = vec![vec![vec![BigInt::zero(); n_parties]; l]; degree + 1];
     let mut d = vec![vec![BigInt::zero(); l]; degree + 1];
 
-    // For each coefficient a_i and each limb q_j:
     for i in 0..degree {
-        let a_i = &sk[i]; // integer coefficient (may be negative)
+        let a_i = &sk[i];
         for (j, &qj_u) in moduli.iter().enumerate() {
             let qj = BigInt::from(qj_u);
 
-            // Make degree-(t-1) Shamir polynomial over Z_{qj} with f(0) = a_i mod qj
+            // degree-(t-1) Shamir poly over Z_qj with c0 = a_i (mod qj) in [0,qj)
             let sss = ShamirSecretSharing::new(t - 1, n_parties, qj.clone());
-            f[i][j] = sample_f_polynomial(&sss, a_i);
+            f[i][j] = sample_f_polynomial(&sss, a_i); // constant-first: [c0, c1, ..., c_{t-1}]
+            let c0 = f[i][j][0].clone();
 
-            // Euclidean quotient for a_i / qj so that a_i = qj * d + (a_i mod qj)
-            let (q_ij, _) = div_rem_euclid(a_i, &qj);
-            d[i][j] = q_ij;
+            // d_{i,j} from a_i - c0 = d * qj
+            let (d_ij, rem) = div_rem_euclid(&(a_i - &c0), &qj);
+            debug_assert!(rem.is_zero());
+            d[i][j] = d_ij;
 
-            // Shares: evaluate as integers, then Euclidean div/rem by qj
+            // shares via integer Horner (constant-first -> iterate rev)
             for (k_idx, xk) in x_coords.iter().enumerate() {
                 let mut acc = BigInt::zero();
-                for c in f[i][j].iter().rev() {
-                    acc = xk * &acc + c;
+                for coeff in f[i][j].iter().rev() {
+                    acc = xk * &acc + coeff;
                 }
-                let (rk, yk) = div_rem_euclid(&acc, &qj);
-                y[i][j][k_idx] = yk;
+                let (rk, yk) = div_rem_euclid(&acc, &qj); // acc = rk * qj + yk
                 r[i][j][k_idx] = rk;
+                y[i][j][k_idx] = yk;
             }
         }
     }
@@ -126,15 +137,14 @@ pub fn generate_sss_toml(
     struct PolyTable {
         coefficients: Vec<String>,
     }
-
     #[derive(Serialize)]
     struct ProverToml {
         sk: PolyTable,
         f: Vec<Vec<PolyTable>>,
-        y: Vec<Vec<PolyTable>>,
-        r: Vec<Vec<PolyTable>>,
+        y: Vec<Vec<Vec<String>>>,
+        r: Vec<Vec<Vec<String>>>,
         d: Vec<Vec<String>>,
-        x_coords: PolyTable,
+        x_coords: Vec<String>,
     }
 
     fn bn254() -> BigInt {
@@ -146,7 +156,7 @@ pub fn generate_sss_toml(
     }
     let p = bn254();
 
-    // Normalize into [0,p) and to string
+    // canonical field rep in [0,p)
     let to_fp_str = |x: &BigInt| {
         let mut r = x % &p;
         if r.sign() == Sign::Minus {
@@ -155,45 +165,52 @@ pub fn generate_sss_toml(
         r.to_string()
     };
 
-    // Vec<BigInt> -> PolyTable (each entry reduced mod p)
-    let to_poly = |v: &Vec<BigInt>| -> PolyTable {
-        PolyTable {
-            coefficients: v.iter().map(&to_fp_str).collect(),
-        }
+    // sk stays constant-first (so sk.coefficients[i] == a_i in Noir)
+    let to_poly_const_first = |v: &Vec<BigInt>| PolyTable {
+        coefficients: v.iter().map(&to_fp_str).collect(),
     };
 
-    // f: Vec<Vec<Polynomial>> -> Vec<Vec<PolyTable>>
+    // f must be highest-first to match Noir's eval (coeff[0] is highest degree)
+    let to_poly_highest_first = |v: &Vec<BigInt>| PolyTable {
+        coefficients: v.iter().rev().map(&to_fp_str).collect(),
+    };
+
     let f_ser: Vec<Vec<PolyTable>> = inputs
         .f
         .iter()
-        .map(|row| row.iter().map(to_poly).collect())
+        .map(|row| row.iter().map(to_poly_highest_first).collect())
         .collect();
 
-    // y, r: Vec<Vec<Vec<BigInt>>> -> Vec<Vec<PolyTable>>
-    let y_ser: Vec<Vec<PolyTable>> = inputs
+    let y_ser: Vec<Vec<Vec<String>>> = inputs
         .y
         .iter()
-        .map(|row| row.iter().map(to_poly).collect())
+        .map(|row| {
+            row.iter()
+                .map(|col| col.iter().map(&to_fp_str).collect())
+                .collect()
+        })
         .collect();
 
-    let r_ser: Vec<Vec<PolyTable>> = inputs
+    let r_ser: Vec<Vec<Vec<String>>> = inputs
         .r
         .iter()
-        .map(|row| row.iter().map(to_poly).collect())
+        .map(|row| {
+            row.iter()
+                .map(|col| col.iter().map(&to_fp_str).collect())
+                .collect()
+        })
         .collect();
 
-    // d: Vec<Vec<BigInt>> -> Vec<Vec<String>> (nested arrays, compact)
     let d_ser: Vec<Vec<String>> = inputs
         .d
         .iter()
         .map(|row| row.iter().map(&to_fp_str).collect())
         .collect();
 
-    // x_coords
-    let x_coords_ser = to_poly(&inputs.x_coords);
+    let x_coords_ser: Vec<String> = inputs.x_coords.iter().map(&to_fp_str).collect();
 
     let obj = ProverToml {
-        sk: to_poly(&inputs.sk),
+        sk: to_poly_const_first(&inputs.sk),
         f: f_ser,
         y: y_ser,
         r: r_ser,
@@ -207,17 +224,16 @@ pub fn generate_sss_toml(
     Ok(path)
 }
 
-// Build degree-(t-1) polynomial over Z_{prime} with f(0) = secret mod prime
+// Build degree-(t-1) polynomial over Z_q with f(0) = secret mod q
 fn sample_f_polynomial(sss: &ShamirSecretSharing, secret: &BigInt) -> Vec<BigInt> {
-    // constant term = a_i mod qj in [0, qj)
+    // c0 = a_i mod q in [0,q)
     let mut c0 = secret % &sss.prime;
     if c0.sign() == Sign::Minus {
         c0 += &sss.prime;
     }
-
-    // random coeffs uniform in [0, qj)
+    // random coeffs in [0,q)
     let low = BigInt::from(0);
-    let high = sss.prime.clone(); // half-open: [0, prime)
+    let high = sss.prime.clone();
     let random_coefficients: Vec<BigInt> = (0..sss.threshold)
         .into_par_iter()
         .map(|_| {
@@ -227,17 +243,7 @@ fn sample_f_polynomial(sss: &ShamirSecretSharing, secret: &BigInt) -> Vec<BigInt
         .collect();
 
     let mut coefficients = Vec::with_capacity(1 + sss.threshold);
-    coefficients.push(c0);
+    coefficients.push(c0); // constant-first
     coefficients.extend(random_coefficients);
     coefficients
-}
-
-// Euclidean division: a = q*n + r with 0 <= r < n (assumes n > 0)
-fn div_rem_euclid(a: &BigInt, n: &BigInt) -> (BigInt, BigInt) {
-    let mut r = a % n;
-    if r.sign() == Sign::Minus {
-        r += n;
-    }
-    let q = (a - &r) / n;
-    (q, r)
 }

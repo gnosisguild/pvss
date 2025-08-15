@@ -76,14 +76,14 @@ impl CliConfig {
                     .long("pvw-n")
                     .value_name("N_PARTIES")
                     .help("PVW: number of parties (used for sk_shares)")
-                    .default_value("10"),
+                    .default_value("3"),
             )
             .arg(
                 Arg::new("pvw-k")
                     .long("pvw-k")
                     .value_name("K_DIM")
                     .help("PVW: LWE dimension k (used for pk_pvw and sk_shares)")
-                    .default_value("32"),
+                    .default_value("2"),
             )
             .arg(
                 Arg::new("pvw-degree")
@@ -91,6 +91,13 @@ impl CliConfig {
                     .value_name("RING_DEGREE")
                     .help("PVW: Ring degree (used for pk_pvw and sk_shares)")
                     .default_value("16"),
+            )
+            .arg(
+                Arg::new("sks-t")
+                    .long("sks-t")
+                    .value_name("T")
+                    .help("SKS: Shamir threshold T (used for sk_shares)")
+                    .default_value("2"),
             )
             .get_matches();
 
@@ -156,6 +163,10 @@ impl CliConfig {
                 .unwrap_or(3),
             k_dim: matches
                 .get_one::<String>("pvw-k")
+                .and_then(|s| s.parse::<usize>().ok())
+                .unwrap_or(2),
+            t: matches
+                .get_one::<String>("sks-t")
                 .and_then(|s| s.parse::<usize>().ok())
                 .unwrap_or(2),
         };

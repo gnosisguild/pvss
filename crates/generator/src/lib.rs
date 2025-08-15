@@ -34,6 +34,7 @@ pub struct GeneratorConfig {
     pub circuit: String,
     pub n_parties: usize,
     pub k_dim: usize,
+    pub t: usize,
 }
 
 impl Default for GeneratorConfig {
@@ -44,6 +45,7 @@ impl Default for GeneratorConfig {
             circuit: "pk_trbfv".to_string(),
             n_parties: 3,
             k_dim: 2,
+            t: 2,
         }
     }
 }
@@ -253,7 +255,7 @@ fn generate_sk_shares_outputs(
         generator_config.k_dim,
         degree,
         &moduli,
-        4,
+        generator_config.t,
         rng,
     )
     .unwrap();

@@ -33,7 +33,7 @@ impl SecretKeySharesCircuit {
         SecretKeySharesCircuit { sk, f, y, r, d, x_coords }
     }
     pub fn correct_sss(self) {
-        for i in 0..N + 1 {
+        for i in 0..N {
             let a_i = self.sk.coefficients[i];
 
             // Loop over each modulus q_j
@@ -56,8 +56,7 @@ impl SecretKeySharesCircuit {
                 }
                 let d_i_j = self.d[i][j];
                 // Verify a_i = f_i_j(0) mod q_j (secret-key consistency)
-                //f_i_j(0) = a_i + d_i_j * q_j  mod P
-                assert_eq(f_i_j.eval(0), a_i + d_i_j * q_j);
+                assert_eq(f_i_j.eval(0), a_i - d_i_j * q_j);
             }
         }
     }
