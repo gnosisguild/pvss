@@ -140,4 +140,32 @@ impl NoirGenerator {
 
         Ok(output_path)
     }
+
+    /// Same as generate, but allows overriding PVW-specific constants K and N_PARTIES when needed
+    pub fn generate_with_pvw(
+        &self,
+        bounds: &InputValidationBounds,
+        params: &Arc<BfvParameters>,
+        context: &Context,
+        output_dir: &Path,
+        circuit: &str,
+        k_dim_override: Option<u32>,
+        n_parties_override: Option<u32>,
+    ) -> Result<PathBuf, Box<dyn std::error::Error>> {
+        let path = self.generate(bounds, params, context, output_dir, circuit)?;
+        // If overrides provided and circuit is PVW-related, append K and N_PARTIES if missing
+        if matches!(circuit, "pk_pvw" | "sk_shares") {
+            if let (Some(k), Some(n)) = (k_dim_override, n_parties_override) {
+                let content = std::fs::read_to_string(&path)?;
+                let mut file = std::fs::OpenOptions::new().append(true).open(&path)?;
+                if !content.contains("pub global K:") {
+                    writeln!(file, "pub global K: u32 = {k};")?;
+                }
+                if !content.contains("pub global N_PARTIES:") {
+                    writeln!(file, "pub global N_PARTIES: u32 = {n};")?;
+                }
+            }
+        }
+        Ok(path)
+    }
 }

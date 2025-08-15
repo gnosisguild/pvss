@@ -70,6 +70,28 @@ impl CliConfig {
                     .help("Skip generation of Prover.toml output file")
                     .action(clap::ArgAction::SetTrue),
             )
+
+             .arg(
+                Arg::new("pvw-n")
+                    .long("pvw-n")
+                    .value_name("N_PARTIES")
+                    .help("PVW: number of parties (used for sk_shares)")
+                    .default_value("10"),
+            )
+            .arg(
+                Arg::new("pvw-k")
+                    .long("pvw-k")
+                    .value_name("K_DIM")
+                    .help("PVW: LWE dimension k (used for pk_pvw and sk_shares)")
+                    .default_value("32"),
+            )
+            .arg(
+                Arg::new("pvw-degree")
+                    .long("pvw-degree")
+                    .value_name("RING_DEGREE")
+                    .help("PVW: Ring degree (used for pk_pvw and sk_shares)")
+                    .default_value("16"),
+            )
             .get_matches();
 
         // Parse polynomial degree
@@ -128,6 +150,14 @@ impl CliConfig {
             output_dir,
             generate_toml,
             circuit: circuit.clone(),
+            n_parties: matches
+                .get_one::<String>("pvw-n")
+                .and_then(|s| s.parse::<usize>().ok())
+                .unwrap_or(3),
+            k_dim: matches
+                .get_one::<String>("pvw-k")
+                .and_then(|s| s.parse::<usize>().ok())
+                .unwrap_or(2),
         };
 
         Ok(CliConfig {

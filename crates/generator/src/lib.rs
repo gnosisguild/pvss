@@ -10,6 +10,7 @@ pub mod bfv;
 pub mod bounds;
 pub mod cli;
 pub mod generators;
+pub mod sk_shares;
 pub mod utils;
 pub mod vectors;
 
@@ -18,6 +19,7 @@ pub use bfv::{BfvConfig, BfvHelper, EncryptionData};
 pub use bounds::InputValidationBounds;
 pub use cli::CliConfig;
 pub use generators::{noir::NoirGenerator, toml::TomlGenerator};
+use rand::thread_rng;
 pub use vectors::InputValidationVectors;
 
 use num_traits::Num;
@@ -30,6 +32,8 @@ pub struct GeneratorConfig {
     pub output_dir: PathBuf,
     pub generate_toml: bool,
     pub circuit: String,
+    pub n_parties: usize,
+    pub k_dim: usize,
 }
 
 impl Default for GeneratorConfig {
@@ -38,6 +42,8 @@ impl Default for GeneratorConfig {
             output_dir: "output".into(),
             generate_toml: true,
             circuit: "pk_trbfv".to_string(),
+            n_parties: 3,
+            k_dim: 2,
         }
     }
 }
@@ -241,38 +247,50 @@ fn generate_sk_shares_outputs(
 
     // Sanity-check that vectors respect the bounds
     bounds.check_constraints(&vectors, &zkp_modulus);
+    let rng = thread_rng();
+    let sss_inputs = crate::sk_shares::compute_sss_inputs(
+        generator_config.n_parties,
+        generator_config.k_dim,
+        degree,
+        &moduli,
+        4,
+        rng,
+    )
+    .unwrap();
 
     // Create circuit-specific directory for constants in output directory
     let circuit_constants_dir = generator_config.output_dir.join(&generator_config.circuit);
     std::fs::create_dir_all(&circuit_constants_dir)?;
 
-    let mut results = GenerationResults {
-        vectors: vectors.clone(),
-        bounds: bounds.clone(),
-        noir_file: None,
-        toml_file: None,
-    };
-
     // Generate Noir constants if requested
     let noir_generator = NoirGenerator::new();
     // We need to create a context for the noir generator
     let context = fhe_math::rq::Context::new(&moduli, degree)?;
-    let noir_path = noir_generator.generate(
+    let noir_path = noir_generator.generate_with_pvw(
         &bounds,
         &helper.params,
         &context,
         &circuit_constants_dir,
         &generator_config.circuit,
+        Some(sss_inputs.k_dim as u32),
+        Some(sss_inputs.n_parties as u32),
     )?;
-    results.noir_file = Some(noir_path);
 
+    let mut toml_file = None;
     // Generate Prover TOML if requested
     if generator_config.generate_toml {
-        let toml_generator = TomlGenerator::new();
-        let toml_path = toml_generator
-            .generate(&vectors.standard_form(&zkp_modulus), &circuit_constants_dir)?;
-        results.toml_file = Some(toml_path);
+        let toml_path = crate::sk_shares::generate_sss_toml(&sss_inputs, &circuit_constants_dir)?;
+        toml_file = Some(toml_path);
     }
+
+    // Fill results (vectors field unused for PVW; provide empty placeholder)
+    let placeholder_vectors = InputValidationVectors::new(moduli.len(), degree);
+    let results = GenerationResults {
+        vectors: placeholder_vectors,
+        bounds,
+        noir_file: Some(noir_path),
+        toml_file: toml_file,
+    };
 
     Ok(results)
 }
