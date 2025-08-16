@@ -1,9 +1,7 @@
 use crate::crypto::pk_pvw::constants::{
-    E_BOUND, K, L, N, N_PARTIES, QIS, R1_LOW_BOUNDS, R1_UP_BOUNDS, R2_BOUNDS, SK_BOUND, E1_BOUND,
-    E2_BOUND, // Different bounds for e1 and e2
-    ENCRYPTION_R1_LOW_BOUNDS, ENCRYPTION_R1_UP_BOUNDS, ENCRYPTION_R2_BOUNDS,
-    ENCRYPTION_S1_LOW_BOUNDS, ENCRYPTION_S1_UP_BOUNDS, ENCRYPTION_S2_BOUNDS, SIZE_ENCRYPTION,
-    TAG_ENCRYPTION,
+    E1_BOUND, E2_BOUND, E_BOUND, ENCRYPTION_R1_LOW_BOUNDS, ENCRYPTION_R1_UP_BOUNDS,
+    ENCRYPTION_R2_BOUNDS, ENCRYPTION_S1_LOW_BOUNDS, ENCRYPTION_S1_UP_BOUNDS, ENCRYPTION_S2_BOUNDS,
+    K, L, N, N_PARTIES, QIS, R1_LOW_BOUNDS, R1_UP_BOUNDS, R2_BOUNDS, SIZE, SK_BOUND, TAG,
 };
 use crate::math::polynomial::Polynomial;
 use safe::safe::SafeSponge;
@@ -83,8 +81,8 @@ impl PvwEncryptionCircuit {
     }
 
     /// Flattens all witness data into a single array for Fiat-Shamir
-    pub fn payload(self) -> [Field; SIZE_ENCRYPTION] {
-        let mut inputs = [0; SIZE_ENCRYPTION];
+    pub fn payload(self) -> [Field; SIZE] {
+        let mut inputs = [0; SIZE];
         let mut offset = 0;
 
         // Flatten public matrices a and b (already known, but included for completeness)
@@ -208,7 +206,7 @@ impl PvwEncryptionCircuit {
 
         // 2. Generate Fiat-Shamir challenges
         let inputs = self.payload();
-        let mut safe = SafeSponge::<_, _, TAG_ENCRYPTION>::start([SIZE_ENCRYPTION, L]);
+        let mut safe = SafeSponge::<_, _, TAG>::start([SIZE, L]);
         safe = safe.absorb(inputs);
         let gammas = safe.squeeze();
 
@@ -266,7 +264,7 @@ impl PvwEncryptionCircuit {
     }
 
     /// Verifies encryption equations for a specific modulus
-    fn verify_encryption_for_modulus(circuit: PvwEncryptionCircuit, l: usize, gamma: Field) {
+    fn verify_encryption_for_modulus(circuit: PvwEncryptionCircuit, l: u32, gamma: Field) {
         // Evaluate all polynomials at the challenge point gamma
         let a_at_gamma = circuit.a[l].map(|row| row.map(|poly| poly.eval(gamma)));
         let b_at_gamma = circuit.b[l].map(|row| row.map(|poly| poly.eval(gamma)));
