@@ -14,9 +14,9 @@ example = { package = "example", path = "./example" }
 polynomial = { package = "e3-pvss-polynomial", path = "./polynomial" }
 generator = { package = "e3-pvss-generator", path = "./generator" }
 rand = "0.8.5"
-fhe = { git = "https://github.com/gnosisguild/fhe.rs" }
-fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs"}
-fhe-math = { git = "https://github.com/gnosisguild/fhe.rs.git" }
+fhe = { git = "https://github.com/gnosisguild/fhe.rs", branch = "pvss" }
+fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", branch = "pvss"}
+fhe-math = { git = "https://github.com/gnosisguild/fhe.rs.git", branch = "pvss" }
 pvw = { git = "https://github.com/gnosisguild/pvw-rs", branch = "feat/keys" }
 serde = { version = "1.0.208", features = ["derive"] }
 num-bigint = "0.4.6"
