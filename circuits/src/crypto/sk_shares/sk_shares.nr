@@ -1,4 +1,7 @@
-use crate::crypto::sk_shares::constants::{L, N, N_PARTIES, QIS, SK_BOUND, T, TAG};
+use crate::crypto::sk_shares::constants::{
+    D_LOWER_BOUND, D_UPPER_BOUND, L, N, N_PARTIES, QIS, R_LOWER_BOUND, R_UPPER_BOUND,
+    RANDOMNESS_BOUND, SK_BOUND, T, TAG, TRANSCRIPT_SIZE,
+};
 use crate::math::polynomial::Polynomial;
 use safe::safe::SafeSponge;
 
@@ -17,9 +20,9 @@ pub type Vector<let SIZE: u32, let POLY_SIZE: u32> = [Polynomial<POLY_SIZE>; SIZ
 /// 4. Secret consistency: f_{i,j}(0) = a_i (mod q_j) for all coefficients and moduli
 ///
 /// TRBFV Context:
-/// - The secret key sk is a polynomial of degree N-1 used in TRBFV
+/// - The secret key sk is a polynomial of degree N-1 used in TRBFV encryption/decryption
 /// - Each coefficient a_i is shared independently across all RNS moduli q_j
-/// - The resulting shares will be encrypted using PVW and broadcast
+/// - The resulting shares will be encrypted using PVW and broadcast for distributed key generation
 ///
 /// PVSS Protocol Flow:
 /// 1. Each party generates their TRBFV secret key polynomial sk
@@ -89,19 +92,6 @@ impl SecretKeySharesCircuit {
         SecretKeySharesCircuit { x_coords, y, sk, f, f_randomness, r, d }
     }
 
-    /// Flattens public inputs for initial transcript
-    /// Only includes evaluation points (party IDs) as public inputs
-    pub fn public_payload(self) -> [Field; N_PARTIES] {
-        let mut public_inputs = [0; N_PARTIES];
-
-        // Include public evaluation points (party IDs: 1, 2, 3, ...)
-        for i in 0..N_PARTIES {
-            public_inputs[i] = self.x_coords[i];
-        }
-
-        public_inputs
-    }
-
     /// Main circuit verification function for TRBFV secret key sharing in PVSS
     /// Computes polynomial commitments internally and uses them to generate challenge
     pub fn verify_correct_trbfv_secret_sharing(self) {
@@ -111,20 +101,11 @@ impl SecretKeySharesCircuit {
         // 2. Perform range checks on all private values
         self.perform_range_checks();
 
-        // 3. Compute polynomial commitments inside circuit
-        let polynomial_commitments = self.compute_all_polynomial_commitments();
+        // 3. Generate Fiat-Shamir challenge from public inputs + polynomial commitments
+        let gamma = self.generate_challenge();
 
-        // 4. Generate Fiat-Shamir challenge from public inputs + computed commitments
-        let challenge_input = self.prepare_challenge_input(polynomial_commitments);
-        let mut safe = SafeSponge::<_, _, TAG>::start([challenge_input.len(), 1]);
-        safe = safe.absorb(challenge_input);
-        let challenges = safe.squeeze();
-        let gamma = challenges.get(0);
-
-        // 5. Verify TRBFV secret key sharing equations using the challenge
+        // 4. Verify TRBFV secret key sharing equations using the challenge
         self.verify_trbfv_sharing_equations(gamma);
-
-        safe.finish();
     }
 
     /// Verifies evaluation points are valid for Shamir sharing
@@ -180,7 +161,7 @@ impl SecretKeySharesCircuit {
         current_modulus: Field,
         gamma: Field,
     ) {
-        // Use random linear combination of shares and polynomial evaluations
+        // Use random linear combination instead of Lagrange interpolation
         let mut lhs = 0; // Left side: polynomial evaluations
         let mut rhs = 0; // Right side: reconstructed from shares
 
@@ -203,52 +184,45 @@ impl SecretKeySharesCircuit {
 
     // === Helper Functions ===
 
-    /// Computes all polynomial commitments inside the circuit
-    fn compute_all_polynomial_commitments(self) -> [[Field; L]; N] {
-        let mut commitments = [[0; L]; N];
+    /// Generates Fiat-Shamir challenge from public inputs and polynomial commitments
+    /// Commits to polynomials first, then includes commitments in transcript
+    fn generate_challenge(self) -> Field {
+        // Use pre-defined constant for transcript size
+        // TRANSCRIPT_SIZE = N_PARTIES + N * L (defined in constants)
+        let mut transcript = [0; TRANSCRIPT_SIZE];
+        let mut offset = 0;
 
+        // Add public evaluation points to transcript
+        for i in 0..N_PARTIES {
+            transcript[offset] = self.x_coords[i];
+            offset += 1;
+        }
+
+        // Add polynomial commitments to transcript (not the polynomials themselves!)
         for coefficient_idx in 0..N {
             for modulus_idx in 0..L {
                 let polynomial = self.f[coefficient_idx][modulus_idx];
                 let randomness = self.f_randomness[coefficient_idx][modulus_idx];
 
-                commitments[coefficient_idx][modulus_idx] =
-                    self.compute_polynomial_commitment(polynomial, randomness);
-            }
-        }
-
-        commitments
-    }
-
-    /// Prepares the full challenge input including public data and computed commitments
-    fn prepare_challenge_input(self, commitments: [[Field; L]; N]) -> [Field; N_PARTIES + N * L] {
-        let mut challenge_input = [0; N_PARTIES + N * L];
-        let mut offset = 0;
-
-        // Include public evaluation points
-        for i in 0..N_PARTIES {
-            challenge_input[offset] = self.x_coords[i];
-            offset += 1;
-        }
-
-        // Include computed polynomial commitments
-        for i in 0..N {
-            for j in 0..L {
-                challenge_input[offset] = commitments[i][j];
+                // Compute commitment and add to transcript
+                let commitment = Self::compute_polynomial_commitment(polynomial, randomness);
+                transcript[offset] = commitment;
                 offset += 1;
             }
         }
 
-        challenge_input
+        // Generate challenge using SafeSponge
+        let mut safe = SafeSponge::<_, _, TAG>::start([TRANSCRIPT_SIZE, 1]);
+        safe = safe.absorb(transcript);
+        let challenges = safe.squeeze();
+        safe.finish();
+
+        challenges.get(0)
     }
 
     /// Computes polynomial commitment using SafeSponge hash-based commitment
     /// Provides computational binding and hiding using the same primitive as the protocol
-    fn compute_polynomial_commitment(
-        self,
-        polynomial: Polynomial<T + 1>,
-        randomness: Field,
-    ) -> Field {
+    fn compute_polynomial_commitment(polynomial: Polynomial<T + 1>, randomness: Field) -> Field {
         // Hash-based commitment: SafeSponge(polynomial_coefficients || randomness)
         // This provides computational binding and hiding properties
 
@@ -289,11 +263,42 @@ impl SecretKeySharesCircuit {
             for modulus_idx in 0..L {
                 for party_idx in 0..N_PARTIES {
                     // Shares should be reduced modulo q_j
-                    assert(
-                        self.y[coefficient_idx][modulus_idx][party_idx] as u64
-                            < QIS[modulus_idx] as u64,
-                    );
+                    let share = self.y[coefficient_idx][modulus_idx][party_idx];
+                    let modulus = QIS[modulus_idx] as Field;
+                    let shifted_share = share + modulus;
+                    shifted_share.assert_max_bit_size::<66>();
+                    (2 * modulus - shifted_share).assert_max_bit_size::<66>();
+
+                    // Range check on share consistency quotients r[i][j][k]
+                    let r_val = self.r[coefficient_idx][modulus_idx][party_idx];
+                    let r_shift = -R_LOWER_BOUND as Field;
+                    let r_comp_value = r_shift + R_UPPER_BOUND as Field;
+                    let r_shifted = r_val + r_shift;
+                    r_shifted.assert_max_bit_size::<66>();
+                    (r_comp_value - r_shifted).assert_max_bit_size::<66>();
                 }
+            }
+        }
+
+        // Check secret consistency quotients d[i][j]
+        for coefficient_idx in 0..N {
+            for modulus_idx in 0..L {
+                let d_val = self.d[coefficient_idx][modulus_idx];
+                let d_shift = -D_LOWER_BOUND as Field;
+                let d_comp_value = d_shift + D_UPPER_BOUND as Field;
+                let d_shifted = d_val + d_shift;
+                d_shifted.assert_max_bit_size::<66>();
+                (d_comp_value - d_shifted).assert_max_bit_size::<66>();
+            }
+        }
+
+        // Check commitment randomness is within bounds
+        for coefficient_idx in 0..N {
+            for modulus_idx in 0..L {
+                let randomness = self.f_randomness[coefficient_idx][modulus_idx];
+                let rand_shifted = randomness + RANDOMNESS_BOUND as Field;
+                rand_shifted.assert_max_bit_size::<66>();
+                (2 * RANDOMNESS_BOUND as Field - rand_shifted).assert_max_bit_size::<66>();
             }
         }
     }

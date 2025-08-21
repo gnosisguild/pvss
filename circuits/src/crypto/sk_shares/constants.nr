@@ -22,3 +22,11 @@ pub global K: u32 = 2;
 pub global N_PARTIES: u32 = 3;
 // Threshold for Shamir's secret sharing
 pub global T: u32 = 2;
+// In constants.rs
+pub global TRANSCRIPT_SIZE: u32 = N_PARTIES + N * L; // x_coords + commitments
+// Range check bounds for quotients and randomness
+pub global R_UPPER_BOUND: u64 = 4294967296; // 2^32 for r quotients
+pub global R_LOWER_BOUND: i64 = -4294967296; // -2^32 for r quotients
+pub global D_UPPER_BOUND: u64 = 4294967296; // 2^32 for d quotients
+pub global D_LOWER_BOUND: i64 = -4294967296; // -2^32 for d quotients
+pub global RANDOMNESS_BOUND: u64 = 4294967296; // 2^32 for randomness
