@@ -1,10 +1,148 @@
-use crate::crypto::enc_pvw::constants::{
-    E1_BOUND, E2_BOUND, ENCRYPTION_R1_LOW_BOUNDS, ENCRYPTION_R1_UP_BOUNDS, ENCRYPTION_R2_BOUNDS,
-    ENCRYPTION_S1_LOW_BOUNDS, ENCRYPTION_S1_UP_BOUNDS, ENCRYPTION_S2_BOUNDS, K, L, N, N_PARTIES,
-    QIS, SK_BOUND,
-};
 use crate::math::polynomial::{flatten_matrix, flatten_vector, Matrix, Vector};
 use safe::safe::SafeSponge;
+
+/// Cryptographic parameters for PVW encryption circuit.
+/// Contains the core mathematical constants used in the PVW encryption scheme.
+pub struct CryptographicParams<let L: u32> {
+    /// CRT moduli for each basis: [q_0, q_1, ..., q_{L-1}]
+    pub qis: [Field; L],
+}
+
+impl<let L: u32> CryptographicParams<L> {
+    /// Creates new cryptographic parameters
+    pub fn new(qis: [Field; L]) -> Self {
+        CryptographicParams { qis }
+    }
+}
+
+/// Bound parameters for range checking in PVW encryption circuit.
+/// Contains all the bounds used to validate polynomial coefficients.
+pub struct BoundParams<let L: u32> {
+    /// Bound for error polynomials e1 (c1 components)
+    pub e1_bound: u64,
+    /// Bound for error polynomials e2 (c2 components)
+    pub e2_bound: u64,
+    /// Bound for secret key polynomials (same as encryption vector u)
+    pub sk_bound: u64,
+    /// Lower bounds for r1 polynomials (modulus switching quotients for c1)
+    pub r1_low_bounds: [i64; L],
+    /// Upper bounds for r1 polynomials (modulus switching quotients for c1)
+    pub r1_up_bounds: [u64; L],
+    /// Bounds for r2 polynomials (cyclotomic reduction quotients for c1)
+    pub r2_bounds: [u64; L],
+    /// Lower bounds for s1 polynomials (modulus switching quotients for c2)
+    pub s1_low_bounds: [i64; L],
+    /// Upper bounds for s1 polynomials (modulus switching quotients for c2)
+    pub s1_up_bounds: [u64; L],
+    /// Bounds for s2 polynomials (cyclotomic reduction quotients for c2)
+    pub s2_bounds: [u64; L],
+}
+
+impl<let L: u32> BoundParams<L> {
+    /// Creates new bound parameters
+    pub fn new(
+        e1_bound: u64,
+        e2_bound: u64,
+        sk_bound: u64,
+        r1_low_bounds: [i64; L],
+        r1_up_bounds: [u64; L],
+        r2_bounds: [u64; L],
+        s1_low_bounds: [i64; L],
+        s1_up_bounds: [u64; L],
+        s2_bounds: [u64; L],
+    ) -> Self {
+        BoundParams {
+            e1_bound,
+            e2_bound,
+            sk_bound,
+            r1_low_bounds,
+            r1_up_bounds,
+            r2_bounds,
+            s1_low_bounds,
+            s1_up_bounds,
+            s2_bounds,
+        }
+    }
+}
+
+/// Circuit-specific parameters for PVW encryption circuit.
+/// Contains dimensions and other circuit-specific constants.
+pub struct CircuitParams {
+    /// The degree of polynomials (ring dimension)
+    pub n: u32,
+    /// Security dimension in PVW encryption
+    pub k: u32,
+    /// Number of parties
+    pub n_parties: u32,
+}
+
+impl CircuitParams {
+    /// Creates new circuit parameters
+    pub fn new(n: u32, k: u32, n_parties: u32) -> Self {
+        CircuitParams { n, k, n_parties }
+    }
+}
+
+/// Complete parameters for PVW encryption circuit.
+/// Combines cryptographic parameters, bounds, and circuit-specific parameters.
+pub struct Params<let N: u32, let L: u32> {
+    /// Cryptographic parameters (moduli)
+    pub crypto: CryptographicParams<L>,
+    /// Bound parameters for range checking
+    pub bounds: BoundParams<L>,
+    /// Circuit-specific parameters
+    pub circuit: CircuitParams,
+}
+
+impl<let N: u32, let L: u32> Params<N, L> {
+    /// Creates new complete parameters
+    pub fn new(
+        qis: [Field; L],
+        e1_bound: u64,
+        e2_bound: u64,
+        sk_bound: u64,
+        r1_low_bounds: [i64; L],
+        r1_up_bounds: [u64; L],
+        r2_bounds: [u64; L],
+        s1_low_bounds: [i64; L],
+        s1_up_bounds: [u64; L],
+        s2_bounds: [u64; L],
+        n: u32,
+        k: u32,
+        n_parties: u32,
+    ) -> Self {
+        let crypto = CryptographicParams::new(qis);
+        let bounds = BoundParams::new(
+            e1_bound,
+            e2_bound,
+            sk_bound,
+            r1_low_bounds,
+            r1_up_bounds,
+            r2_bounds,
+            s1_low_bounds,
+            s1_up_bounds,
+            s2_bounds,
+        );
+        let circuit = CircuitParams::new(n, k, n_parties);
+
+        Params { crypto, bounds, circuit }
+    }
+
+    /// Convenience method to access cryptographic parameters
+    pub fn crypto_params(self) -> CryptographicParams<L> {
+        self.crypto
+    }
+
+    /// Convenience method to access bound parameters
+    pub fn bound_params(self) -> BoundParams<L> {
+        self.bounds
+    }
+
+    /// Convenience method to access circuit parameters
+    pub fn circuit_params(self) -> CircuitParams {
+        self.circuit
+    }
+}
 
 /// PVW Encryption Verification Circuit
 ///
@@ -22,7 +160,10 @@ use safe::safe::SafeSponge;
 /// - r1, r2, s1, s2 are quotients from modulus switching and cyclotomic reduction
 /// - L is the number of moduli, must equal the length of QIS array
 /// - q_l = QIS[l] is the l-th modulus in the RNS representation
-pub struct PvwEncryptionCircuit {
+pub struct PvwEncryptionCircuit<let N: u32, let L: u32, let K: u32, let N_PARTIES: u32> {
+    /// Cryptographic parameters including bounds, moduli, and constants.
+    params: Params<N, L>,
+
     // Public inputs (from public key)
     // Public matrix A for each modulus
     a: [Matrix<K, K, N>; L],
@@ -58,8 +199,9 @@ pub struct PvwEncryptionCircuit {
     s2: [Matrix<N_PARTIES, 1, N - 1>; L],
 }
 
-impl PvwEncryptionCircuit {
+impl<let N: u32, let L: u32, let K: u32, let N_PARTIES: u32> PvwEncryptionCircuit<N, L, K, N_PARTIES> {
     pub fn new(
+        params: Params<N, L>,
         a: [Matrix<K, K, N>; L],
         b: [Matrix<N_PARTIES, K, N>; L],
         c1: [Vector<K, N>; L],
@@ -73,7 +215,7 @@ impl PvwEncryptionCircuit {
         s1: [Matrix<N_PARTIES, 1, 2 * N - 1>; L],
         s2: [Matrix<N_PARTIES, 1, N - 1>; L],
     ) -> Self {
-        PvwEncryptionCircuit { a, b, c1, c2, u, encoded_messages, e1, e2, r1, r2, s1, s2 }
+        PvwEncryptionCircuit { params, a, b, c1, c2, u, encoded_messages, e1, e2, r1, r2, s1, s2 }
     }
 
     /// Flattens all witness data into a single array for Fiat-Shamir
@@ -153,22 +295,22 @@ impl PvwEncryptionCircuit {
     }
 
     /// Performs range checks on all secret witness values
-    fn perform_range_checks(circuit: PvwEncryptionCircuit) {
+    fn perform_range_checks(circuit: PvwEncryptionCircuit<N, L, K, N_PARTIES>) {
         // Check encryption vector u has same bounds as secret key (CBD distribution)
         for j in 0..K {
             // Same bound as secret key
-            circuit.u[j].range_check_1bound(SK_BOUND);
+            circuit.u[j].range_check_1bound(circuit.params.bounds.sk_bound);
         }
 
         // Check error terms have appropriate bounds
         for j in 0..K {
             // Error bound for c1 components
-            circuit.e1[j].range_check_1bound(E1_BOUND);
+            circuit.e1[j].range_check_1bound(circuit.params.bounds.e1_bound);
         }
 
         for i in 0..N_PARTIES {
             // Error bound for c2 components
-            circuit.e2[i].range_check_1bound(E2_BOUND);
+            circuit.e2[i].range_check_1bound(circuit.params.bounds.e2_bound);
         }
 
         // Check quotient terms are within expected bounds (per modulus)
@@ -176,21 +318,21 @@ impl PvwEncryptionCircuit {
             for j in 0..K {
                 // r1 can be negative (modulus switching quotients for c1)
                 circuit.r1[l][j].range_check_2bounds(
-                    ENCRYPTION_R1_UP_BOUNDS[l],
-                    ENCRYPTION_R1_LOW_BOUNDS[l],
+                    circuit.params.bounds.r1_up_bounds[l],
+                    circuit.params.bounds.r1_low_bounds[l],
                 );
                 // r2 bound check (cyclotomic reduction quotients for c1)
-                circuit.r2[l][j].range_check_1bound(ENCRYPTION_R2_BOUNDS[l]);
+                circuit.r2[l][j].range_check_1bound(circuit.params.bounds.r2_bounds[l]);
             }
 
             for i in 0..N_PARTIES {
                 // s1 can be negative (modulus switching quotients for c2)
                 circuit.s1[l][i][0].range_check_2bounds(
-                    ENCRYPTION_S1_UP_BOUNDS[l],
-                    ENCRYPTION_S1_LOW_BOUNDS[l],
+                    circuit.params.bounds.s1_up_bounds[l],
+                    circuit.params.bounds.s1_low_bounds[l],
                 );
                 // s2 range check (cyclotomic reduction quotients for c2)
-                circuit.s2[l][i][0].range_check_1bound(ENCRYPTION_S2_BOUNDS[l]);
+                circuit.s2[l][i][0].range_check_1bound(circuit.params.bounds.s2_bounds[l]);
             }
         }
 
@@ -198,7 +340,11 @@ impl PvwEncryptionCircuit {
     }
 
     /// Verifies encryption equations for a specific modulus
-    fn verify_encryption_for_modulus(circuit: PvwEncryptionCircuit, l: u32, gamma: Field) {
+    fn verify_encryption_for_modulus(
+        circuit: PvwEncryptionCircuit<N, L, K, N_PARTIES>,
+        l: u32,
+        gamma: Field,
+    ) {
         // Evaluate all polynomials at the challenge point gamma
         let a_at_gamma = circuit.a[l].map(|row| row.map(|poly| poly.eval(gamma)));
         let b_at_gamma = circuit.b[l].map(|row| row.map(|poly| poly.eval(gamma)));
@@ -231,7 +377,7 @@ impl PvwEncryptionCircuit {
             let expected_c1 = a_u_product
                 + e1_at_gamma[j]
                 + r2_at_gamma[j] * cyclo_at_gamma
-                + r1_at_gamma[j] * QIS[l];
+                + r1_at_gamma[j] * circuit.params.crypto.qis[l];
 
             // Verify c1 matches
             assert_eq(c1_at_gamma[j], expected_c1);
@@ -251,7 +397,7 @@ impl PvwEncryptionCircuit {
                 + messages_at_gamma[i]
                 + e2_at_gamma[i]
                 + s2_at_gamma[i][0] * cyclo_at_gamma
-                + s1_at_gamma[i][0] * QIS[l];
+                + s1_at_gamma[i][0] * circuit.params.crypto.qis[l];
 
             // Verify c2 matches
             assert_eq(c2_at_gamma[i][0], expected_c2);
@@ -260,7 +406,10 @@ impl PvwEncryptionCircuit {
 
     /// Verify that the encryption uses fresh randomness
     /// (prevents replay attacks and ensures semantic security)
-    pub fn verify_fresh_randomness(circuit: PvwEncryptionCircuit, mut previous_u: Vector<K, N>) {
+    pub fn verify_fresh_randomness(
+        circuit: PvwEncryptionCircuit<N, L, K, N_PARTIES>,
+        mut previous_u: Vector<K, N>,
+    ) {
         // Ensure u is different from any previously used randomness
         let mut is_different = false;
         for j in 0..K {
