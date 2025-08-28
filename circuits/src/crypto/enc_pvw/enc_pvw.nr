@@ -3,7 +3,7 @@ use crate::crypto::enc_pvw::constants::{
     ENCRYPTION_S1_LOW_BOUNDS, ENCRYPTION_S1_UP_BOUNDS, ENCRYPTION_S2_BOUNDS, K, L, N, N_PARTIES,
     QIS, SIZE, SK_BOUND, TAG,
 };
-use crate::math::polynomial::{Matrix, Vector};
+use crate::math::polynomial::{flatten_matrix, flatten_vector, Matrix, Vector};
 use safe::safe::SafeSponge;
 
 /// PVW Encryption Verification Circuit
@@ -81,116 +81,29 @@ impl PvwEncryptionCircuit {
         let mut inputs = [0; SIZE];
         let mut offset = 0;
 
-        // Flatten public matrices a and b (already known, but included for completeness)
         for l in 0..L {
-            for row in 0..K {
-                for col in 0..K {
-                    for k in 0..N {
-                        inputs[k + offset] = self.a[l][row][col].coefficients[k];
-                    }
-                    offset += N;
-                }
-            }
-        }
+            // Flatten public matrices a and b (already known, but included for completeness)
+            let (inputs, offset) = flatten_matrix(inputs, self.a[l], offset);
+            let (inputs, offset) = flatten_matrix(inputs, self.b[l], offset);
 
-        for l in 0..L {
-            for i in 0..N_PARTIES {
-                for j in 0..K {
-                    for k in 0..N {
-                        inputs[k + offset] = self.b[l][i][j].coefficients[k];
-                    }
-                    offset += N;
-                }
-            }
-        }
+            // Flatten ciphertext components (public)
+            let (inputs, offset) = flatten_vector(inputs, self.c1[l], offset);
+            let (inputs, offset) = flatten_matrix(inputs, self.c2[l], offset);
 
-        // Flatten ciphertext components (public)
-        for l in 0..L {
-            for j in 0..K {
-                for k in 0..N {
-                    inputs[k + offset] = self.c1[l][j].coefficients[k];
-                }
-                offset += N;
-            }
-        }
-
-        for l in 0..L {
-            for i in 0..N_PARTIES {
-                for k in 0..N {
-                    inputs[k + offset] = self.c2[l][i][0].coefficients[k];
-                }
-                offset += N;
-            }
+            // Flatten modulus switching terms
+            let (inputs, offset) = flatten_vector(inputs, self.r1[l], offset);
+            let (inputs, offset) = flatten_vector(inputs, self.r2[l], offset);
+            let (inputs, offset) = flatten_matrix(inputs, self.s1[l], offset);
+            let (_, _) = flatten_matrix(inputs, self.s2[l], offset);
         }
 
         // Flatten witness values (secret)
-        for j in 0..K {
-            for k in 0..N {
-                inputs[k + offset] = self.u[j].coefficients[k];
-            }
-            offset += N;
-        }
-
-        for i in 0..N_PARTIES {
-            for k in 0..N {
-                inputs[k + offset] = self.encoded_messages[i].coefficients[k];
-            }
-            offset += N;
-        }
+        let (inputs, offset) = flatten_vector(inputs, self.u, offset);
+        let (inputs, offset) = flatten_vector(inputs, self.encoded_messages, offset);
 
         // Flatten error terms
-        for j in 0..K {
-            for k in 0..N {
-                inputs[k + offset] = self.e1[j].coefficients[k];
-            }
-            offset += N;
-        }
-
-        for i in 0..N_PARTIES {
-            for k in 0..N {
-                inputs[k + offset] = self.e2[i].coefficients[k];
-            }
-            offset += N;
-        }
-
-        // Flatten modulus switching terms
-        for l in 0..L {
-            for j in 0..K {
-                for k in 0..(2 * N - 1) {
-                    inputs[k + offset] = self.r1[l][j].coefficients[k];
-                }
-                offset += 2 * N - 1;
-            }
-        }
-
-        for l in 0..L {
-            for j in 0..K {
-                for k in 0..(N - 1) {
-                    // Updated: N-1 degree
-                    inputs[k + offset] = self.r2[l][j].coefficients[k];
-                }
-                offset += N - 1; // Updated: N-1 degree
-            }
-        }
-
-        for l in 0..L {
-            for i in 0..N_PARTIES {
-                for k in 0..(2 * N - 1) {
-                    inputs[k + offset] = self.s1[l][i][0].coefficients[k];
-                }
-                offset += 2 * N - 1;
-            }
-        }
-
-        for l in 0..L {
-            for i in 0..N_PARTIES {
-                for k in 0..(N - 1) {
-                    // Updated: N-1 degree
-                    inputs[k + offset] = self.s2[l][i][0].coefficients[k];
-                }
-                offset += N - 1; // Updated: N-1 degree
-            }
-        }
+        let (inputs, offset) = flatten_vector(inputs, self.e1, offset);
+        let (inputs, _) = flatten_vector(inputs, self.e2, offset);
 
         inputs
     }

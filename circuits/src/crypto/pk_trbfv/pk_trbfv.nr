@@ -1,7 +1,7 @@
 use crate::crypto::pk_trbfv::constants::{
     EEK_BOUND, L, N, QIS, R1_LOW_BOUNDS, R1_UP_BOUNDS, R2_BOUNDS, SIZE, SK_BOUND, TAG,
 };
-use crate::math::polynomial::Polynomial;
+use crate::math::polynomial::{flatten_vector, Polynomial};
 use safe::safe::SafeSponge;
 
 /// BFV Public Key Verification Circuit
@@ -69,21 +69,21 @@ impl BfvPublicKeyCircuit {
 
         // Flatten CRS polynomials a (L polynomials of degree N)
         // These are public but included for completeness in the transcript
-        let (inputs, offset) = flatten(inputs, self.a, offset);
+        let (inputs, offset) = flatten_vector(inputs, self.a, offset);
 
         // Flatten error polynomial eek (1 polynomial of degree N)
         // This is a secret witness that must remain hidden
-        let (inputs, offset) = flatten(inputs, [self.eek], offset);
+        let (inputs, offset) = flatten_vector(inputs, [self.eek], offset);
 
         // Flatten secret key polynomial sk (1 polynomial of degree N)
         // This is the most sensitive secret value
-        let (inputs, offset) = flatten(inputs, [self.sk], offset);
+        let (inputs, offset) = flatten_vector(inputs, [self.sk], offset);
 
         // Flatten quotient polynomials (L polynomials each)
         // r1: quotients from modulus switching (degree 2*N-1)
-        let (inputs, offset) = flatten(inputs, self.r1, offset);
+        let (inputs, offset) = flatten_vector(inputs, self.r1, offset);
         // r2: quotients from cyclotomic reduction (degree N-1)
-        let (inputs, _) = flatten(inputs, self.r2, offset);
+        let (inputs, _) = flatten_vector(inputs, self.r2, offset);
 
         inputs
     }
@@ -174,25 +174,4 @@ fn verify_public_key_for_modulus(circuit: BfvPublicKeyCircuit, i: u32, gamma: Fi
     // Equation 2: pk1_i = a_i
     // The second component of BFV public key is just the CRS polynomial
     assert_eq(pk1_at_gamma[i], a_at_gamma[i]);
-}
-
-/// Helper function to flatten polynomial arrays into the Fiat-Shamir transcript
-/// Converts arrays of polynomials into a flat array of field elements
-fn flatten<let A: u32, let L: u32>(
-    mut inputs: [Field; SIZE],
-    poly_array: [Polynomial<A>; L],
-    mut offset: u32,
-) -> ([Field; SIZE], u32) {
-    // For each polynomial in the array
-    for j in 0..L {
-        // For each coefficient in the polynomial
-        for k in 0..A {
-            // Copy coefficient into the flat inputs array
-            inputs[k + offset] = poly_array[j].coefficients[k];
-        }
-        // Move offset by the polynomial degree
-        offset += A;
-    }
-
-    (inputs, offset)
 }

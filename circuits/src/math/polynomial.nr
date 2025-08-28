@@ -49,6 +49,77 @@ impl<let N: u32> Polynomial<N> {
     }
 }
 
+/// Flattens an array of polynomials into a 1D array of Field elements.
+///
+/// This helper function serializes polynomial coefficients maintaining a deterministic
+/// ordering of coefficients to ensure reproducible challenge values.
+///
+/// # Generic Parameters
+/// * `A` - The degree of each polynomial in the array
+/// * `L` - The number of polynomials in the array
+/// * `SIZE` - The total size of the target array
+///
+/// # Arguments
+/// * `inputs` - The target array to store flattened coefficients
+/// * `poly` - Array of polynomials to flatten
+/// * `offset` - Starting position in the inputs array
+///
+/// # Returns
+/// A tuple containing:
+/// * The updated inputs array with flattened coefficients
+/// * The new offset position after flattening
+pub fn flatten_vector<let A: u32, let L: u32, let SIZE: u32>(
+    mut inputs: [Field; SIZE],
+    poly: [Polynomial<A>; L],
+    mut offset: u32,
+) -> ([Field; SIZE], u32) {
+    for j in 0..L {
+        for i in 0..A {
+            inputs[i + offset] = poly[j].coefficients[i];
+        }
+        offset += A;
+    }
+
+    (inputs, offset)
+}
+
+/// Flattens a matrix of polynomials into a 1D array of Field elements.
+///
+/// This helper function serializes polynomial coefficients from a matrix maintaining a deterministic
+/// ordering of coefficients to ensure reproducible challenge values.
+///
+/// # Generic Parameters
+/// * `ROWS` - The number of rows in the matrix
+/// * `COLS` - The number of columns in the matrix
+/// * `N` - The degree of each polynomial in the matrix
+/// * `SIZE` - The total size of the target array
+///
+/// # Arguments
+/// * `inputs` - The target array to store flattened coefficients
+/// * `matrix` - Matrix of polynomials to flatten
+/// * `offset` - Starting position in the inputs array
+///
+/// # Returns
+/// A tuple containing:
+/// * The updated inputs array with flattened coefficients
+/// * The new offset position after flattening
+pub fn flatten_matrix<let ROWS: u32, let COLS: u32, let N: u32, let SIZE: u32>(
+    mut inputs: [Field; SIZE],
+    matrix: Matrix<ROWS, COLS, N>,
+    mut offset: u32,
+) -> ([Field; SIZE], u32) {
+    for j in 0..ROWS {
+        for i in 0..COLS {
+            for k in 0..N {
+                inputs[k + offset] = matrix[j][i].coefficients[k];
+            }
+            offset += N;
+        }
+    }
+
+    (inputs, offset)
+}
+
 #[test]
 fn test_polynomial_eval() {
     let coeffs = [1, 2, 3]; // represents 1x^2 + 2x + 3

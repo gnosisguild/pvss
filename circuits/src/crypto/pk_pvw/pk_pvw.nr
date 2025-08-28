@@ -1,7 +1,7 @@
 use crate::crypto::pk_pvw::constants::{
     E_BOUND, K, L, N, N_PARTIES, QIS, R1_LOW_BOUNDS, R1_UP_BOUNDS, R2_BOUNDS, SIZE, SK_BOUND, TAG,
 };
-use crate::math::polynomial::Matrix;
+use crate::math::polynomial::{flatten_matrix, Matrix};
 use safe::safe::SafeSponge;
 
 /// PVW Public Key Verification Circuit
@@ -61,79 +61,31 @@ impl PvwPublicKeyCircuit {
         let mut inputs = [0; SIZE];
         let mut offset = 0;
 
-        // Flatten CRS matrices a (L matrices of KxK polynomials of degree N)
-        // These are public but included for completeness in the transcript
         for l in 0..L {
-            for row in 0..K {
-                for col in 0..K {
-                    for k in 0..N {
-                        inputs[k + offset] = self.a[l][row][col].coefficients[k];
-                    }
-                    offset += N;
-                }
-            }
+            // Flatten CRS matrices a (L matrices of KxK polynomials of degree N)
+            // These are public but included for completeness in the transcript
+            let (inputs, offset) = flatten_matrix(inputs, self.a[l], offset);
+
+            // Flatten public key matrices b (L matrices of N_PARTIES x K polynomials of degree N)
+            // These are public outputs but included in transcript for binding
+            let (inputs, offset) = flatten_matrix(inputs, self.b[l], offset);
+
+            // Flatten r1 quotient matrices (L matrices of N_PARTIES x K polynomials of degree 2*N-1)
+            // Quotients from modulus switching (degree 2*N-1 to handle polynomial products)
+            let (inputs, offset) = flatten_matrix(inputs, self.r1[l], offset);
+
+            // Flatten r2 quotient matrices (L matrices of N_PARTIES x K polynomials of degree 2*N-1)
+            // Quotients from cyclotomic reduction modulo (X^N + 1)
+            let (_, _) = flatten_matrix(inputs, self.r2[l], offset);
         }
 
         // Flatten error matrix e (N_PARTIES x K polynomials of degree N)
         // These are secret witnesses that must remain hidden
-        for i in 0..N_PARTIES {
-            for j in 0..K {
-                for k in 0..N {
-                    inputs[k + offset] = self.e[i][j].coefficients[k];
-                }
-                offset += N;
-            }
-        }
+        let (inputs, offset) = flatten_matrix(inputs, self.e, offset);
 
         // Flatten secret key matrix sk (N_PARTIES x K polynomials of degree N)
         // These are the most sensitive secret values
-        for i in 0..N_PARTIES {
-            for j in 0..K {
-                for k in 0..N {
-                    inputs[k + offset] = self.sk[i][j].coefficients[k];
-                }
-                offset += N;
-            }
-        }
-
-        // Flatten public key matrices b (L matrices of N_PARTIES x K polynomials of degree N)
-        // These are public outputs but included in transcript for binding
-        for l in 0..L {
-            for i in 0..N_PARTIES {
-                for j in 0..K {
-                    for k in 0..N {
-                        inputs[k + offset] = self.b[l][i][j].coefficients[k];
-                    }
-                    offset += N;
-                }
-            }
-        }
-
-        // Flatten r1 quotient matrices (L matrices of N_PARTIES x K polynomials of degree 2*N-1)
-        // Quotients from modulus switching (degree 2*N-1 to handle polynomial products)
-        for l in 0..L {
-            for i in 0..N_PARTIES {
-                for j in 0..K {
-                    for k in 0..(2 * N - 1) {
-                        inputs[k + offset] = self.r1[l][i][j].coefficients[k];
-                    }
-                    offset += 2 * N - 1;
-                }
-            }
-        }
-
-        // Flatten r2 quotient matrices (L matrices of N_PARTIES x K polynomials of degree 2*N-1)
-        // Quotients from cyclotomic reduction modulo (X^N + 1)
-        for l in 0..L {
-            for i in 0..N_PARTIES {
-                for j in 0..K {
-                    for k in 0..(2 * N - 1) {
-                        inputs[k + offset] = self.r2[l][i][j].coefficients[k];
-                    }
-                    offset += 2 * N - 1;
-                }
-            }
-        }
+        let (inputs, _) = flatten_matrix(inputs, self.sk, offset);
 
         inputs
     }
