@@ -1,16 +1,8 @@
 use crate::crypto::pk_pvw::constants::{
     E_BOUND, K, L, N, N_PARTIES, QIS, R1_LOW_BOUNDS, R1_UP_BOUNDS, R2_BOUNDS, SIZE, SK_BOUND, TAG,
 };
-use crate::math::polynomial::Polynomial;
+use crate::math::polynomial::Matrix;
 use safe::safe::SafeSponge;
-
-// Matrix type representing a 2D array of polynomials
-// ROWS x COLS matrix where each entry is a polynomial of degree N
-pub type Matrix<let ROWS: u32, let COLS: u32, let N: u32> = [[Polynomial<N>; COLS]; ROWS];
-
-// Vector type representing a 1D array of polynomials
-// SIZE vector where each entry is a polynomial of degree N
-pub type Vector<let SIZE: u32, let N: u32> = [Polynomial<N>; SIZE];
 
 /// PVW Public Key Verification Circuit
 ///

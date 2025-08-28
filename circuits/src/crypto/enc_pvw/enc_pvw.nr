@@ -3,12 +3,8 @@ use crate::crypto::pk_pvw::constants::{
     ENCRYPTION_R2_BOUNDS, ENCRYPTION_S1_LOW_BOUNDS, ENCRYPTION_S1_UP_BOUNDS, ENCRYPTION_S2_BOUNDS,
     K, L, N, N_PARTIES, QIS, R1_LOW_BOUNDS, R1_UP_BOUNDS, R2_BOUNDS, SIZE, SK_BOUND, TAG,
 };
-use crate::math::polynomial::Polynomial;
+use crate::math::polynomial::{Matrix, Vector};
 use safe::safe::SafeSponge;
-
-// Matrix types for encryption circuit
-pub type Matrix<let ROWS: u32, let COLS: u32, let N: u32> = [[Polynomial<N>; COLS]; ROWS];
-pub type Vector<let SIZE: u32, let N: u32> = [Polynomial<N>; SIZE];
 
 /// PVW Encryption Verification Circuit
 ///

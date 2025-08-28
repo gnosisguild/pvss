@@ -4,6 +4,14 @@ pub struct Polynomial<let N: u32> {
     pub coefficients: [Field; N],
 }
 
+// Matrix type representing a 2D array of polynomials
+// ROWS x COLS matrix where each entry is a polynomial of degree N
+pub type Matrix<let ROWS: u32, let COLS: u32, let N: u32> = [[Polynomial<N>; COLS]; ROWS];
+
+// Vector type representing a 1D array of polynomials
+// SIZE vector where each entry is a polynomial of degree N
+pub type Vector<let SIZE: u32, let N: u32> = [Polynomial<N>; SIZE];
+
 impl<let N: u32> Polynomial<N> {
     /// Creates a new polynomial
     pub fn new(coefficients: [Field; N]) -> Self {

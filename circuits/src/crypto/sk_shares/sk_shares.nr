@@ -2,12 +2,8 @@ use crate::crypto::sk_shares::constants::{
     D_LOWER_BOUND, D_UPPER_BOUND, L, N, N_PARTIES, QIS, R_LOWER_BOUND, R_UPPER_BOUND,
     RANDOMNESS_BOUND, SK_BOUND, T, TAG, TRANSCRIPT_SIZE,
 };
-use crate::math::polynomial::Polynomial;
+use crate::math::polynomial::{Matrix, Polynomial};
 use safe::safe::SafeSponge;
-
-/// Matrix and Vector types for polynomial arrays (using your existing definitions)
-pub type Matrix<let ROWS: u32, let COLS: u32, let POLY_SIZE: u32> = [[Polynomial<POLY_SIZE>; COLS]; ROWS];
-pub type Vector<let SIZE: u32, let POLY_SIZE: u32> = [Polynomial<POLY_SIZE>; SIZE];
 
 /// PVSS Circuit for TRBFV Secret Key Shamir Secret Shares
 ///
