@@ -271,7 +271,7 @@ impl SecretKeySharesCircuit {
 
                     // Range check on share consistency quotients r[i][j][k]
                     let r_val = self.r[coefficient_idx][modulus_idx][party_idx];
-                    let r_shift = -R_LOWER_BOUND as Field;
+                    let r_shift = (-1 * R_LOWER_BOUND) as u64 as Field;
                     let r_comp_value = r_shift + R_UPPER_BOUND as Field;
                     let r_shifted = r_val + r_shift;
                     r_shifted.assert_max_bit_size::<66>();
@@ -284,7 +284,7 @@ impl SecretKeySharesCircuit {
         for coefficient_idx in 0..N {
             for modulus_idx in 0..L {
                 let d_val = self.d[coefficient_idx][modulus_idx];
-                let d_shift = -D_LOWER_BOUND as Field;
+                let d_shift = (-1 * D_LOWER_BOUND) as u64 as Field;
                 let d_comp_value = d_shift + D_UPPER_BOUND as Field;
                 let d_shifted = d_val + d_shift;
                 d_shifted.assert_max_bit_size::<66>();
