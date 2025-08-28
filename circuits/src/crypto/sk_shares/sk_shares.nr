@@ -24,10 +24,6 @@ pub struct BoundParams {
     pub r_lower_bound: i64,
     /// Upper bound for r polynomials (share consistency quotients)
     pub r_upper_bound: u64,
-    /// Lower bound for d polynomials (secret consistency quotients)
-    pub d_lower_bound: i64,
-    /// Upper bound for d polynomials (secret consistency quotients)
-    pub d_upper_bound: u64,
     /// Bound for randomness values
     pub randomness_bound: u64,
 }
@@ -38,18 +34,9 @@ impl BoundParams {
         sk_bound: u64,
         r_lower_bound: i64,
         r_upper_bound: u64,
-        d_lower_bound: i64,
-        d_upper_bound: u64,
         randomness_bound: u64,
     ) -> Self {
-        BoundParams {
-            sk_bound,
-            r_lower_bound,
-            r_upper_bound,
-            d_lower_bound,
-            d_upper_bound,
-            randomness_bound,
-        }
+        BoundParams { sk_bound, r_lower_bound, r_upper_bound, randomness_bound }
     }
 }
 
@@ -89,22 +76,13 @@ impl<let N: u32, let L: u32> Params<N, L> {
         sk_bound: u64,
         r_lower_bound: i64,
         r_upper_bound: u64,
-        d_lower_bound: i64,
-        d_upper_bound: u64,
         randomness_bound: u64,
         n: u32,
         n_parties: u32,
         t: u32,
     ) -> Self {
         let crypto = CryptographicParams::new(qis);
-        let bounds = BoundParams::new(
-            sk_bound,
-            r_lower_bound,
-            r_upper_bound,
-            d_lower_bound,
-            d_upper_bound,
-            randomness_bound,
-        );
+        let bounds = BoundParams::new(sk_bound, r_lower_bound, r_upper_bound, randomness_bound);
         let circuit = CircuitParams::new(n, n_parties, t);
 
         Params { crypto, bounds, circuit }
@@ -435,11 +413,7 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32> SecretKeySharesCirc
         for coefficient_idx in 0..N {
             for modulus_idx in 0..L {
                 let d_val = self.d[coefficient_idx][modulus_idx];
-                let d_shift = (-1 * bound_params.d_lower_bound) as u64 as Field;
-                let d_comp_value = d_shift + bound_params.d_upper_bound as Field;
-                let d_shifted = d_val + d_shift;
-                d_shifted.assert_max_bit_size::<66>();
-                (d_comp_value - d_shifted).assert_max_bit_size::<66>();
+                assert_eq(d_val, 0);
             }
         }
 
