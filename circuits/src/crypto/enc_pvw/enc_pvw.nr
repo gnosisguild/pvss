@@ -1,7 +1,7 @@
 use crate::crypto::enc_pvw::constants::{
     E1_BOUND, E2_BOUND, ENCRYPTION_R1_LOW_BOUNDS, ENCRYPTION_R1_UP_BOUNDS, ENCRYPTION_R2_BOUNDS,
     ENCRYPTION_S1_LOW_BOUNDS, ENCRYPTION_S1_UP_BOUNDS, ENCRYPTION_S2_BOUNDS, K, L, N, N_PARTIES,
-    QIS, SIZE, SK_BOUND, TAG,
+    QIS, SK_BOUND,
 };
 use crate::math::polynomial::{flatten_matrix, flatten_vector, Matrix, Vector};
 use safe::safe::SafeSponge;
@@ -77,7 +77,7 @@ impl PvwEncryptionCircuit {
     }
 
     /// Flattens all witness data into a single array for Fiat-Shamir
-    pub fn payload(self) -> [Field; SIZE] {
+    pub fn payload<let SIZE: u32>(self) -> [Field; SIZE] {
         let mut inputs = [0; SIZE];
         let mut offset = 0;
 
@@ -114,17 +114,42 @@ impl PvwEncryptionCircuit {
         self.perform_range_checks();
 
         // 2. Generate Fiat-Shamir challenges
-        let inputs = self.payload();
-        let mut safe = SafeSponge::<_, _, TAG>::start([SIZE, L]);
-        safe = safe.absorb(inputs);
-        let gammas = safe.squeeze();
+        let gammas = self.generate_challenge();
 
         // 3. Verify encryption equations for each modulus
         for l in 0..L {
             self.verify_encryption_for_modulus(l, gammas.get(l));
         }
+    }
 
-        safe.finish();
+    /// Generates Fiat-Shamir challenge values using a cryptographic sponge
+    ///
+    /// The sponge absorbs all witness values and squeezes out deterministic random field elements
+    /// that will be used to evaluate polynomials for the Schwartz-Zippel lemma.
+    ///
+    /// # Returns
+    /// Vector of challenge values [gamma_0, gamma_1, ..., gamma_{L-1}]
+    fn generate_challenge(self) -> Vec<Field> {
+        // Domain separator for PVSS_enc_pvw circuit - "PVSS_enc_pvw" in hex
+        let domain_separator = [
+            0x50, 0x56, 0x53, 0x53, 0x5f, 0x65, 0x6e, 0x63, 0x5f, 0x70, 0x76, 0x77, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+
+        // IO Pattern: ABSORB(SIZE), SQUEEZE(L)
+        // TODO: double check pattern and size value.
+        let inputs = self.payload::<28668>();
+        let input_size = 28668;
+        let io_pattern = [0x80000000 | input_size, 0x00000000 | (L)];
+
+        let mut sponge = SafeSponge::start(io_pattern, domain_separator);
+        sponge.absorb(inputs);
+        let gammas = sponge.squeeze();
+        sponge.finish();
+        gammas
     }
 
     /// Performs range checks on all secret witness values

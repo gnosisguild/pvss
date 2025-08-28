@@ -1,6 +1,6 @@
 use crate::crypto::sk_shares::constants::{
     D_LOWER_BOUND, D_UPPER_BOUND, L, N, N_PARTIES, QIS, R_LOWER_BOUND, R_UPPER_BOUND,
-    RANDOMNESS_BOUND, SK_BOUND, T, TAG, TRANSCRIPT_SIZE,
+    RANDOMNESS_BOUND, SK_BOUND, T, TRANSCRIPT_SIZE,
 };
 use crate::math::polynomial::{Matrix, Polynomial};
 use safe::safe::SafeSponge;
@@ -208,10 +208,23 @@ impl SecretKeySharesCircuit {
         }
 
         // Generate challenge using SafeSponge
-        let mut safe = SafeSponge::<_, _, TAG>::start([TRANSCRIPT_SIZE, 1]);
-        safe = safe.absorb(transcript);
-        let challenges = safe.squeeze();
-        safe.finish();
+        // Domain separator for PVSS_sk_shares circuit - "PVSS_sk_shares" in hex
+        let domain_separator = [
+            0x50, 0x56, 0x53, 0x53, 0x5f, 0x73, 0x6b, 0x5f, 0x73, 0x68, 0x61, 0x72, 0x65, 0x73,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+
+        // IO Pattern: ABSORB(TRANSCRIPT_SIZE), SQUEEZE(1)
+        let input_size = TRANSCRIPT_SIZE;
+        let io_pattern = [0x80000000 | input_size, 0x00000000 | (1)];
+
+        let mut sponge = SafeSponge::start(io_pattern, domain_separator);
+        sponge.absorb(transcript);
+        let challenges = sponge.squeeze();
+        sponge.finish();
 
         challenges.get(0)
     }
@@ -233,10 +246,23 @@ impl SecretKeySharesCircuit {
         commitment_input[T + 1] = randomness;
 
         // Use SafeSponge to compute commitment hash
-        let mut safe = SafeSponge::<_, _, TAG>::start([T + 2, 1]);
-        safe = safe.absorb(commitment_input);
-        let commitment_hash = safe.squeeze();
-        safe.finish();
+        // Domain separator for PVSS_sk_shares circuit - "PVSS_sk_shares" in hex
+        let domain_separator = [
+            0x50, 0x56, 0x53, 0x53, 0x5f, 0x73, 0x6b, 0x5f, 0x73, 0x68, 0x61, 0x72, 0x65, 0x73,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+
+        // IO Pattern: ABSORB(TRANSCRIPT_SIZE), SQUEEZE(1)
+        let input_size = T + 2;
+        let io_pattern = [0x80000000 | input_size, 0x00000000 | (1)];
+
+        let mut sponge = SafeSponge::start(io_pattern, domain_separator);
+        sponge.absorb(commitment_input);
+        let commitment_hash = sponge.squeeze();
+        sponge.finish();
 
         commitment_hash.get(0)
     }

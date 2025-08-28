@@ -1,5 +1,5 @@
 use crate::crypto::pk_pvw::constants::{
-    E_BOUND, K, L, N, N_PARTIES, QIS, R1_LOW_BOUNDS, R1_UP_BOUNDS, R2_BOUNDS, SIZE, SK_BOUND, TAG,
+    E_BOUND, K, L, N, N_PARTIES, QIS, R1_LOW_BOUNDS, R1_UP_BOUNDS, R2_BOUNDS, SK_BOUND,
 };
 use crate::math::polynomial::{flatten_matrix, Matrix};
 use safe::safe::SafeSponge;
@@ -57,7 +57,7 @@ impl PvwPublicKeyCircuit {
 
     /// Flattens all witness data into a single array for Fiat-Shamir challenge generation
     /// This creates a commitment to all the secret and public values used in the protocol
-    pub fn payload(self) -> [Field; SIZE] {
+    pub fn payload<let SIZE: u32>(self) -> [Field; SIZE] {
         let mut inputs = [0; SIZE];
         let mut offset = 0;
 
@@ -98,11 +98,7 @@ impl PvwPublicKeyCircuit {
         perform_range_checks(self);
 
         // Step 2: Generate Fiat-Shamir challenges from the transcript
-        let inputs = self.payload();
-        let mut safe = SafeSponge::<_, _, TAG>::start([SIZE, 2 * L]);
-        safe = safe.absorb(inputs);
-        let gammas = safe.squeeze();
-
+        let gammas = self.generate_challenge();
         // Step 3: Verify public key equations for each modulus
         // For each modulus q_l, we evaluate all polynomials at a random challenge gamma
         // and verify the linear algebra relation holds
@@ -110,8 +106,36 @@ impl PvwPublicKeyCircuit {
             let gamma = gammas.get(l);
             verify_public_key_for_modulus(self, l, gamma);
         }
+    }
 
-        safe.finish();
+    /// Generates Fiat-Shamir challenge values using a cryptographic sponge
+    ///
+    /// The sponge absorbs all witness values and squeezes out deterministic random field elements
+    /// that will be used to evaluate polynomials for the Schwartz-Zippel lemma.
+    ///
+    /// # Returns
+    /// Vector of challenge values [gamma_0, gamma_1, ..., gamma_{2L-1}]
+    fn generate_challenge(self) -> Vec<Field> {
+        // Domain separator for PVSS_pk_pvw circuit - "PVSS_pk_pvw" in hex
+        let domain_separator = [
+            0x50, 0x56, 0x53, 0x53, 0x5f, 0x70, 0x6b, 0x5f, 0x70, 0x76, 0x77, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+
+        // IO Pattern: ABSORB(SIZE), SQUEEZE(2 * L)
+        // TODO: double check pattern and size value.
+        let inputs = self.payload::<28668>();
+        let input_size = 28668;
+        let io_pattern = [0x80000000 | input_size, 0x00000000 | (2 * L)];
+
+        let mut sponge = SafeSponge::start(io_pattern, domain_separator);
+        sponge.absorb(inputs);
+        let gammas = sponge.squeeze();
+        sponge.finish();
+        gammas
     }
 }
 

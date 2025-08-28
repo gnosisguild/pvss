@@ -16,8 +16,3 @@ pub global R2_BOUNDS: [u64; 2] = [2251799812767744, 2251799813160960];
 /// Security dimension in PVW encryption
 pub global K: u32 = 2;
 pub global N_PARTIES: u32 = 3;
-
-/// Size of the payload.
-pub global SIZE: u32 = 28668;
-/// Constant value for the SAFE sponge algorithm.
-pub global TAG: Field = 5380324561195082;

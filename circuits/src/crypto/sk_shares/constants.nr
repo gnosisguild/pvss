@@ -13,10 +13,6 @@ pub global R1_UP_BOUNDS: [u64; 1] = [481795];
 pub global R2_BOUNDS: [u64; 1] = [9007199246352384];
 /// List of scalars `qis` such that `qis[i]` is the modulus of the i-th CRT basis of `q` (ciphertext space modulus).
 pub global QIS: [Field; 1] = [18014398492704769];
-/// Size of the payload.
-pub global SIZE: u32 = 28668;
-/// Constant value for the SAFE sponge algorithm.
-pub global TAG: Field = 5380324561195082;
 /// Security dimension in PVW encryption
 pub global K: u32 = 2;
 pub global N_PARTIES: u32 = 3;
