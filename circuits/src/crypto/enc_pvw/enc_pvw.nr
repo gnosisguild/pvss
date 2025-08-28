@@ -1,7 +1,7 @@
-use crate::crypto::pk_pvw::constants::{
-    E1_BOUND, E2_BOUND, E_BOUND, ENCRYPTION_R1_LOW_BOUNDS, ENCRYPTION_R1_UP_BOUNDS,
-    ENCRYPTION_R2_BOUNDS, ENCRYPTION_S1_LOW_BOUNDS, ENCRYPTION_S1_UP_BOUNDS, ENCRYPTION_S2_BOUNDS,
-    K, L, N, N_PARTIES, QIS, R1_LOW_BOUNDS, R1_UP_BOUNDS, R2_BOUNDS, SIZE, SK_BOUND, TAG,
+use crate::crypto::enc_pvw::constants::{
+    E1_BOUND, E2_BOUND, ENCRYPTION_R1_LOW_BOUNDS, ENCRYPTION_R1_UP_BOUNDS, ENCRYPTION_R2_BOUNDS,
+    ENCRYPTION_S1_LOW_BOUNDS, ENCRYPTION_S1_UP_BOUNDS, ENCRYPTION_S2_BOUNDS, K, L, N, N_PARTIES,
+    QIS, SIZE, SK_BOUND, TAG,
 };
 use crate::math::polynomial::{Matrix, Vector};
 use safe::safe::SafeSponge;
@@ -73,7 +73,7 @@ impl PvwEncryptionCircuit {
         s1: [Matrix<N_PARTIES, 1, 2 * N - 1>; L],
         s2: [Matrix<N_PARTIES, 1, N - 1>; L],
     ) -> Self {
-        PvwEncryptionCircuit { a, b, c1, c2, u, messages, e1, e2, r1, r2, s1, s2 }
+        PvwEncryptionCircuit { a, b, c1, c2, u, encoded_messages, e1, e2, r1, r2, s1, s2 }
     }
 
     /// Flattens all witness data into a single array for Fiat-Shamir
@@ -198,7 +198,7 @@ impl PvwEncryptionCircuit {
     /// Verifies that the ciphertext was correctly generated
     pub fn verify_correct_encryption(self) {
         // 1. Range checks on all secret values
-        perform_range_checks(self);
+        self.perform_range_checks();
 
         // 2. Generate Fiat-Shamir challenges
         let inputs = self.payload();
@@ -208,7 +208,7 @@ impl PvwEncryptionCircuit {
 
         // 3. Verify encryption equations for each modulus
         for l in 0..L {
-            verify_encryption_for_modulus(self, l, gammas.get(l));
+            self.verify_encryption_for_modulus(l, gammas.get(l));
         }
 
         safe.finish();
@@ -329,11 +329,7 @@ impl PvwEncryptionCircuit {
             for k in 0..N {
                 if circuit.u[j].coefficients[k] != previous_u[j].coefficients[k] {
                     is_different = true;
-                    break;
                 }
-            }
-            if is_different {
-                break;
             }
         }
         assert(is_different);
