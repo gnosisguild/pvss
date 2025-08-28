@@ -1,8 +1,109 @@
-use crate::crypto::pk_trbfv::constants::{
-    EEK_BOUND, L, N, QIS, R1_LOW_BOUNDS, R1_UP_BOUNDS, R2_BOUNDS, SK_BOUND,
-};
 use crate::math::polynomial::{flatten_vector, Polynomial};
 use safe::safe::SafeSponge;
+
+/// Cryptographic parameters for BFV public key circuit.
+/// Contains the core mathematical constants used in the BFV encryption scheme.
+pub struct CryptographicParams<let L: u32> {
+    /// CRT moduli for each basis: [q_0, q_1, ..., q_{L-1}]
+    pub qis: [Field; L],
+}
+
+impl<let L: u32> CryptographicParams<L> {
+    /// Creates new cryptographic parameters
+    pub fn new(qis: [Field; L]) -> Self {
+        CryptographicParams { qis }
+    }
+}
+
+/// Bound parameters for range checking in BFV public key circuit.
+/// Contains all the bounds used to validate polynomial coefficients.
+pub struct BoundParams<let L: u32> {
+    /// Bound for error polynomials (eek)
+    pub eek_bound: u64,
+    /// Bound for secret key polynomials (sk)
+    pub sk_bound: u64,
+    /// Lower bounds for r1 polynomials (modulus switching quotients)
+    pub r1_low_bounds: [i64; L],
+    /// Upper bounds for r1 polynomials (modulus switching quotients)
+    pub r1_up_bounds: [u64; L],
+    /// Bounds for r2 polynomials (cyclotomic reduction quotients)
+    pub r2_bounds: [u64; L],
+}
+
+impl<let L: u32> BoundParams<L> {
+    /// Creates new bound parameters
+    pub fn new(
+        eek_bound: u64,
+        sk_bound: u64,
+        r1_low_bounds: [i64; L],
+        r1_up_bounds: [u64; L],
+        r2_bounds: [u64; L],
+    ) -> Self {
+        BoundParams { eek_bound, sk_bound, r1_low_bounds, r1_up_bounds, r2_bounds }
+    }
+}
+
+/// Circuit-specific parameters for BFV public key circuit.
+/// Contains dimensions and other circuit-specific constants.
+pub struct CircuitParams {
+    /// The degree of polynomials (ring dimension)
+    pub n: u32,
+    /// Number of moduli
+    pub l: u32,
+}
+
+impl CircuitParams {
+    /// Creates new circuit parameters
+    pub fn new(n: u32, l: u32) -> Self {
+        CircuitParams { n, l }
+    }
+}
+
+/// Complete parameters for BFV public key circuit.
+/// Combines cryptographic parameters, bounds, and circuit-specific parameters.
+pub struct Params<let N: u32, let L: u32> {
+    /// Cryptographic parameters (moduli)
+    pub crypto: CryptographicParams<L>,
+    /// Bound parameters for range checking
+    pub bounds: BoundParams<L>,
+    /// Circuit-specific parameters
+    pub circuit: CircuitParams,
+}
+
+impl<let N: u32, let L: u32> Params<N, L> {
+    /// Creates new complete parameters
+    pub fn new(
+        qis: [Field; L],
+        eek_bound: u64,
+        sk_bound: u64,
+        r1_low_bounds: [i64; L],
+        r1_up_bounds: [u64; L],
+        r2_bounds: [u64; L],
+        n: u32,
+        l: u32,
+    ) -> Self {
+        let crypto = CryptographicParams::new(qis);
+        let bounds = BoundParams::new(eek_bound, sk_bound, r1_low_bounds, r1_up_bounds, r2_bounds);
+        let circuit = CircuitParams::new(n, l);
+
+        Params { crypto, bounds, circuit }
+    }
+
+    /// Convenience method to access cryptographic parameters
+    pub fn crypto_params(self) -> CryptographicParams<L> {
+        self.crypto
+    }
+
+    /// Convenience method to access bound parameters
+    pub fn bound_params(self) -> BoundParams<L> {
+        self.bounds
+    }
+
+    /// Convenience method to access circuit parameters
+    pub fn circuit_params(self) -> CircuitParams {
+        self.circuit
+    }
+}
 
 /// BFV Public Key Verification Circuit
 ///
@@ -21,7 +122,10 @@ use safe::safe::SafeSponge;
 /// - q_i = QIS[i] is the i-th modulus in the RNS representation
 ///
 /// Note: This uses RNS (Residue Number System) representation for efficiency
-pub struct BfvPublicKeyCircuit {
+pub struct BfvPublicKeyCircuit<let N: u32, let L: u32> {
+    /// Cryptographic parameters including bounds, moduli, and constants.
+    params: Params<N, L>,
+
     // Common Reference String polynomials (public)
     // One polynomial per modulus i
     a: [Polynomial<N>; L],
@@ -47,9 +151,10 @@ pub struct BfvPublicKeyCircuit {
     pk1: [Polynomial<N>; L],
 }
 
-impl BfvPublicKeyCircuit {
+impl<let N: u32, let L: u32> BfvPublicKeyCircuit<N, L> {
     /// Creates a new BFV public key verification circuit
     pub fn new(
+        params: Params<N, L>,
         a: [Polynomial<N>; L],
         eek: Polynomial<N>,
         sk: Polynomial<N>,
@@ -58,7 +163,7 @@ impl BfvPublicKeyCircuit {
         pk0: [Polynomial<N>; L],
         pk1: [Polynomial<N>; L],
     ) -> Self {
-        BfvPublicKeyCircuit { a, eek, sk, r1, r2, pk0, pk1 }
+        BfvPublicKeyCircuit { params, a, eek, sk, r1, r2, pk0, pk1 }
     }
 
     /// Flattens all witness data into a single array for Fiat-Shamir challenge generation
@@ -138,30 +243,37 @@ impl BfvPublicKeyCircuit {
 
 /// Performs comprehensive range checks on all secret witness values
 /// Ensures that secret keys, errors, and quotients are within cryptographically safe bounds
-fn perform_range_checks(circuit: BfvPublicKeyCircuit) {
+fn perform_range_checks<let N: u32, let L: u32>(circuit: BfvPublicKeyCircuit<N, L>) {
     // Check that error polynomial has small coefficients
     // Small errors are crucial for both security and correctness in BFV
-    circuit.eek.range_check_1bound(EEK_BOUND);
+    circuit.eek.range_check_1bound(circuit.params.bounds.eek_bound);
 
     // Check that secret key polynomial has small coefficients
     // Secret key must be small (from CBD distribution) for security
-    circuit.sk.range_check_1bound(SK_BOUND);
+    circuit.sk.range_check_1bound(circuit.params.bounds.sk_bound);
 
     // Check quotient terms are within expected bounds (per modulus)
     for i in 0..L {
         // r1 quotients can be negative (modulus switching can produce negative quotients)
         // Use asymmetric bounds [R1_LOW_BOUNDS[i], R1_UP_BOUNDS[i]] for modulus i
-        circuit.r1[i].range_check_2bounds(R1_UP_BOUNDS[i], R1_LOW_BOUNDS[i]);
+        circuit.r1[i].range_check_2bounds(
+            circuit.params.bounds.r1_up_bounds[i],
+            circuit.params.bounds.r1_low_bounds[i],
+        );
 
         // r2 quotients are typically positive (cyclotomic reduction quotients)
         // Use symmetric bounds [-R2_BOUNDS[i], R2_BOUNDS[i]] for modulus i
-        circuit.r2[i].range_check_1bound(R2_BOUNDS[i]);
+        circuit.r2[i].range_check_1bound(circuit.params.bounds.r2_bounds[i]);
     }
 }
 
 /// Verifies the BFV public key generation equation for a specific modulus
 /// This is where the core BFV verification happens
-fn verify_public_key_for_modulus(circuit: BfvPublicKeyCircuit, i: u32, gamma: Field) {
+fn verify_public_key_for_modulus<let N: u32, let L: u32>(
+    circuit: BfvPublicKeyCircuit<N, L>,
+    i: u32,
+    gamma: Field,
+) {
     // Evaluate all polynomials at the random challenge point gamma
     // This reduces polynomial equations to field element equations
 
@@ -190,7 +302,7 @@ fn verify_public_key_for_modulus(circuit: BfvPublicKeyCircuit, i: u32, gamma: Fi
     let expected_pk0 = -a_at_gamma[i] * sk_at_gamma // -a_i * sk
         + eek_at_gamma // + eek (error term)
         + r2_at_gamma[i] * cyclo_at_gamma // + r2_i * (X^N + 1)
-        + r1_at_gamma[i] * QIS[i]; // + r1_i * q_i
+        + r1_at_gamma[i] * circuit.params.crypto.qis[i]; // + r1_i * q_i
 
     assert_eq(pk0_at_gamma[i], expected_pk0);
 
