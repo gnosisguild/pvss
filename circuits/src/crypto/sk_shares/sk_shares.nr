@@ -416,9 +416,9 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32> SecretKeySharesCirc
                     // Shares should be reduced modulo q_j
                     let share = self.y[coefficient_idx][modulus_idx][party_idx];
                     let modulus = crypto_params.qis[modulus_idx] as Field;
-                    let shifted_share = share + modulus;
-                    shifted_share.assert_max_bit_size::<66>();
-                    (2 * modulus - shifted_share).assert_max_bit_size::<66>();
+                    // For positive range [0, modulus)
+                    share.assert_max_bit_size::<66>();
+                    (modulus - 1 - share).assert_max_bit_size::<66>();
 
                     // Range check on share consistency quotients r[i][j][k]
                     let r_val = self.r[coefficient_idx][modulus_idx][party_idx];
