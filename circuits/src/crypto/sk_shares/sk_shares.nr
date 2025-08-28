@@ -1,9 +1,130 @@
-use crate::crypto::sk_shares::constants::{
-    D_LOWER_BOUND, D_UPPER_BOUND, L, N, N_PARTIES, QIS, R_LOWER_BOUND, R_UPPER_BOUND,
-    RANDOMNESS_BOUND, SK_BOUND, T, TRANSCRIPT_SIZE,
-};
 use crate::math::polynomial::{Matrix, Polynomial};
 use safe::safe::SafeSponge;
+
+/// Cryptographic parameters for SK shares circuit.
+/// Contains the core mathematical constants used in the SK sharing scheme.
+pub struct CryptographicParams<let L: u32> {
+    /// CRT moduli for each basis: [q_0, q_1, ..., q_{L-1}]
+    pub qis: [Field; L],
+}
+
+impl<let L: u32> CryptographicParams<L> {
+    /// Creates new cryptographic parameters
+    pub fn new(qis: [Field; L]) -> Self {
+        CryptographicParams { qis }
+    }
+}
+
+/// Bound parameters for range checking in SK shares circuit.
+/// Contains all the bounds used to validate polynomial coefficients.
+pub struct BoundParams {
+    /// Bound for secret key polynomials (sk)
+    pub sk_bound: u64,
+    /// Lower bound for r polynomials (share consistency quotients)
+    pub r_lower_bound: i64,
+    /// Upper bound for r polynomials (share consistency quotients)
+    pub r_upper_bound: u64,
+    /// Lower bound for d polynomials (secret consistency quotients)
+    pub d_lower_bound: i64,
+    /// Upper bound for d polynomials (secret consistency quotients)
+    pub d_upper_bound: u64,
+    /// Bound for randomness values
+    pub randomness_bound: u64,
+}
+
+impl BoundParams {
+    /// Creates new bound parameters
+    pub fn new(
+        sk_bound: u64,
+        r_lower_bound: i64,
+        r_upper_bound: u64,
+        d_lower_bound: i64,
+        d_upper_bound: u64,
+        randomness_bound: u64,
+    ) -> Self {
+        BoundParams {
+            sk_bound,
+            r_lower_bound,
+            r_upper_bound,
+            d_lower_bound,
+            d_upper_bound,
+            randomness_bound,
+        }
+    }
+}
+
+/// Circuit-specific parameters for SK shares circuit.
+/// Contains dimensions and other circuit-specific constants.
+pub struct CircuitParams {
+    /// The degree of polynomials (ring dimension)
+    pub n: u32,
+    /// Number of parties
+    pub n_parties: u32,
+    /// Threshold for Shamir's secret sharing
+    pub t: u32,
+}
+
+impl CircuitParams {
+    /// Creates new circuit parameters
+    pub fn new(n: u32, n_parties: u32, t: u32) -> Self {
+        CircuitParams { n, n_parties, t }
+    }
+}
+
+/// Complete parameters for SK shares circuit.
+/// Combines cryptographic parameters, bounds, and circuit-specific parameters.
+pub struct Params<let N: u32, let L: u32> {
+    /// Cryptographic parameters (moduli)
+    pub crypto: CryptographicParams<L>,
+    /// Bound parameters for range checking
+    pub bounds: BoundParams,
+    /// Circuit-specific parameters
+    pub circuit: CircuitParams,
+}
+
+impl<let N: u32, let L: u32> Params<N, L> {
+    /// Creates new complete parameters
+    pub fn new(
+        qis: [Field; L],
+        sk_bound: u64,
+        r_lower_bound: i64,
+        r_upper_bound: u64,
+        d_lower_bound: i64,
+        d_upper_bound: u64,
+        randomness_bound: u64,
+        n: u32,
+        n_parties: u32,
+        t: u32,
+    ) -> Self {
+        let crypto = CryptographicParams::new(qis);
+        let bounds = BoundParams::new(
+            sk_bound,
+            r_lower_bound,
+            r_upper_bound,
+            d_lower_bound,
+            d_upper_bound,
+            randomness_bound,
+        );
+        let circuit = CircuitParams::new(n, n_parties, t);
+
+        Params { crypto, bounds, circuit }
+    }
+
+    /// Convenience method to access cryptographic parameters
+    pub fn crypto_params(self) -> CryptographicParams<L> {
+        self.crypto
+    }
+
+    /// Convenience method to access bound parameters
+    pub fn bound_params(self) -> BoundParams {
+        self.bounds
+    }
+
+    /// Convenience method to access circuit parameters
+    pub fn circuit_params(self) -> CircuitParams {
+        self.circuit
+    }
+}
 
 /// PVSS Circuit for TRBFV Secret Key Shamir Secret Shares
 ///
@@ -32,7 +153,10 @@ use safe::safe::SafeSponge;
 /// - Shares y_{i,j,k} are private but will be PVW encrypted for broadcast
 /// - Only polynomial commitments are public
 /// - Fiat-Shamir challenges prevent selective disclosure
-pub struct SecretKeySharesCircuit {
+pub struct SecretKeySharesCircuit<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32> {
+    /// Cryptographic parameters including bounds, moduli, and constants.
+    params: Params<N, L>,
+
     // === Public Inputs ===
 
     /// Evaluation points for each party (public party IDs: 1, 2, 3, ..., N_PARTIES)
@@ -74,9 +198,10 @@ pub struct SecretKeySharesCircuit {
     d: [[Field; L]; N],
 }
 
-impl SecretKeySharesCircuit {
+impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32> SecretKeySharesCircuit<N, L, N_PARTIES, T> {
     /// Creates a new instance of the TRBFV secret key sharing circuit for PVSS
     pub fn new(
+        params: Params<N, L>,
         x_coords: [Field; N_PARTIES],
         y: [[[Field; N_PARTIES]; L]; N],
         sk: Polynomial<N>,
@@ -85,7 +210,7 @@ impl SecretKeySharesCircuit {
         r: [[[Field; N_PARTIES]; L]; N],
         d: [[Field; L]; N],
     ) -> Self {
-        SecretKeySharesCircuit { x_coords, y, sk, f, f_randomness, r, d }
+        SecretKeySharesCircuit { params, x_coords, y, sk, f, f_randomness, r, d }
     }
 
     /// Main circuit verification function for TRBFV secret key sharing in PVSS
@@ -120,11 +245,13 @@ impl SecretKeySharesCircuit {
     /// Verifies the TRBFV secret key sharing equations using Fiat-Shamir challenge
     /// All verification is done in zero-knowledge using the challenge point
     fn verify_trbfv_sharing_equations(self, gamma: Field) {
+        let crypto_params = self.params.crypto_params();
+
         for coefficient_idx in 0..N {
             let trbfv_secret_coeff = self.sk.coefficients[coefficient_idx];
 
             for modulus_idx in 0..L {
-                let current_modulus = QIS[modulus_idx];
+                let current_modulus = crypto_params.qis[modulus_idx];
                 let sharing_poly = self.f[coefficient_idx][modulus_idx];
 
                 // Verify share consistency using polynomial evaluation at challenge
@@ -183,9 +310,8 @@ impl SecretKeySharesCircuit {
     /// Generates Fiat-Shamir challenge from public inputs and polynomial commitments
     /// Commits to polynomials first, then includes commitments in transcript
     fn generate_challenge(self) -> Field {
-        // Use pre-defined constant for transcript size
-        // TRANSCRIPT_SIZE = N_PARTIES + N * L (defined in constants)
-        let mut transcript = [0; TRANSCRIPT_SIZE];
+        // Use generic parameters directly for array size
+        let mut transcript = [0; N_PARTIES + N * L];
         let mut offset = 0;
 
         // Add public evaluation points to transcript
@@ -218,7 +344,7 @@ impl SecretKeySharesCircuit {
         ];
 
         // IO Pattern: ABSORB(TRANSCRIPT_SIZE), SQUEEZE(1)
-        let input_size = TRANSCRIPT_SIZE;
+        let input_size = N_PARTIES + N * L;
         let io_pattern = [0x80000000 | input_size, 0x00000000 | (1)];
 
         let mut sponge = SafeSponge::start(io_pattern, domain_separator);
@@ -269,13 +395,16 @@ impl SecretKeySharesCircuit {
 
     /// Performs range checks on all private witness values
     fn perform_range_checks(self) {
+        let bound_params = self.params.bound_params();
+        let crypto_params = self.params.crypto_params();
+
         // Check secret key coefficients
-        self.sk.range_check_1bound(SK_BOUND);
+        self.sk.range_check_1bound(bound_params.sk_bound);
 
         // Check sharing polynomial coefficients
         for coefficient_idx in 0..N {
             for modulus_idx in 0..L {
-                let current_modulus = QIS[modulus_idx];
+                let current_modulus = crypto_params.qis[modulus_idx];
                 self.f[coefficient_idx][modulus_idx].range_check_1bound(current_modulus as u64);
             }
         }
@@ -286,15 +415,15 @@ impl SecretKeySharesCircuit {
                 for party_idx in 0..N_PARTIES {
                     // Shares should be reduced modulo q_j
                     let share = self.y[coefficient_idx][modulus_idx][party_idx];
-                    let modulus = QIS[modulus_idx] as Field;
+                    let modulus = crypto_params.qis[modulus_idx] as Field;
                     let shifted_share = share + modulus;
                     shifted_share.assert_max_bit_size::<66>();
                     (2 * modulus - shifted_share).assert_max_bit_size::<66>();
 
                     // Range check on share consistency quotients r[i][j][k]
                     let r_val = self.r[coefficient_idx][modulus_idx][party_idx];
-                    let r_shift = (-1 * R_LOWER_BOUND) as u64 as Field;
-                    let r_comp_value = r_shift + R_UPPER_BOUND as Field;
+                    let r_shift = (-1 * bound_params.r_lower_bound) as u64 as Field;
+                    let r_comp_value = r_shift + bound_params.r_upper_bound as Field;
                     let r_shifted = r_val + r_shift;
                     r_shifted.assert_max_bit_size::<66>();
                     (r_comp_value - r_shifted).assert_max_bit_size::<66>();
@@ -306,8 +435,8 @@ impl SecretKeySharesCircuit {
         for coefficient_idx in 0..N {
             for modulus_idx in 0..L {
                 let d_val = self.d[coefficient_idx][modulus_idx];
-                let d_shift = (-1 * D_LOWER_BOUND) as u64 as Field;
-                let d_comp_value = d_shift + D_UPPER_BOUND as Field;
+                let d_shift = (-1 * bound_params.d_lower_bound) as u64 as Field;
+                let d_comp_value = d_shift + bound_params.d_upper_bound as Field;
                 let d_shifted = d_val + d_shift;
                 d_shifted.assert_max_bit_size::<66>();
                 (d_comp_value - d_shifted).assert_max_bit_size::<66>();
@@ -318,9 +447,10 @@ impl SecretKeySharesCircuit {
         for coefficient_idx in 0..N {
             for modulus_idx in 0..L {
                 let randomness = self.f_randomness[coefficient_idx][modulus_idx];
-                let rand_shifted = randomness + RANDOMNESS_BOUND as Field;
+                let rand_shifted = randomness + bound_params.randomness_bound as Field;
                 rand_shifted.assert_max_bit_size::<66>();
-                (2 * RANDOMNESS_BOUND as Field - rand_shifted).assert_max_bit_size::<66>();
+                (2 * bound_params.randomness_bound as Field - rand_shifted)
+                    .assert_max_bit_size::<66>();
             }
         }
     }
