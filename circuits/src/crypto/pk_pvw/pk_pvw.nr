@@ -1,8 +1,112 @@
-use crate::crypto::pk_pvw::constants::{
-    E_BOUND, K, L, N, N_PARTIES, QIS, R1_LOW_BOUNDS, R1_UP_BOUNDS, R2_BOUNDS, SK_BOUND,
-};
 use crate::math::polynomial::{flatten_matrix, Matrix};
 use safe::safe::SafeSponge;
+
+/// Cryptographic parameters for PVW public key circuit.
+/// Contains the core mathematical constants used in the PVW encryption scheme.
+pub struct CryptographicParams<let L: u32> {
+    /// CRT moduli for each basis: [q_0, q_1, ..., q_{L-1}]
+    pub qis: [Field; L],
+}
+
+impl<let L: u32> CryptographicParams<L> {
+    /// Creates new cryptographic parameters
+    pub fn new(qis: [Field; L]) -> Self {
+        CryptographicParams { qis }
+    }
+}
+
+/// Bound parameters for range checking in PVW public key circuit.
+/// Contains all the bounds used to validate polynomial coefficients.
+pub struct BoundParams<let L: u32> {
+    /// Bound for error polynomials (e)
+    pub e_bound: u64,
+    /// Bound for secret key polynomials (sk)
+    pub sk_bound: u64,
+    /// Lower bounds for r1 polynomials (modulus switching quotients)
+    pub r1_low_bounds: [i64; L],
+    /// Upper bounds for r1 polynomials (modulus switching quotients)
+    pub r1_up_bounds: [u64; L],
+    /// Bounds for r2 polynomials (cyclotomic reduction quotients)
+    pub r2_bounds: [u64; L],
+}
+
+impl<let L: u32> BoundParams<L> {
+    /// Creates new bound parameters
+    pub fn new(
+        e_bound: u64,
+        sk_bound: u64,
+        r1_low_bounds: [i64; L],
+        r1_up_bounds: [u64; L],
+        r2_bounds: [u64; L],
+    ) -> Self {
+        BoundParams { e_bound, sk_bound, r1_low_bounds, r1_up_bounds, r2_bounds }
+    }
+}
+
+/// Circuit-specific parameters for PVW public key circuit.
+/// Contains dimensions and other circuit-specific constants.
+pub struct CircuitParams {
+    /// The degree of polynomials (ring dimension)
+    pub n: u32,
+    /// Security dimension in PVW encryption
+    pub k: u32,
+    /// Number of parties
+    pub n_parties: u32,
+}
+
+impl CircuitParams {
+    /// Creates new circuit parameters
+    pub fn new(n: u32, k: u32, n_parties: u32) -> Self {
+        CircuitParams { n, k, n_parties }
+    }
+}
+
+/// Complete parameters for PVW public key circuit.
+/// Combines cryptographic parameters, bounds, and circuit-specific parameters.
+pub struct Params<let N: u32, let L: u32> {
+    /// Cryptographic parameters (moduli)
+    pub crypto: CryptographicParams<L>,
+    /// Bound parameters for range checking
+    pub bounds: BoundParams<L>,
+    /// Circuit-specific parameters
+    pub circuit: CircuitParams,
+}
+
+impl<let N: u32, let L: u32> Params<N, L> {
+    /// Creates new complete parameters
+    pub fn new(
+        qis: [Field; L],
+        e_bound: u64,
+        sk_bound: u64,
+        r1_low_bounds: [i64; L],
+        r1_up_bounds: [u64; L],
+        r2_bounds: [u64; L],
+        n: u32,
+        k: u32,
+        n_parties: u32,
+    ) -> Self {
+        let crypto = CryptographicParams::new(qis);
+        let bounds = BoundParams::new(e_bound, sk_bound, r1_low_bounds, r1_up_bounds, r2_bounds);
+        let circuit = CircuitParams::new(n, k, n_parties);
+
+        Params { crypto, bounds, circuit }
+    }
+
+    /// Convenience method to access cryptographic parameters
+    pub fn crypto_params(self) -> CryptographicParams<L> {
+        self.crypto
+    }
+
+    /// Convenience method to access bound parameters
+    pub fn bound_params(self) -> BoundParams<L> {
+        self.bounds
+    }
+
+    /// Convenience method to access circuit parameters
+    pub fn circuit_params(self) -> CircuitParams {
+        self.circuit
+    }
+}
 
 /// PVW Public Key Verification Circuit
 ///
@@ -18,7 +122,10 @@ use safe::safe::SafeSponge;
 /// - r1_{l,i}, r2_{l,i} are quotients from modulus switching and cyclotomic reduction
 /// - L is the number of moduli, must equal the length of QIS array
 /// - q_l = QIS[l] is the l-th modulus in the RNS representation
-pub struct PvwPublicKeyCircuit {
+pub struct PvwPublicKeyCircuit<let N: u32, let L: u32, let K: u32, let N_PARTIES: u32> {
+    // Parameters for the circuit
+    params: Params<N, L>,
+
     // Common Reference String (CRS) matrices
     // One KxK matrix per modulus l
     a: [Matrix<K, K, N>; L],
@@ -42,9 +149,10 @@ pub struct PvwPublicKeyCircuit {
     r2: [Matrix<N_PARTIES, K, 2 * N - 1>; L],
 }
 
-impl PvwPublicKeyCircuit {
+impl<let N: u32, let L: u32, let K: u32, let N_PARTIES: u32> PvwPublicKeyCircuit<N, L, K, N_PARTIES> {
     /// Creates a new PVW public key verification circuit
     pub fn new(
+        params: Params<N, L>,
         a: [Matrix<K, K, N>; L],
         e: Matrix<N_PARTIES, K, N>,
         sk: Matrix<N_PARTIES, K, N>,
@@ -52,7 +160,7 @@ impl PvwPublicKeyCircuit {
         r1: [Matrix<N_PARTIES, K, 2 * N - 1>; L],
         r2: [Matrix<N_PARTIES, K, 2 * N - 1>; L],
     ) -> Self {
-        PvwPublicKeyCircuit { a, e, sk, b, r1, r2 }
+        PvwPublicKeyCircuit { params, a, e, sk, b, r1, r2 }
     }
 
     /// Flattens all witness data into a single array for Fiat-Shamir challenge generation
@@ -141,15 +249,17 @@ impl PvwPublicKeyCircuit {
 
 /// Performs comprehensive range checks on all secret witness values
 /// Ensures that secret keys, errors, and quotients are within cryptographically safe bounds
-fn perform_range_checks(circuit: PvwPublicKeyCircuit) {
+fn perform_range_checks<let N: u32, let L: u32, let K: u32, let N_PARTIES: u32>(
+    circuit: PvwPublicKeyCircuit<N, L, K, N_PARTIES>,
+) {
     // Check that all party error vectors have small coefficients
     // Small errors are crucial for both security and correctness
     for i in 0..N_PARTIES {
         for j in 0..K {
             // Error coefficients must be bounded to maintain security
-            circuit.e[i][j].range_check_1bound(E_BOUND);
+            circuit.e[i][j].range_check_1bound(circuit.params.bounds.e_bound);
             // Secret key coefficients must be small (from CBD distribution)
-            circuit.sk[i][j].range_check_1bound(SK_BOUND);
+            circuit.sk[i][j].range_check_1bound(circuit.params.bounds.sk_bound);
         }
     }
 
@@ -159,11 +269,14 @@ fn perform_range_checks(circuit: PvwPublicKeyCircuit) {
             for k in 0..K {
                 // r1 quotients can be negative (modulus switching can produce negative quotients)
                 // Use asymmetric bounds [R1_LOW_BOUNDS[l], R1_UP_BOUNDS[l]] for modulus l
-                circuit.r1[l][j][k].range_check_2bounds(R1_UP_BOUNDS[l], R1_LOW_BOUNDS[l]);
+                circuit.r1[l][j][k].range_check_2bounds(
+                    circuit.params.bounds.r1_up_bounds[l],
+                    circuit.params.bounds.r1_low_bounds[l],
+                );
 
                 // r2 quotients are typically positive (cyclotomic reduction quotients)
                 // Use symmetric bounds [-R2_BOUNDS[l], R2_BOUNDS[l]] for modulus l
-                circuit.r2[l][j][k].range_check_1bound(R2_BOUNDS[l]);
+                circuit.r2[l][j][k].range_check_1bound(circuit.params.bounds.r2_bounds[l]);
             }
         }
     }
@@ -171,7 +284,11 @@ fn perform_range_checks(circuit: PvwPublicKeyCircuit) {
 
 /// Verifies the public key generation equation for a specific modulus
 /// This is where the core PVW linear algebra verification happens
-fn verify_public_key_for_modulus(circuit: PvwPublicKeyCircuit, l: u32, gamma: Field) {
+fn verify_public_key_for_modulus<let N: u32, let L: u32, let K: u32, let N_PARTIES: u32>(
+    circuit: PvwPublicKeyCircuit<N, L, K, N_PARTIES>,
+    l: u32,
+    gamma: Field,
+) {
     // Evaluate all polynomials at the random challenge point gamma
     // This reduces polynomial equations to field element equations
 
@@ -209,7 +326,7 @@ fn verify_public_key_for_modulus(circuit: PvwPublicKeyCircuit, l: u32, gamma: Fi
             let rhs = a_times_s[k] // a_l * s_i (matrix-vector product)
                 + e_at_gamma[i][k] // + e_i[k] (error term)
                 + r2_at_gamma[i][k] * cyclo_at_gamma // + r2_{l,i}[k] * (X^N + 1)
-                + r1_at_gamma[i][k] * QIS[l]; // + r1_{l,i}[k] * q_l
+                + r1_at_gamma[i][k] * circuit.params.crypto.qis[l]; // + r1_{l,i}[k] * q_l
 
             // Assert that the computed public key matches the expected value
             // This is the core verification: b_{l,i}[k] = RHS
