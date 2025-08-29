@@ -264,24 +264,14 @@ fn generate_sk_shares_outputs(
     let circuit_constants_dir = generator_config.output_dir.join(&generator_config.circuit);
     std::fs::create_dir_all(&circuit_constants_dir)?;
 
-    // Generate Noir constants if requested
-    let noir_generator = NoirGenerator::new();
-    // We need to create a context for the noir generator
-    let context = fhe_math::rq::Context::new(&moduli, degree)?;
-    let noir_path = noir_generator.generate_with_pvw(
-        &bounds,
-        &helper.params,
-        &context,
-        &circuit_constants_dir,
-        &generator_config.circuit,
-        Some(sss_inputs.k_dim as u32),
-        Some(sss_inputs.n_parties as u32),
-    )?;
-
     let mut toml_file = None;
     // Generate Prover TOML if requested
     if generator_config.generate_toml {
-        let toml_path = crate::sk_shares::generate_sss_toml(&sss_inputs, &circuit_constants_dir)?;
+        let toml_path = crate::sk_shares::generate_sss_toml(
+            &sss_inputs,
+            bounds.clone(),
+            &circuit_constants_dir,
+        )?;
         toml_file = Some(toml_path);
     }
 
@@ -290,7 +280,7 @@ fn generate_sk_shares_outputs(
     let results = GenerationResults {
         vectors: placeholder_vectors,
         bounds,
-        noir_file: Some(noir_path),
+        noir_file: None,
         toml_file: toml_file,
     };
 
