@@ -4,6 +4,14 @@ pub struct Polynomial<let N: u32> {
     pub coefficients: [Field; N],
 }
 
+// Matrix type representing a 2D array of polynomials
+// ROWS x COLS matrix where each entry is a polynomial of degree N
+pub type Matrix<let ROWS: u32, let COLS: u32, let N: u32> = [[Polynomial<N>; COLS]; ROWS];
+
+// Vector type representing a 1D array of polynomials
+// SIZE vector where each entry is a polynomial of degree N
+pub type Vector<let SIZE: u32, let N: u32> = [Polynomial<N>; SIZE];
+
 impl<let N: u32> Polynomial<N> {
     /// Creates a new polynomial
     pub fn new(coefficients: [Field; N]) -> Self {
@@ -31,7 +39,7 @@ impl<let N: u32> Polynomial<N> {
 
     /// Adds `-lower_bound` to the coefficients of the polynomial and constrains them to be in the range `[0, upper_bound - lower_bound]`.
     pub fn range_check_2bounds(self, upper_bound: u64, lower_bound: i64) {
-        let mut value_shift = ((lower_bound * -1) as u64) as Field;
+        let value_shift = (-1 * lower_bound) as u64 as Field;
         let comp_value = value_shift + upper_bound as Field;
         for i in 0..self.coefficients.len() {
             let shifted_coeff = self.coefficients[i] + value_shift;
@@ -39,6 +47,77 @@ impl<let N: u32> Polynomial<N> {
             (comp_value - shifted_coeff).assert_max_bit_size::<66>();
         }
     }
+}
+
+/// Flattens an array of polynomials into a 1D array of Field elements.
+///
+/// This helper function serializes polynomial coefficients maintaining a deterministic
+/// ordering of coefficients to ensure reproducible challenge values.
+///
+/// # Generic Parameters
+/// * `A` - The degree of each polynomial in the array
+/// * `L` - The number of polynomials in the array
+/// * `SIZE` - The total size of the target array
+///
+/// # Arguments
+/// * `inputs` - The target array to store flattened coefficients
+/// * `poly` - Array of polynomials to flatten
+/// * `offset` - Starting position in the inputs array
+///
+/// # Returns
+/// A tuple containing:
+/// * The updated inputs array with flattened coefficients
+/// * The new offset position after flattening
+pub fn flatten_vector<let A: u32, let L: u32, let SIZE: u32>(
+    mut inputs: [Field; SIZE],
+    poly: [Polynomial<A>; L],
+    mut offset: u32,
+) -> ([Field; SIZE], u32) {
+    for j in 0..L {
+        for i in 0..A {
+            inputs[i + offset] = poly[j].coefficients[i];
+        }
+        offset += A;
+    }
+
+    (inputs, offset)
+}
+
+/// Flattens a matrix of polynomials into a 1D array of Field elements.
+///
+/// This helper function serializes polynomial coefficients from a matrix maintaining a deterministic
+/// ordering of coefficients to ensure reproducible challenge values.
+///
+/// # Generic Parameters
+/// * `ROWS` - The number of rows in the matrix
+/// * `COLS` - The number of columns in the matrix
+/// * `N` - The degree of each polynomial in the matrix
+/// * `SIZE` - The total size of the target array
+///
+/// # Arguments
+/// * `inputs` - The target array to store flattened coefficients
+/// * `matrix` - Matrix of polynomials to flatten
+/// * `offset` - Starting position in the inputs array
+///
+/// # Returns
+/// A tuple containing:
+/// * The updated inputs array with flattened coefficients
+/// * The new offset position after flattening
+pub fn flatten_matrix<let ROWS: u32, let COLS: u32, let N: u32, let SIZE: u32>(
+    mut inputs: [Field; SIZE],
+    matrix: Matrix<ROWS, COLS, N>,
+    mut offset: u32,
+) -> ([Field; SIZE], u32) {
+    for j in 0..ROWS {
+        for i in 0..COLS {
+            for k in 0..N {
+                inputs[k + offset] = matrix[j][i].coefficients[k];
+            }
+            offset += N;
+        }
+    }
+
+    (inputs, offset)
 }
 
 #[test]

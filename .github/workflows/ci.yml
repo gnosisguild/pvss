@@ -48,9 +48,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Nargo
-        uses: noir-lang/noirup@v0.1.3
+        uses: noir-lang/noirup@v0.1.4
         with:
-          toolchain: stable
+          toolchain: v1.0.0-beta.11
 
       - name: Check Noir formatting
         run: nargo fmt --check
@@ -80,11 +80,11 @@ jobs:
       - name: Install Nargo
         uses: noir-lang/noirup@v0.1.4
         with:
-          toolchain: stable
+          toolchain: v1.0.0-beta.11
 
       - name: Install bbup (Barretenberg)
         run: |
-          curl -L https://raw.githubusercontent.com/AztecProtocol/aztec-packages/refs/heads/master/barretenberg/bbup/install | bash
+          curl -L https://raw.githubusercontent.com/AztecProtocol/aztec-packages/refs/heads/next/barretenberg/bbup/install | bash
           echo "$HOME/.bb" >> $GITHUB_PATH
           export PATH="$HOME/.bb:$PATH"
           bbup
@@ -100,22 +100,22 @@ jobs:
           sudo swapon --show
 
       - name: Compile example circuit
-        working-directory: examples/pk_circuit
+        working-directory: examples/example
         run: nargo compile
 
       - name: Execute example circuit
-        working-directory: examples/pk_circuit
+        working-directory: examples/example
         run: nargo execute
 
       - name: Generate proof
-        working-directory: examples/pk_circuit
-        run: bb prove -b ./target/pk_circuit.json -w ./target/pk_circuit.gz -o ./target
+        working-directory: examples/example
+        run: bb prove -b ./target/example.json -w ./target/example.gz -o ./target
 
       - name: Generate verification key
-        working-directory: examples/pk_circuit
-        run: bb write_vk -b ./target/pk_circuit.json -o ./target
+        working-directory: examples/example
+        run: bb write_vk -b ./target/example.json -o ./target
 
       - name: Verify proof
-        working-directory: examples/pk_circuit
+        working-directory: examples/example
         run: bb verify -k ./target/vk -p ./target/proof
         continue-on-error: false
