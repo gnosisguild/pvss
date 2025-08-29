@@ -112,7 +112,7 @@ impl<let N: u32, let L: u32> Params<N, L> {
 ///
 /// Verifies that a PVW public key was correctly generated according to the protocol.
 /// For each party i and modulus l, the public key generation equation is:
-/// b_{l,i} = -a_l * s_i + e_i + r2_{l,i} * (X^N + 1) + r1_{l,i} * q_l
+/// b_{l,i} = a_l * s_i + e_i + r2_{l,i} * (X^N + 1) + r1_{l,i} * q_l
 ///
 /// Where:
 /// - a_l is the l-th KxK CRS matrix (same for all parties)
