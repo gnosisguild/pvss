@@ -14,7 +14,7 @@ use std::{
 #[derive(Clone, Debug)]
 pub struct SssInputs {
     pub n_parties: usize,
-    pub t: usize,         // threshold (poly degree = T-1)
+    pub t: usize,         // threshold
     pub moduli: Vec<u64>, // QIS (length L)
     pub k_dim: usize,
     pub degree: usize, // number of coefficients minus 1 (N)
@@ -42,7 +42,7 @@ pub fn compute_sss_inputs(
     k_dim: usize,
     degree: usize, // N (sk has N+1 coeffs; we output i=0..N-1 to match Noir loop 0..N)
     moduli: &[u64],
-    t: usize, // threshold (poly degree = T-1)
+    t: usize, // threshold
     mut rng: ThreadRng,
 ) -> Result<SssInputs, Box<dyn std::error::Error>> {
     assert!(t >= 1, "T must be ≥ 1");
@@ -75,24 +75,24 @@ pub fn compute_sss_inputs(
     // x = 1..n
     let x_coords: Vec<BigInt> = (1..=n_parties).map(|k| BigInt::from(k as u64)).collect();
 
-    // secret poly (length N+1), constant-first
+    // secret poly, constant-first
     let sk_bn: Vec<BigUint> = Vec::from(&pvw_params.sample_secret_polynomial(&mut rng)?);
     let sk: Vec<BigInt> = sk_bn.iter().map(|x| x.to_bigint().unwrap()).collect();
 
     // Allocate outputs
-    let mut f = vec![vec![vec![BigInt::zero(); t]; l]; degree + 1];
-    let mut y = vec![vec![vec![BigInt::zero(); n_parties]; l]; degree + 1];
-    let mut r = vec![vec![vec![BigInt::zero(); n_parties]; l]; degree + 1];
-    let mut d = vec![vec![BigInt::zero(); l]; degree + 1];
+    let mut f = vec![vec![vec![BigInt::zero(); t]; l]; degree];
+    let mut y = vec![vec![vec![BigInt::zero(); n_parties]; l]; degree];
+    let mut r = vec![vec![vec![BigInt::zero(); n_parties]; l]; degree];
+    let mut d = vec![vec![BigInt::zero(); l]; degree];
 
     for i in 0..degree {
         let a_i = &sk[i];
         for (j, &qj_u) in moduli.iter().enumerate() {
             let qj = BigInt::from(qj_u);
 
-            // degree-(t-1) Shamir poly over Z_qj with c0 = a_i (mod qj) in [0,qj)
+            // Shamir poly over Z_qj with c0 = a_i (mod qj) in [0,qj)
             let sss = ShamirSecretSharing::new(t - 1, n_parties, qj.clone());
-            f[i][j] = sample_f_polynomial(&sss, a_i); // constant-first: [c0, c1, ..., c_{t-1}]
+            f[i][j] = sample_f_polynomial(&sss, a_i);
             let c0 = f[i][j][0].clone();
 
             // d_{i,j} from a_i - c0 = d * qj
@@ -224,7 +224,7 @@ pub fn generate_sss_toml(
     Ok(path)
 }
 
-// Build degree-(t-1) polynomial over Z_q with f(0) = secret mod q
+// Build polynomial over Z_q with f(0) = secret mod q
 fn sample_f_polynomial(sss: &ShamirSecretSharing, secret: &BigInt) -> Vec<BigInt> {
     // c0 = a_i mod q in [0,q)
     let mut c0 = secret % &sss.prime;
