@@ -274,7 +274,6 @@ fn perform_range_checks<let N: u32, let L: u32, let K: u32, let N_PARTIES: u32>(
                     circuit.params.bounds.r1_low_bounds[l],
                 );
 
-                // r2 quotients are typically positive (cyclotomic reduction quotients)
                 // Use symmetric bounds [-R2_BOUNDS[l], R2_BOUNDS[l]] for modulus l
                 circuit.r2[l][j][k].range_check_1bound(circuit.params.bounds.r2_bounds[l]);
             }
