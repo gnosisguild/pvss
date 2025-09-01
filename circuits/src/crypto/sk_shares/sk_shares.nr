@@ -285,11 +285,10 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32> SecretKeySharesCirc
 
     // === Helper Functions ===
 
-    /// Generates Fiat-Shamir challenge from public inputs and polynomial commitments
-    /// Commits to polynomials first, then includes commitments in transcript
+    /// Generates Fiat-Shamir challenge
     fn generate_challenge(self) -> Field {
-        // Use generic parameters directly for array size
-        let mut transcript = [0; N_PARTIES + N * L];
+        // Updated array size: x_coords + polynomial commitments + y values + r values
+        let mut transcript = [0; N_PARTIES + N * L + N * L * N_PARTIES + N * L * N_PARTIES];
         let mut offset = 0;
 
         // Add public evaluation points to transcript
@@ -298,7 +297,7 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32> SecretKeySharesCirc
             offset += 1;
         }
 
-        // Add polynomial commitments to transcript (not the polynomials themselves!)
+        // Add polynomial commitments to transcript
         for coefficient_idx in 0..N {
             for modulus_idx in 0..L {
                 let polynomial = self.f[coefficient_idx][modulus_idx];
@@ -311,8 +310,27 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32> SecretKeySharesCirc
             }
         }
 
+        // Add all y values to transcript
+        for coefficient_idx in 0..N {
+            for modulus_idx in 0..L {
+                for party_idx in 0..N_PARTIES {
+                    transcript[offset] = self.y[coefficient_idx][modulus_idx][party_idx];
+                    offset += 1;
+                }
+            }
+        }
+
+        // Add all r values to transcript
+        for coefficient_idx in 0..N {
+            for modulus_idx in 0..L {
+                for party_idx in 0..N_PARTIES {
+                    transcript[offset] = self.r[coefficient_idx][modulus_idx][party_idx];
+                    offset += 1;
+                }
+            }
+        }
+
         // Generate challenge using SafeSponge
-        // Domain separator for PVSS_sk_shares circuit - "PVSS_sk_shares" in hex
         let domain_separator = [
             0x50, 0x56, 0x53, 0x53, 0x5f, 0x73, 0x6b, 0x5f, 0x73, 0x68, 0x61, 0x72, 0x65, 0x73,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -321,9 +339,8 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32> SecretKeySharesCirc
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
 
-        // IO Pattern: ABSORB(TRANSCRIPT_SIZE), SQUEEZE(1)
-        let input_size = N_PARTIES + N * L;
-        let io_pattern = [0x80000000 | input_size, 0x00000000 | (1)];
+        let input_size = N_PARTIES + N * L + N * L * N_PARTIES + N * L * N_PARTIES;
+        let io_pattern = [0x80000000 | input_size, 0x00000000 | 1];
 
         let mut sponge = SafeSponge::start(io_pattern, domain_separator);
         sponge.absorb(transcript);
