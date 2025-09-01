@@ -267,11 +267,7 @@ fn generate_sk_shares_outputs(
     let mut toml_file = None;
     // Generate Prover TOML if requested
     if generator_config.generate_toml {
-        let toml_path = crate::sk_shares::generate_sss_toml(
-            &sss_inputs,
-            bounds.clone(),
-            &circuit_constants_dir,
-        )?;
+        let toml_path = crate::sk_shares::generate_sss_toml(&sss_inputs, &circuit_constants_dir)?;
         toml_file = Some(toml_path);
     }
 

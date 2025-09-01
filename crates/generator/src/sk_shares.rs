@@ -1,17 +1,12 @@
-//! PVSS Shamir-Share Generator & Prover I/O (PolyTable serialization)
+//! PVSS Shamir-Share Generator & Prover I/O (TOML layout exactly as requested)
 //!
 //! This module prepares witness values and parameters for a PVSS circuit that
 //! verifies Shamir secret sharing of a TRBFV secret key across an RNS basis,
-//! and serializes them to `Prover.toml`
-//!
-//!
-//! ## Determinism
-//! Sampling is non-deterministic (uses `ThreadRng` and Rayon). Replace the RNG
-//! and/or remove parallelism if you need reproducibility.
+//! and serializes them to `Prover.toml`.
 
 use fhe::trbfv::ShamirSecretSharing;
 use num_bigint::{BigInt, BigUint, RandBigInt, Sign, ToBigInt};
-use num_traits::Zero;
+use num_traits::{ToPrimitive, Zero};
 use pvw::{params::PvwParameters, PvwParametersBuilder};
 use rand::rngs::ThreadRng;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -22,17 +17,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::InputValidationBounds;
-
-/// Witness bundle passed to the prover.
-///
-/// Shapes with `N = degree`, `L = moduli.len()`, `P = n_parties`:
-/// - `sk`: `[N]`
-/// - `f`: `[N][L][t]` (constant-first, degree `t-1`)
-/// - `y`, `r`: `[N][L][P]`
-/// - `d`: `[N][L]`
-/// - `f_randomness`: `[N][L]`
-/// - `x_coords`: `[P]`
 #[derive(Clone, Debug)]
 pub struct SssInputs {
     pub n_parties: usize,
@@ -42,7 +26,7 @@ pub struct SssInputs {
     pub degree: usize, // number of coefficients (N)
 
     // Witness payloads
-    pub sk: Vec<BigInt>,                // [N] constant-first
+    pub sk: Vec<BigInt>,                // [N] constant-first (one coeff per slot)
     pub f: Vec<Vec<Vec<BigInt>>>,       // [N][L][t] constant-first
     pub y: Vec<Vec<Vec<BigInt>>>,       // [N][L][P]
     pub r: Vec<Vec<Vec<BigInt>>>,       // [N][L][P]
@@ -51,7 +35,8 @@ pub struct SssInputs {
     pub x_coords: Vec<BigInt>,          // [P]
 }
 
-/// Integer Euclidean division: returns `(q, r)` s.t. `a = q*n + r` and `0 ≤ r < n`.
+// ---------- helpers ----------
+
 fn div_rem_euclid(a: &BigInt, n: &BigInt) -> (BigInt, BigInt) {
     let mut r = a % n;
     if r.sign() == Sign::Minus {
@@ -61,7 +46,77 @@ fn div_rem_euclid(a: &BigInt, n: &BigInt) -> (BigInt, BigInt) {
     (q, r)
 }
 
-/// Generate all witnesses for the SK-sharing circuit.
+fn geometric_sum_u128(base: usize, terms: usize) -> u128 {
+    if terms == 0 {
+        return 0;
+    }
+    let mut s: u128 = 0;
+    let mut pow: u128 = 1;
+    for _ in 0..terms {
+        s = s.saturating_add(pow);
+        pow = pow.saturating_mul(base as u128);
+    }
+    s
+}
+
+/// r-bounds:
+/// - r_lower_bound = 0
+/// - r_upper_bound = (1 + n + ... + n^{t-1}) - 1 (clamped to u64)
+fn derive_sss_r_bounds(n_parties: usize, t: usize) -> (i64, u64) {
+    let s = geometric_sum_u128(n_parties, t);
+    let upper = s.saturating_sub(1);
+    (
+        0_i64,
+        if upper > u64::MAX as u128 {
+            u64::MAX
+        } else {
+            upper as u64
+        },
+    )
+}
+
+/// sk_bound = max |sk[i]| (clamped to u64)
+fn derive_sk_bound_from_sk(sk: &[BigInt]) -> u64 {
+    sk.iter()
+        .map(|c| {
+            let abs = if c.sign() == Sign::Minus {
+                -c
+            } else {
+                c.clone()
+            };
+            abs.to_u128().unwrap_or(u128::MAX)
+        })
+        .max()
+        .map(|m| {
+            if m > u64::MAX as u128 {
+                u64::MAX
+            } else {
+                m as u64
+            }
+        })
+        .unwrap_or(0)
+}
+
+/// BN254 modulus for canonical field encoding as strings.
+fn bn254_modulus() -> BigInt {
+    BigInt::parse_bytes(
+        b"21888242871839275222246405745257275088548364400416034343698204186575808495617",
+        10,
+    )
+    .unwrap()
+}
+
+/// Reduce into canonical field rep in [0, p) and stringify.
+fn to_fp_str(p: &BigInt, x: &BigInt) -> String {
+    let mut r = x % p;
+    if r.sign() == Sign::Minus {
+        r += p;
+    }
+    r.to_string()
+}
+
+// ---------- witness generation ----------
+
 pub fn compute_sss_inputs(
     n_parties: usize,
     k_dim: usize,
@@ -73,7 +128,6 @@ pub fn compute_sss_inputs(
     assert!(t >= 1, "T must be ≥ 1");
     assert!(t <= n_parties, "threshold T must be ≤ number of parties");
 
-    // Sample a secret polynomial via PVW parameters (used here for convenience).
     let (variance, bound1, bound2) =
         PvwParameters::suggest_correct_parameters(n_parties, k_dim, degree, moduli)
             .unwrap_or((1, 100, 200));
@@ -97,10 +151,8 @@ pub fn compute_sss_inputs(
         );
     }
 
-    // Public evaluation points x_k = 1..=n_parties.
     let x_coords: Vec<BigInt> = (1..=n_parties).map(|k| BigInt::from(k as u64)).collect();
 
-    // Secret polynomial (constant-first).
     let sk_bn: Vec<BigUint> = Vec::from(&pvw_params.sample_secret_polynomial(&mut rng)?);
     let mut sk: Vec<BigInt> = sk_bn.iter().map(|x| x.to_bigint().unwrap()).collect();
     assert!(
@@ -109,21 +161,18 @@ pub fn compute_sss_inputs(
     );
     sk.truncate(degree);
 
-    // Allocate.
     let mut f = vec![vec![vec![BigInt::zero(); t]; l]; degree];
     let mut y = vec![vec![vec![BigInt::zero(); n_parties]; l]; degree];
     let mut r = vec![vec![vec![BigInt::zero(); n_parties]; l]; degree];
     let mut d = vec![vec![BigInt::zero(); l]; degree];
     let mut f_randomness = vec![vec![BigInt::zero(); l]; degree];
 
-    // Build Shamir polynomials, shares, and quotients.
     for i in 0..degree {
         let a_i = &sk[i];
-
         for (j, &qj_u) in moduli.iter().enumerate() {
             let qj = BigInt::from(qj_u);
 
-            // f_{i,j} over Z_{q_j}, degree t-1, with c0 ≡ a_i (mod q_j).
+            // Shamir poly over Z_qj, degree t-1, with c0 ≡ a_i (mod q_j)
             let sss = ShamirSecretSharing::new(t - 1, n_parties, qj.clone());
             f[i][j] = sample_f_polynomial(&sss, a_i);
             let c0 = f[i][j][0].clone();
@@ -133,7 +182,7 @@ pub fn compute_sss_inputs(
             debug_assert!(rem.is_zero());
             d[i][j] = d_ij;
 
-            // Shares: evaluate f_{i,j}(x_k) and split as r*q_j + y (0 ≤ y < q_j).
+            // shares: f(x_k) = r*q_j + y, with 0 ≤ y < q_j
             for (k_idx, xk) in x_coords.iter().enumerate() {
                 let mut acc = BigInt::zero();
                 for coeff in f[i][j].iter().rev() {
@@ -144,11 +193,9 @@ pub fn compute_sss_inputs(
                 y[i][j][k_idx] = yk;
             }
 
-            // Commitment randomness in symmetric range: [-⌊(q_j-1)/2⌋, +⌊(q_j-1)/2⌋].
+            // commitment randomness in symmetric range
             let bj = BigInt::from((qj_u - 1) / 2);
-            let low = -&bj;
-            let high = &bj + 1; // exclusive
-            let rand_ij = rng.gen_bigint_range(&low, &high);
+            let rand_ij = rng.gen_bigint_range(&-bj.clone(), &(&bj + 1)); // upper bound exclusive
             f_randomness[i][j] = rand_ij;
         }
     }
@@ -169,170 +216,145 @@ pub fn compute_sss_inputs(
     })
 }
 
-/// Serialize witnesses and params to `Prover.toml` using PolyTable wrappers.
 pub fn generate_sss_toml(
     inputs: &SssInputs,
-    bounds: InputValidationBounds,
     output_dir: &Path,
 ) -> Result<PathBuf, Box<dyn std::error::Error>> {
-    /// A generic vector of Field elements.
     #[derive(Serialize)]
-    struct PolyTable {
-        coefficients: Vec<String>,
+    struct CryptoToml {
+        qis: Vec<String>,
     }
 
-    /// `params.crypto`
     #[derive(Serialize)]
-    struct ParamsCrypto {
-        qis: PolyTable,
+    struct BoundsToml {
+        sk_bound: String,
+        r_lower_bound: String,
+        r_upper_bound: String,
+        randomness_bound: String,
     }
 
-    /// `params.bounds` (scalar bounds, as required by the circuit)
     #[derive(Serialize)]
-    struct ParamsBounds {
-        sk_bound: u64,
-        r_lower_bound: i64,
-        r_upper_bound: u64,
-        randomness_bound: u64,
+    struct CircuitToml {
+        n: String,
+        n_parties: String,
+        t: String,
     }
 
-    /// `params.circuit`
-    #[derive(Serialize)]
-    struct ParamsCircuit {
-        n: u32,
-        n_parties: u32,
-        t: u32,
-    }
-
-    /// Nested `params` block
     #[derive(Serialize)]
     struct ParamsToml {
-        crypto: ParamsCrypto,
-        bounds: ParamsBounds,
-        circuit: ParamsCircuit,
+        crypto: CryptoToml,
+        bounds: BoundsToml,
+        circuit: CircuitToml,
     }
 
-    /// Top-level TOML object
+    #[derive(Serialize)]
+    struct PolyToml {
+        coefficients: Vec<String>,
+    } // highest-first for f; flat for sk
+
     #[derive(Serialize)]
     struct ProverToml {
-        // Witness payloads
-        sk: PolyTable,
-        f: Vec<Vec<PolyTable>>,
-        y: Vec<Vec<PolyTable>>,
-        r: Vec<Vec<PolyTable>>,
-        d: Vec<Vec<PolyTable>>,
-        f_randomness: Vec<Vec<PolyTable>>,
-        x_coords: PolyTable,
+        // Witness payloads (all strings)
+        f: Vec<Vec<PolyToml>>,          // [N][L] of { coefficients = [..] }
+        y: Vec<Vec<Vec<String>>>,       // [N][L][P]
+        r: Vec<Vec<Vec<String>>>,       // [N][L][P]
+        d: Vec<Vec<String>>,            // [N][L]
+        f_randomness: Vec<Vec<String>>, // [N][L]
+        x_coords: Vec<String>,          // [P]
 
-        // Circuit params
+        // Params
         params: ParamsToml,
+
+        // Top-level [sk] table
+        sk: PolyToml,
     }
 
-    // --- Field canonicalization ------------------------------------------------
+    let p = bn254_modulus();
 
-    fn bn254() -> BigInt {
-        BigInt::parse_bytes(
-            b"21888242871839275222246405745257275088548364400416034343698204186575808495617",
-            10,
-        )
-        .unwrap()
-    }
-    let p = bn254();
+    // field encoders
+    let enc = |x: &BigInt| to_fp_str(&p, x);
+    let enc_usize = |q: usize| enc(&BigInt::from(q as u64));
 
-    let to_fp_str = |x: &BigInt| {
-        let mut r = x % &p;
-        if r.sign() == Sign::Minus {
-            r += &p;
-        }
-        r.to_string()
+    // ----- witnesses -----
+
+    // sk → [sk] coefficients = [..]
+    let sk_ser = PolyToml {
+        coefficients: inputs.sk.iter().map(&enc).collect(),
     };
 
-    // Helpers to pack slices into PolyTable
-    let to_polytable = |slice: &[BigInt]| PolyTable {
-        coefficients: slice.iter().map(&to_fp_str).collect(),
-    };
-    let to_polytable_from_u64s = |slice: &[u64]| PolyTable {
-        coefficients: slice.iter().map(|&q| to_fp_str(&BigInt::from(q))).collect(),
-    };
-
-    // --- Witness serialization -------------------------------------------------
-
-    // sk: constant-first
-    let sk_ser = to_polytable(&inputs.sk);
-
-    // f: [N][L][t]
-    let f_ser: Vec<Vec<PolyTable>> = inputs
+    // f: constant-first → highest-first, then wrap into inline table per (i,j)
+    let f_ser: Vec<Vec<PolyToml>> = inputs
         .f
         .iter()
         .map(|row| {
             row.iter()
                 .map(|poly_const_first| {
                     let mut tmp = poly_const_first.clone();
-                    tmp.reverse(); // highest-first for Noir
-                    to_polytable(&tmp)
+                    tmp.reverse();
+                    PolyToml {
+                        coefficients: tmp.iter().map(&enc).collect::<Vec<String>>(),
+                    }
                 })
-                .collect()
+                .collect::<Vec<PolyToml>>()
         })
         .collect();
 
-    // y: [N][L][P]
-    let y_ser: Vec<Vec<PolyTable>> = inputs
+    // y, r
+    let y_ser: Vec<Vec<Vec<String>>> = inputs
         .y
         .iter()
         .map(|row| {
             row.iter()
-                .map(|shares_over_parties| to_polytable(shares_over_parties))
+                .map(|col| col.iter().map(&enc).collect())
                 .collect()
         })
         .collect();
 
-    // r: [N][L][P]
-    let r_ser: Vec<Vec<PolyTable>> = inputs
+    let r_ser: Vec<Vec<Vec<String>>> = inputs
         .r
         .iter()
         .map(|row| {
             row.iter()
-                .map(|quotients_over_parties| to_polytable(quotients_over_parties))
+                .map(|col| col.iter().map(&enc).collect())
                 .collect()
         })
         .collect();
 
-    // d: [N][L]
-    let d_ser: Vec<Vec<PolyTable>> = inputs
+    // d
+    let d_ser: Vec<Vec<String>> = inputs
         .d
         .iter()
-        .map(|row| {
-            row.iter()
-                .map(|val| to_polytable(std::slice::from_ref(val)))
-                .collect()
-        })
+        .map(|row| row.iter().map(&enc).collect())
         .collect();
 
-    // f_randomness: [N][L]
-    let f_randomness_ser: Vec<Vec<PolyTable>> = inputs
+    // f_randomness
+    let f_randomness_ser: Vec<Vec<String>> = inputs
         .f_randomness
         .iter()
-        .map(|row| {
-            row.iter()
-                .map(|val| to_polytable(std::slice::from_ref(val)))
-                .collect()
-        })
+        .map(|row| row.iter().map(&enc).collect())
         .collect();
 
-    // x_coords: [P]
-    let x_coords_ser = to_polytable(&inputs.x_coords);
+    // x_coords
+    let x_coords_ser: Vec<String> = inputs.x_coords.iter().map(&enc).collect();
 
-    // --- Build [params] --------------------------------------------------------
+    // ----- params -----
 
-    // crypto.qis
-    let qis_poly = to_polytable_from_u64s(&inputs.moduli);
+    // crypto.qis (as field strings)
+    let qis_ser: Vec<String> = inputs
+        .moduli
+        .iter()
+        .copied()
+        .map(|q: u64| enc(&BigInt::from(q)))
+        .collect();
 
-    // scalar bounds expected by the circuit
-    let r_lower_bound_scalar: i64 = *bounds.r1_low_bounds.iter().min().unwrap_or(&0i64);
-    let r_upper_bound_scalar: u64 = *bounds.r1_up_bounds.iter().max().unwrap_or(&0u64);
+    // r-bounds from n_parties, t
+    let (r_lower_bound_i64, r_upper_bound_u64) = derive_sss_r_bounds(inputs.n_parties, inputs.t);
 
-    // randomness_bound = max_j floor((q_j - 1) / 2)
-    let randomness_bound: u64 = inputs
+    // sk_bound from actual sk
+    let sk_bound_u64 = derive_sk_bound_from_sk(&inputs.sk);
+
+    // randomness_bound = max_j floor((q_j-1)/2)
+    let randomness_bound_u64: u64 = inputs
         .moduli
         .iter()
         .copied()
@@ -341,22 +363,23 @@ pub fn generate_sss_toml(
         .unwrap_or(0);
 
     let params = ParamsToml {
-        crypto: ParamsCrypto { qis: qis_poly },
-        bounds: ParamsBounds {
-            sk_bound: bounds.sk_bound,
-            r_lower_bound: r_lower_bound_scalar,
-            r_upper_bound: r_upper_bound_scalar,
-            randomness_bound,
+        crypto: CryptoToml { qis: qis_ser },
+        bounds: BoundsToml {
+            sk_bound: enc(&BigInt::from(sk_bound_u64)),
+            r_lower_bound: enc(&BigInt::from(r_lower_bound_i64)),
+            r_upper_bound: enc(&BigInt::from(r_upper_bound_u64)),
+            randomness_bound: enc(&BigInt::from(randomness_bound_u64)),
         },
-        circuit: ParamsCircuit {
-            n: inputs.degree as u32,
-            n_parties: inputs.n_parties as u32,
-            t: inputs.t as u32,
+        circuit: CircuitToml {
+            n: enc_usize(inputs.degree),
+            n_parties: enc_usize(inputs.n_parties),
+            t: enc_usize(inputs.t),
         },
     };
 
+    // ----- write -----
+
     let obj = ProverToml {
-        sk: sk_ser,
         f: f_ser,
         y: y_ser,
         r: r_ser,
@@ -364,9 +387,8 @@ pub fn generate_sss_toml(
         f_randomness: f_randomness_ser,
         x_coords: x_coords_ser,
         params,
+        sk: sk_ser,
     };
-
-    // --- Write TOML ------------------------------------------------------------
 
     let path = output_dir.join("Prover.toml");
     let mut f = File::create(&path)?;
@@ -374,12 +396,7 @@ pub fn generate_sss_toml(
     Ok(path)
 }
 
-/// Sample a Shamir polynomial `f(x)` over `Z_q` with `f(0) ≡ secret (mod q)`.
-///
-/// - Degree = `sss.threshold` (`t-1`); number of coeffs = `t`.
-/// - Layout: **constant-first** → `[c0, c1, ..., c_{t-1}]`.
-/// - `c0` is the reduction of `secret` into `[0, q)`.
-/// - Remaining coeffs are uniform in `[0, q)`.
+// Build polynomial over Z_q with f(0) = secret mod q (constant-first).
 fn sample_f_polynomial(sss: &ShamirSecretSharing, secret: &BigInt) -> Vec<BigInt> {
     // c0 in [0, q)
     let mut c0 = secret % &sss.prime;
@@ -387,7 +404,7 @@ fn sample_f_polynomial(sss: &ShamirSecretSharing, secret: &BigInt) -> Vec<BigInt
         c0 += &sss.prime;
     }
 
-    // Random remaining coefficients
+    // random coeffs in [0, q)
     let low = BigInt::from(0);
     let high = sss.prime.clone();
     let random_coefficients: Vec<BigInt> = (0..sss.threshold)
