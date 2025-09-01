@@ -288,8 +288,7 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32> SecretKeySharesCirc
     /// Generates Fiat-Shamir challenge
     fn generate_challenge(self) -> Field {
         // Updated array size: x_coords + polynomial commitments + y values + r values
-        let transcript_size = N_PARTIES + N * L + N * L * N_PARTIES + N * L * N_PARTIES;
-        let mut transcript = [0; transcript_size];
+        let mut transcript = [0; N_PARTIES + N * L + N * L * N_PARTIES + N * L * N_PARTIES];
         let mut offset = 0;
 
         // Add public evaluation points to transcript
@@ -340,8 +339,10 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32> SecretKeySharesCirc
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
 
-        let input_size = transcript_size;
-        let io_pattern = [0x80000000 | input_size, 0x00000000 | 1];
+        let io_pattern = [
+            0x80000000 | N_PARTIES + N * L + N * L * N_PARTIES + N * L * N_PARTIES,
+            0x00000000 | 1,
+        ];
 
         let mut sponge = SafeSponge::start(io_pattern, domain_separator);
         sponge.absorb(transcript);
