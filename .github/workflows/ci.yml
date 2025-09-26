@@ -8,36 +8,6 @@ on:
       - main
 
 jobs:
-  rust:
-    name: Rust CI
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: crates
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust 1.85.0
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: 1.85.0
-          components: rustfmt
-          override: true
-
-      - name: Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: crates -> target
-
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-
-      - name: Run tests
-        run: cargo test
-
-      - name: Build
-        run: cargo build --release
-
   noir:
     name: Noir CI
     runs-on: ubuntu-latest
@@ -50,7 +20,7 @@ jobs:
       - name: Install Nargo
         uses: noir-lang/noirup@v0.1.4
         with:
-          toolchain: v1.0.0-beta.11
+          toolchain: 1.0.0-beta.12
 
       - name: Check Noir formatting
         run: nargo fmt --check
@@ -62,7 +32,7 @@ jobs:
         run: nargo test
 
   noir-examples:
-    name: Noir Example
+    name: Noir PK PVW Example
     runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:
@@ -80,7 +50,7 @@ jobs:
       - name: Install Nargo
         uses: noir-lang/noirup@v0.1.4
         with:
-          toolchain: v1.0.0-beta.11
+          toolchain: 1.0.0-beta.12
 
       - name: Install bbup (Barretenberg)
         run: |
@@ -99,23 +69,23 @@ jobs:
           sudo swapon /swapfile
           sudo swapon --show
 
-      - name: Compile example circuit
-        working-directory: examples/example
+      - name: Compile pk_pvw circuit
+        working-directory: examples/pk_pvw
         run: nargo compile
 
-      - name: Execute example circuit
-        working-directory: examples/example
+      - name: Execute pk_pvw circuit
+        working-directory: examples/pk_pvw
         run: nargo execute
 
       - name: Generate proof
-        working-directory: examples/example
-        run: bb prove -b ./target/example.json -w ./target/example.gz -o ./target
+        working-directory: examples/pk_pvw
+        run: bb prove -b ./target/pk_pvw.json -w ./target/pk_pvw.gz -o ./target
 
       - name: Generate verification key
-        working-directory: examples/example
-        run: bb write_vk -b ./target/example.json -o ./target
+        working-directory: examples/pk_pvw
+        run: bb write_vk -b ./target/pk_pvw.json -o ./target
 
       - name: Verify proof
-        working-directory: examples/example
+        working-directory: examples/pk_pvw
         run: bb verify -k ./target/vk -p ./target/proof
         continue-on-error: false
