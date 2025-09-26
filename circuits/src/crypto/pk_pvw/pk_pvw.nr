@@ -112,7 +112,7 @@ impl<let N: u32, let L: u32> Params<N, L> {
 ///
 /// Verifies that a PVW public key was correctly generated according to the protocol.
 /// For each party i and modulus l, the public key generation equation is:
-/// b_{l,i} = a_l * s_i + e_i + r2_{l,i} * (X^N + 1) + r1_{l,i} * q_l
+/// b_{l,i} = s_i * a_l + e_i + r2_{l,i} * (X^N + 1) + r1_{l,i} * q_l
 ///
 /// Where:
 /// - a_l is the l-th KxK CRS matrix (same for all parties)
@@ -146,7 +146,7 @@ pub struct PvwPublicKeyCircuit<let N: u32, let L: u32, let K: u32, let N_PARTIES
     // r1[l][i] are quotients from modulus switching for party i, modulus l (can be negative)
     r1: [Matrix<N_PARTIES, K, 2 * N - 1>; L],
     // r2[l][i] are quotients from cyclotomic reduction for party i, modulus l (typically positive)
-    r2: [Matrix<N_PARTIES, K, 2 * N - 1>; L],
+    r2: [Matrix<N_PARTIES, K, N - 1>; L],
 }
 
 impl<let N: u32, let L: u32, let K: u32, let N_PARTIES: u32> PvwPublicKeyCircuit<N, L, K, N_PARTIES> {
@@ -158,7 +158,7 @@ impl<let N: u32, let L: u32, let K: u32, let N_PARTIES: u32> PvwPublicKeyCircuit
         sk: Matrix<N_PARTIES, K, N>,
         b: [Matrix<N_PARTIES, K, N>; L],
         r1: [Matrix<N_PARTIES, K, 2 * N - 1>; L],
-        r2: [Matrix<N_PARTIES, K, 2 * N - 1>; L],
+        r2: [Matrix<N_PARTIES, K, N - 1>; L],
     ) -> Self {
         PvwPublicKeyCircuit { params, a, e, sk, b, r1, r2 }
     }
@@ -182,7 +182,7 @@ impl<let N: u32, let L: u32, let K: u32, let N_PARTIES: u32> PvwPublicKeyCircuit
             // Quotients from modulus switching (degree 2*N-1 to handle polynomial products)
             let (inputs, offset) = flatten_matrix(inputs, self.r1[l], offset);
 
-            // Flatten r2 quotient matrices (L matrices of N_PARTIES x K polynomials of degree 2*N-1)
+            // Flatten r2 quotient matrices (L matrices of N_PARTIES x K polynomials of degree N-1)
             // Quotients from cyclotomic reduction modulo (X^N + 1)
             let (_, _) = flatten_matrix(inputs, self.r2[l], offset);
         }
@@ -307,22 +307,22 @@ fn verify_public_key_for_modulus<let N: u32, let L: u32, let K: u32, let N_PARTI
     let cyclo_at_gamma = gamma.pow_32(N as Field) + 1;
 
     // Verify the public key equation for each party
-    // The equation is: b_{l,i} = a_l * s_i + e_i + r2_{l,i}*(X^N+1) + r1_{l,i}*q_l
+    // The equation is: b_{l,i} = s_i * a_l + e_i + r2_{l,i}*(X^N+1) + r1_{l,i}*q_l
     for i in 0..N_PARTIES {
-        // Step 1: Compute matrix-vector product a_l * s_i
-        // This is the core lattice operation: multiply KxK matrix by K-vector
-        let mut a_times_s = [0; K];
-        for row in 0..K {
-            for col in 0..K {
-                // Accumulate the dot product of row 'row' with secret key s_i
-                a_times_s[row] += a_at_gamma[row][col] * sk_at_gamma[i][col];
+        // Step 1: Compute vector-matrix product s_i * a_l
+        // This is the modified lattice operation: multiply K-vector by KxK matrix
+        let mut s_times_a = [0; K];
+        for col in 0..K {
+            for row in 0..K {
+                // Accumulate the dot product of secret key s_i with column 'col' of matrix a_l
+                s_times_a[col] += sk_at_gamma[i][row] * a_at_gamma[row][col];
             }
         }
 
         // Step 2: Verify each component of the K-dimensional equation
         for k in 0..K {
             // Compute the right-hand side of the public key equation
-            let rhs = a_times_s[k] // a_l * s_i (matrix-vector product)
+            let rhs = s_times_a[k] // s_i * a_l (vector-matrix product)
                 + e_at_gamma[i][k] // + e_i[k] (error term)
                 + r2_at_gamma[i][k] * cyclo_at_gamma // + r2_{l,i}[k] * (X^N + 1)
                 + r1_at_gamma[i][k] * circuit.params.crypto.qis[l]; // + r1_{l,i}[k] * q_l
