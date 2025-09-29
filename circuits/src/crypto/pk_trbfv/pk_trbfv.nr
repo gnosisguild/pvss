@@ -1,5 +1,5 @@
 use crate::math::polynomial::{flatten_vector, Polynomial};
-use safe::safe::SafeSponge;
+use crate::math::safe::SafeSponge;
 
 /// Cryptographic parameters for BFV public key circuit.
 /// Contains the core mathematical constants used in the BFV encryption scheme.
@@ -168,27 +168,26 @@ impl<let N: u32, let L: u32> BfvPublicKeyCircuit<N, L> {
 
     /// Flattens all witness data into a single array for Fiat-Shamir challenge generation
     /// This creates a commitment to all the secret and public values used in the protocol
-    fn payload<let SIZE: u32>(self) -> [Field; SIZE] {
-        let mut inputs = [0; SIZE];
-        let mut offset = 0;
+    fn payload(self) -> Vec<Field> {
+        let mut inputs = Vec::new();
 
         // Flatten CRS polynomials a (L polynomials of degree N)
         // These are public but included for completeness in the transcript
-        let (inputs, offset) = flatten_vector(inputs, self.a, offset);
+        let inputs = flatten_vector(inputs, self.a);
 
         // Flatten error polynomial eek (1 polynomial of degree N)
         // This is a secret witness that must remain hidden
-        let (inputs, offset) = flatten_vector(inputs, [self.eek], offset);
+        let inputs = flatten_vector(inputs, [self.eek]);
 
         // Flatten secret key polynomial sk (1 polynomial of degree N)
         // This is the most sensitive secret value
-        let (inputs, offset) = flatten_vector(inputs, [self.sk], offset);
+        let inputs = flatten_vector(inputs, [self.sk]);
 
         // Flatten quotient polynomials (L polynomials each)
         // r1: quotients from modulus switching (degree 2*N-1)
-        let (inputs, offset) = flatten_vector(inputs, self.r1, offset);
+        let inputs = flatten_vector(inputs, self.r1);
         // r2: quotients from cyclotomic reduction (degree N-1)
-        let (inputs, _) = flatten_vector(inputs, self.r2, offset);
+        let inputs = flatten_vector(inputs, self.r2);
 
         inputs
     }
@@ -229,8 +228,8 @@ impl<let N: u32, let L: u32> BfvPublicKeyCircuit<N, L> {
         ];
 
         // IO Pattern: ABSORB(input_size), SQUEEZE(2 * L)
-        let inputs = self.payload::<4 * L * N + 2 * N - 2 * L>();
-        let input_size = 4 * L * N + 2 * N - 2 * L;
+        let inputs = self.payload();
+        let input_size = inputs.len();
         let io_pattern = [0x80000000 | input_size, 0x00000000 | (2 * L)];
 
         let mut sponge = SafeSponge::start(io_pattern, domain_separator);

@@ -1,5 +1,5 @@
 use crate::math::polynomial::{flatten_matrix, flatten_vector, Matrix, Vector};
-use safe::safe::SafeSponge;
+use crate::math::safe::SafeSponge;
 
 /// Cryptographic parameters for PVW encryption circuit.
 /// Contains the core mathematical constants used in the PVW encryption scheme.
@@ -219,33 +219,32 @@ impl<let N: u32, let L: u32, let K: u32, let N_PARTIES: u32> PvwEncryptionCircui
     }
 
     /// Flattens all witness data into a single array for Fiat-Shamir
-    pub fn payload<let SIZE: u32>(self) -> [Field; SIZE] {
-        let mut inputs = [0; SIZE];
-        let mut offset = 0;
+    pub fn payload(self) -> Vec<Field> {
+        let mut inputs = Vec::new();
 
         for l in 0..L {
             // Flatten public matrices a and b (already known, but included for completeness)
-            let (inputs, offset) = flatten_matrix(inputs, self.a[l], offset);
-            let (inputs, offset) = flatten_matrix(inputs, self.b[l], offset);
+            let inputs = flatten_matrix(inputs, self.a[l]);
+            let inputs = flatten_matrix(inputs, self.b[l]);
 
             // Flatten ciphertext components (public)
-            let (inputs, offset) = flatten_vector(inputs, self.c1[l], offset);
-            let (inputs, offset) = flatten_matrix(inputs, self.c2[l], offset);
+            let inputs = flatten_vector(inputs, self.c1[l]);
+            let inputs = flatten_matrix(inputs, self.c2[l]);
 
             // Flatten modulus switching terms
-            let (inputs, offset) = flatten_vector(inputs, self.r1[l], offset);
-            let (inputs, offset) = flatten_vector(inputs, self.r2[l], offset);
-            let (inputs, offset) = flatten_matrix(inputs, self.s1[l], offset);
-            let (_, _) = flatten_matrix(inputs, self.s2[l], offset);
+            let inputs = flatten_vector(inputs, self.r1[l]);
+            let inputs = flatten_vector(inputs, self.r2[l]);
+            let inputs = flatten_matrix(inputs, self.s1[l]);
+            let _ = flatten_matrix(inputs, self.s2[l]);
         }
 
         // Flatten witness values (secret)
-        let (inputs, offset) = flatten_vector(inputs, self.u, offset);
-        let (inputs, offset) = flatten_vector(inputs, self.encoded_messages, offset);
+        let inputs = flatten_vector(inputs, self.u);
+        let inputs = flatten_vector(inputs, self.encoded_messages);
 
         // Flatten error terms
-        let (inputs, offset) = flatten_vector(inputs, self.e1, offset);
-        let (inputs, _) = flatten_vector(inputs, self.e2, offset);
+        let inputs = flatten_vector(inputs, self.e1);
+        let inputs = flatten_vector(inputs, self.e2);
 
         inputs
     }
@@ -283,8 +282,8 @@ impl<let N: u32, let L: u32, let K: u32, let N_PARTIES: u32> PvwEncryptionCircui
 
         // IO Pattern: ABSORB(SIZE), SQUEEZE(L)
         // TODO: double check pattern and size value.
-        let inputs = self.payload::<28668>();
-        let input_size = 28668;
+        let inputs = self.payload();
+        let input_size = inputs.len();
         let io_pattern = [0x80000000 | input_size, 0x00000000 | (L)];
 
         let mut sponge = SafeSponge::start(io_pattern, domain_separator);

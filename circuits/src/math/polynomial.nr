@@ -68,19 +68,17 @@ impl<let N: u32> Polynomial<N> {
 /// A tuple containing:
 /// * The updated inputs array with flattened coefficients
 /// * The new offset position after flattening
-pub fn flatten_vector<let A: u32, let L: u32, let SIZE: u32>(
-    mut inputs: [Field; SIZE],
+pub fn flatten_vector<let A: u32, let L: u32>(
+    mut inputs: Vec<Field>,
     poly: [Polynomial<A>; L],
-    mut offset: u32,
-) -> ([Field; SIZE], u32) {
+) -> Vec<Field> {
     for j in 0..L {
         for i in 0..A {
-            inputs[i + offset] = poly[j].coefficients[i];
+            inputs.push(poly[j].coefficients[i]);
         }
-        offset += A;
     }
 
-    (inputs, offset)
+    inputs
 }
 
 /// Flattens a matrix of polynomials into a 1D array of Field elements.
@@ -103,21 +101,19 @@ pub fn flatten_vector<let A: u32, let L: u32, let SIZE: u32>(
 /// A tuple containing:
 /// * The updated inputs array with flattened coefficients
 /// * The new offset position after flattening
-pub fn flatten_matrix<let ROWS: u32, let COLS: u32, let N: u32, let SIZE: u32>(
-    mut inputs: [Field; SIZE],
+pub fn flatten_matrix<let ROWS: u32, let COLS: u32, let N: u32>(
+    mut inputs: Vec<Field>,
     matrix: Matrix<ROWS, COLS, N>,
-    mut offset: u32,
-) -> ([Field; SIZE], u32) {
+) -> Vec<Field> {
     for j in 0..ROWS {
         for i in 0..COLS {
             for k in 0..N {
-                inputs[k + offset] = matrix[j][i].coefficients[k];
+                inputs.push(matrix[j][i].coefficients[k]);
             }
-            offset += N;
         }
     }
 
-    (inputs, offset)
+    inputs
 }
 
 #[test]
