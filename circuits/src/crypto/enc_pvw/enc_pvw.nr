@@ -224,27 +224,27 @@ impl<let N: u32, let L: u32, let K: u32, let N_PARTIES: u32> PvwEncryptionCircui
 
         for l in 0..L {
             // Flatten public matrices a and b (already known, but included for completeness)
-            let inputs = flatten_matrix(inputs, self.a[l]);
-            let inputs = flatten_matrix(inputs, self.b[l]);
+            inputs = flatten_matrix(inputs, self.a[l]);
+            inputs = flatten_matrix(inputs, self.b[l]);
 
             // Flatten ciphertext components (public)
-            let inputs = flatten_vector(inputs, self.c1[l]);
-            let inputs = flatten_matrix(inputs, self.c2[l]);
+            inputs = flatten_vector(inputs, self.c1[l]);
+            inputs = flatten_matrix(inputs, self.c2[l]);
 
             // Flatten modulus switching terms
-            let inputs = flatten_vector(inputs, self.r1[l]);
-            let inputs = flatten_vector(inputs, self.r2[l]);
-            let inputs = flatten_matrix(inputs, self.s1[l]);
-            let _ = flatten_matrix(inputs, self.s2[l]);
+            inputs = flatten_vector(inputs, self.r1[l]);
+            inputs = flatten_vector(inputs, self.r2[l]);
+            inputs = flatten_matrix(inputs, self.s1[l]);
+            inputs = flatten_matrix(inputs, self.s2[l]);
         }
 
         // Flatten witness values (secret)
-        let inputs = flatten_vector(inputs, self.u);
-        let inputs = flatten_vector(inputs, self.encoded_messages);
+        inputs = flatten_vector(inputs, self.u);
+        inputs = flatten_vector(inputs, self.encoded_messages);
 
         // Flatten error terms
-        let inputs = flatten_vector(inputs, self.e1);
-        let inputs = flatten_vector(inputs, self.e2);
+        inputs = flatten_vector(inputs, self.e1);
+        inputs = flatten_vector(inputs, self.e2);
 
         inputs
     }

@@ -171,28 +171,28 @@ impl<let N: u32, let L: u32, let K: u32, let N_PARTIES: u32> PvwPublicKeyCircuit
         for l in 0..L {
             // Flatten CRS matrices a (L matrices of KxK polynomials of degree N)
             // These are public but included for completeness in the transcript
-            let inputs = flatten_matrix(inputs, self.a[l]);
+            inputs = flatten_matrix(inputs, self.a[l]);
 
             // Flatten public key matrices b (L matrices of N_PARTIES x K polynomials of degree N)
             // These are public outputs but included in transcript for binding
-            let inputs = flatten_matrix(inputs, self.b[l]);
+            inputs = flatten_matrix(inputs, self.b[l]);
 
             // Flatten r1 quotient matrices (L matrices of N_PARTIES x K polynomials of degree 2*N-1)
             // Quotients from modulus switching (degree 2*N-1 to handle polynomial products)
-            let inputs = flatten_matrix(inputs, self.r1[l]);
+            inputs = flatten_matrix(inputs, self.r1[l]);
 
             // Flatten r2 quotient matrices (L matrices of N_PARTIES x K polynomials of degree N-1)
             // Quotients from cyclotomic reduction modulo (X^N + 1)
-            let _ = flatten_matrix(inputs, self.r2[l]);
+            inputs = flatten_matrix(inputs, self.r2[l]);
         }
 
         // Flatten error matrix e (N_PARTIES x K polynomials of degree N)
         // These are secret witnesses that must remain hidden
-        let inputs = flatten_matrix(inputs, self.e);
+        inputs = flatten_matrix(inputs, self.e);
 
         // Flatten secret key matrix sk (N_PARTIES x K polynomials of degree N)
         // These are the most sensitive secret values
-        let inputs = flatten_matrix(inputs, self.sk);
+        inputs = flatten_matrix(inputs, self.sk);
 
         inputs
     }

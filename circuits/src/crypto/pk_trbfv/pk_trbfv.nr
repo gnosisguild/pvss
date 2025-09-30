@@ -173,21 +173,21 @@ impl<let N: u32, let L: u32> BfvPublicKeyCircuit<N, L> {
 
         // Flatten CRS polynomials a (L polynomials of degree N)
         // These are public but included for completeness in the transcript
-        let inputs = flatten_vector(inputs, self.a);
+        inputs = flatten_vector(inputs, self.a);
 
         // Flatten error polynomial eek (1 polynomial of degree N)
         // This is a secret witness that must remain hidden
-        let inputs = flatten_vector(inputs, [self.eek]);
+        inputs = flatten_vector(inputs, [self.eek]);
 
         // Flatten secret key polynomial sk (1 polynomial of degree N)
         // This is the most sensitive secret value
-        let inputs = flatten_vector(inputs, [self.sk]);
+        inputs = flatten_vector(inputs, [self.sk]);
 
         // Flatten quotient polynomials (L polynomials each)
         // r1: quotients from modulus switching (degree 2*N-1)
-        let inputs = flatten_vector(inputs, self.r1);
+        inputs = flatten_vector(inputs, self.r1);
         // r2: quotients from cyclotomic reduction (degree N-1)
-        let inputs = flatten_vector(inputs, self.r2);
+        inputs = flatten_vector(inputs, self.r2);
 
         inputs
     }
