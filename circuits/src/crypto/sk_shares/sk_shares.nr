@@ -1,5 +1,5 @@
 use crate::math::polynomial::{Matrix, Polynomial};
-use safe::safe::SafeSponge;
+use crate::math::safe::SafeSponge;
 
 /// Cryptographic parameters for SK shares circuit.
 /// Contains the core mathematical constants used in the SK sharing scheme.
@@ -288,13 +288,11 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32> SecretKeySharesCirc
     /// Generates Fiat-Shamir challenge
     fn generate_challenge(self) -> Field {
         // Updated array size: x_coords + polynomial commitments + y values + r values
-        let mut transcript = [0; N_PARTIES + N * L + N * L * N_PARTIES + N * L * N_PARTIES];
-        let mut offset = 0;
+        let mut transcript = Vec::new();
 
         // Add public evaluation points to transcript
         for i in 0..N_PARTIES {
-            transcript[offset] = self.x_coords[i];
-            offset += 1;
+            transcript.push(self.x_coords[i]);
         }
 
         // Add polynomial commitments to transcript
@@ -305,8 +303,7 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32> SecretKeySharesCirc
 
                 // Compute commitment and add to transcript
                 let commitment = Self::compute_polynomial_commitment(polynomial, randomness);
-                transcript[offset] = commitment;
-                offset += 1;
+                transcript.push(commitment);
             }
         }
 
@@ -314,8 +311,7 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32> SecretKeySharesCirc
         for coefficient_idx in 0..N {
             for modulus_idx in 0..L {
                 for party_idx in 0..N_PARTIES {
-                    transcript[offset] = self.y[coefficient_idx][modulus_idx][party_idx];
-                    offset += 1;
+                    transcript.push(self.y[coefficient_idx][modulus_idx][party_idx]);
                 }
             }
         }
@@ -324,8 +320,7 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32> SecretKeySharesCirc
         for coefficient_idx in 0..N {
             for modulus_idx in 0..L {
                 for party_idx in 0..N_PARTIES {
-                    transcript[offset] = self.r[coefficient_idx][modulus_idx][party_idx];
-                    offset += 1;
+                    transcript.push(self.r[coefficient_idx][modulus_idx][party_idx]);
                 }
             }
         }
@@ -339,10 +334,7 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32> SecretKeySharesCirc
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
 
-        let io_pattern = [
-            0x80000000 | N_PARTIES + N * L + N * L * N_PARTIES + N * L * N_PARTIES,
-            0x00000000 | 1,
-        ];
+        let io_pattern = [0x80000000 | transcript.len(), 0x00000000 | 1];
 
         let mut sponge = SafeSponge::start(io_pattern, domain_separator);
         sponge.absorb(transcript);
@@ -358,15 +350,15 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32> SecretKeySharesCirc
         // Hash-based commitment: SafeSponge(polynomial_coefficients || randomness)
         // This provides computational binding and hiding properties
 
-        let mut commitment_input = [0; T + 2]; // (T+1) coefficients + 1 randomness
+        let mut commitment_input = Vec::new(); // (T+1) coefficients + 1 randomness
 
         // Add polynomial coefficients (Polynomial<T+1> has T+1 coefficients: a_0, a_1, ..., a_T)
         for deg in 0..(T + 1) {
-            commitment_input[deg] = polynomial.coefficients[deg];
+            commitment_input.push(polynomial.coefficients[deg]);
         }
 
         // Add randomness for hiding property
-        commitment_input[T + 1] = randomness;
+        commitment_input.push(randomness);
 
         // Use SafeSponge to compute commitment hash
         // Domain separator for PVSS_sk_shares circuit - "PVSS_sk_shares" in hex
@@ -379,7 +371,7 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32> SecretKeySharesCirc
         ];
 
         // IO Pattern: ABSORB(TRANSCRIPT_SIZE), SQUEEZE(1)
-        let input_size = T + 2;
+        let input_size = commitment_input.len();
         let io_pattern = [0x80000000 | input_size, 0x00000000 | (1)];
 
         let mut sponge = SafeSponge::start(io_pattern, domain_separator);

@@ -1,5 +1,5 @@
 use crate::math::polynomial::{flatten_matrix, Matrix};
-use safe::safe::SafeSponge;
+use crate::math::safe::SafeSponge;
 
 /// Cryptographic parameters for PVW public key circuit.
 /// Contains the core mathematical constants used in the PVW encryption scheme.
@@ -165,35 +165,34 @@ impl<let N: u32, let L: u32, let K: u32, let N_PARTIES: u32> PvwPublicKeyCircuit
 
     /// Flattens all witness data into a single array for Fiat-Shamir challenge generation
     /// This creates a commitment to all the secret and public values used in the protocol
-    pub fn payload<let SIZE: u32>(self) -> [Field; SIZE] {
-        let mut inputs = [0; SIZE];
-        let mut offset = 0;
+    pub fn payload(self) -> Vec<Field> {
+        let mut inputs = Vec::new();
 
         for l in 0..L {
             // Flatten CRS matrices a (L matrices of KxK polynomials of degree N)
             // These are public but included for completeness in the transcript
-            let (inputs, offset) = flatten_matrix(inputs, self.a[l], offset);
+            inputs = flatten_matrix(inputs, self.a[l]);
 
             // Flatten public key matrices b (L matrices of N_PARTIES x K polynomials of degree N)
             // These are public outputs but included in transcript for binding
-            let (inputs, offset) = flatten_matrix(inputs, self.b[l], offset);
+            inputs = flatten_matrix(inputs, self.b[l]);
 
             // Flatten r1 quotient matrices (L matrices of N_PARTIES x K polynomials of degree 2*N-1)
             // Quotients from modulus switching (degree 2*N-1 to handle polynomial products)
-            let (inputs, offset) = flatten_matrix(inputs, self.r1[l], offset);
+            inputs = flatten_matrix(inputs, self.r1[l]);
 
             // Flatten r2 quotient matrices (L matrices of N_PARTIES x K polynomials of degree N-1)
             // Quotients from cyclotomic reduction modulo (X^N + 1)
-            let (_, _) = flatten_matrix(inputs, self.r2[l], offset);
+            inputs = flatten_matrix(inputs, self.r2[l]);
         }
 
         // Flatten error matrix e (N_PARTIES x K polynomials of degree N)
         // These are secret witnesses that must remain hidden
-        let (inputs, offset) = flatten_matrix(inputs, self.e, offset);
+        inputs = flatten_matrix(inputs, self.e);
 
         // Flatten secret key matrix sk (N_PARTIES x K polynomials of degree N)
         // These are the most sensitive secret values
-        let (inputs, _) = flatten_matrix(inputs, self.sk, offset);
+        inputs = flatten_matrix(inputs, self.sk);
 
         inputs
     }
@@ -235,8 +234,8 @@ impl<let N: u32, let L: u32, let K: u32, let N_PARTIES: u32> PvwPublicKeyCircuit
 
         // IO Pattern: ABSORB(SIZE), SQUEEZE(2 * L)
         // TODO: double check pattern and size value.
-        let inputs = self.payload::<28668>();
-        let input_size = 28668;
+        let inputs = self.payload();
+        let input_size = inputs.len();
         let io_pattern = [0x80000000 | input_size, 0x00000000 | (2 * L)];
 
         let mut sponge = SafeSponge::start(io_pattern, domain_separator);
