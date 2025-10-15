@@ -28,39 +28,16 @@ impl<let N: u32> Polynomial<N> {
     }
     /// Evaluate a polynomial at a point modulo q
     /// Optimized for: 56-bit coefficients, 56-bit q, x up to 1000
-
-    // pub fn eval_mod(self, x: Field, q: Field) -> Field {
-    //     let mut acc = self.coefficients[0];
-
-    //     // Reduce initial coefficient if needed
-    //     acc = mod_reduce(acc, q);
-
-    //     for i in 1..self.coefficients.len() {
-    //         acc = acc * x + self.coefficients[i];
-
-    //         // Reduce every 10 iterations to prevent overflow
-    //         if (i % 2 == 0) | (i == self.coefficients.len() - 1) {
-    //             acc = mod_reduce(acc, q);
-    //         }
-    //     }
-
-    //     acc
-    // }
-    /// Evaluate a polynomial at a point modulo q
     pub fn eval_mod(self, x: Field, q: Field) -> Field {
         let mut acc = self.coefficients[0];
 
-        // Reduce initial coefficient if needed
-        acc = mod_reduce(acc, q);
-
         for i in 1..self.coefficients.len() {
-            // Multiply by x
-            acc = acc * x;
-            acc = mod_reduce(acc, q);
+            acc = acc * x + self.coefficients[i];
 
-            // Add next coefficient
-            acc = acc + self.coefficients[i];
-            acc = mod_reduce(acc, q);
+            // Reduce every 10 iterations to prevent overflow
+            if (i % 10 == 0) | (i == self.coefficients.len() - 1) {
+                acc = mod_reduce(acc, q);
+            }
         }
 
         acc
@@ -96,7 +73,6 @@ pub fn mod_reduce(value: Field, q: Field) -> Field {
     remainder
 }
 
-/// Compute quotient and remainder for value mod q (unconstrained)
 /// Compute quotient and remainder for value mod q (unconstrained)
 pub unconstrained fn compute_mod_reduction(value: Field, q: Field) -> (Field, Field) {
     // Convert to u64 for proper integer division
