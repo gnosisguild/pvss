@@ -26,6 +26,45 @@ impl<let N: u32> Polynomial<N> {
         }
         acc
     }
+    /// Evaluate a polynomial at a point modulo q
+    /// Optimized for: 56-bit coefficients, 56-bit q, x up to 1000
+
+    // pub fn eval_mod(self, x: Field, q: Field) -> Field {
+    //     let mut acc = self.coefficients[0];
+
+    //     // Reduce initial coefficient if needed
+    //     acc = mod_reduce(acc, q);
+
+    //     for i in 1..self.coefficients.len() {
+    //         acc = acc * x + self.coefficients[i];
+
+    //         // Reduce every 10 iterations to prevent overflow
+    //         if (i % 2 == 0) | (i == self.coefficients.len() - 1) {
+    //             acc = mod_reduce(acc, q);
+    //         }
+    //     }
+
+    //     acc
+    // }
+    /// Evaluate a polynomial at a point modulo q
+    pub fn eval_mod(self, x: Field, q: Field) -> Field {
+        let mut acc = self.coefficients[0];
+
+        // Reduce initial coefficient if needed
+        acc = mod_reduce(acc, q);
+
+        for i in 1..self.coefficients.len() {
+            // Multiply by x
+            acc = acc * x;
+            acc = mod_reduce(acc, q);
+
+            // Add next coefficient
+            acc = acc + self.coefficients[i];
+            acc = mod_reduce(acc, q);
+        }
+
+        acc
+    }
 
     ///  Adds `upper_bound` to the coefficients of the polynomial and constrains them to be in the range `[0, 2 * upper_bound]`.
     pub fn range_check_1bound(self, upper_bound: u64) {
@@ -49,6 +88,26 @@ impl<let N: u32> Polynomial<N> {
     }
 }
 
+pub fn mod_reduce(value: Field, q: Field) -> Field {
+    //Safety: compute_mod_reduction is safe to call here because we assert the properties of the output
+    let (quotient, remainder) = unsafe { compute_mod_reduction(value, q) };
+    assert(remainder as u64 < q as u64); // Ensure remainder is in [0, q)
+    assert(value == quotient * q + remainder); // Verify the reduction is correct
+    remainder
+}
+
+/// Compute quotient and remainder for value mod q (unconstrained)
+/// Compute quotient and remainder for value mod q (unconstrained)
+pub unconstrained fn compute_mod_reduction(value: Field, q: Field) -> (Field, Field) {
+    // Convert to u64 for proper integer division
+    let value_u64 = value as u64;
+    let q_u64 = q as u64;
+
+    let quotient_u64 = value_u64 / q_u64;
+    let remainder_u64 = value_u64 % q_u64;
+
+    (quotient_u64 as Field, remainder_u64 as Field)
+}
 /// Flattens an array of polynomials into a 1D array of Field elements.
 ///
 /// This helper function serializes polynomial coefficients maintaining a deterministic
@@ -162,4 +221,136 @@ fn test_polynomial_eval_large() {
     let result = poly.eval(x);
     // 1000000*2^2 - 500000*2 + 250000 = 4000000 - 1000000 + 250000 = 3250000
     assert_eq(result, 3250000);
+}
+
+#[test]
+
+fn test_mod_reduce_small_values() {
+    // Test mod_reduce with values already less than q
+    let q = 7;
+
+    // These should pass through unchanged
+    assert(mod_reduce(0, q) == 0);
+    assert(mod_reduce(1, q) == 1);
+    assert(mod_reduce(6, q) == 6);
+
+    // These need actual reduction
+    assert(mod_reduce(7, q) == 0);
+    assert(mod_reduce(8, q) == 1);
+    assert(mod_reduce(13, q) == 6);
+}
+
+#[test]
+fn test_eval_mod_step_by_step() {
+    // p(x) = x + 1 at x=5, mod 7
+    // Step by step: acc = 1, then acc = 1*5 + 1 = 6
+    let poly = Polynomial::new([1, 1]);
+
+    // Manually compute
+    let mut acc = 1; // coefficients[0]
+    acc = acc * 5 + 1; // = 6
+    assert(acc == 6);
+
+    // Now with mod_reduce
+    let reduced = mod_reduce(acc, 7);
+    assert(reduced == 6);
+
+    // Now test the actual function
+    let result = poly.eval_mod(5, 7);
+    assert(result == 6);
+}
+#[test]
+fn test_eval_mod_simple() {
+    // Test without initial reduction - simple case
+    // p(x) = x + 1 at x=5, mod 7
+    // Expected: (5 + 1) mod 7 = 6
+    let poly1 = Polynomial::new([1, 1]);
+    let result1 = poly1.eval_mod(5, 7);
+    assert(result1 == 6);
+
+    // Test: p(x) = 2x + 3 at x=5, mod 7
+    // Expected: (10 + 3) mod 7 = 13 mod 7 = 6
+    let poly2 = Polynomial::new([2, 3]);
+    let result2 = poly2.eval_mod(5, 7);
+    assert(result2 == 6);
+}
+
+#[test]
+fn test_eval_mod_degree_2() {
+    // p(x) = x^2 + 2x + 3 at x=5, mod 7
+    // Using Horner's method: ((1)*5 + 2)*5 + 3 = (5+2)*5 + 3 = 7*5 + 3 = 35 + 3 = 38
+    // 38 mod 7 = 3 (since 38 = 5*7 + 3)
+    let poly = Polynomial::new([1, 2, 3]);
+    let result = poly.eval_mod(5, 7);
+    assert(result == 3);
+}
+
+#[test]
+fn test_mod_reduce_function() {
+    // Test mod_reduce directly first
+    assert(mod_reduce(38, 7) == 3);
+    assert(mod_reduce(6, 7) == 6);
+    assert(mod_reduce(7, 7) == 0);
+    assert(mod_reduce(14, 7) == 0);
+}
+
+#[test]
+fn test_eval_vs_eval_mod() {
+    // Compare eval and eval_mod for small values where no reduction should occur
+    let poly = Polynomial::new([1, 2, 3]);
+    let x = 2;
+    let q = 1000; // Large enough that no reduction happens
+
+    let result_normal = poly.eval(x);
+    let result_mod = poly.eval_mod(x, q);
+
+    // They should be equal: (1)*2 + 2)*2 + 3 = (2+2)*2 + 3 = 4*2 + 3 = 11
+    assert(result_normal == 11);
+    assert(result_mod == 11);
+}
+#[test]
+fn test_eval_mod() {
+    // Test 1: Simple polynomial x^2 + 2x + 3 at x=5, mod 7
+    // Expected: (25 + 10 + 3) mod 7 = 38 mod 7 = 3
+    let poly1 = Polynomial::new([1, 2, 3]);
+    let result1 = poly1.eval_mod(5, 7);
+    assert(result1 == 3);
+
+    // Test 2: Higher degree polynomial, mod small prime
+    // p(x) = x^3 + x^2 + x + 1 at x=2, mod 11
+    // Expected: (8 + 4 + 2 + 1) mod 11 = 15 mod 11 = 4
+    let poly2 = Polynomial::new([1, 1, 1, 1]);
+    let result2 = poly2.eval_mod(2, 11);
+    assert(result2 == 4);
+
+    // Test 3: Polynomial with larger coefficients
+    // p(x) = 100x^2 + 50x + 25 at x=10, mod 73
+    // Expected: (10000 + 500 + 25) mod 73 = 10525 mod 73 = 13
+    let poly3 = Polynomial::new([100, 50, 25]);
+    let result3 = poly3.eval_mod(10, 73);
+    assert(result3 == 13);
+
+    // Test 4: Result should be less than modulus
+    let poly4 = Polynomial::new([5, 3, 7]);
+    let q = 17;
+    let result4 = poly4.eval_mod(4, q);
+    assert(result4 as u64 < q as u64);
+
+    // Test 5: Compare with regular eval for small values
+    let poly5 = Polynomial::new([1, 2, 1]);
+    let x = 3;
+    let q = 1000;
+    let result5 = poly5.eval_mod(x, q);
+    let expected5 = poly5.eval(x);
+    assert(result5 == expected5);
+
+    // Test 6: Zero polynomial
+    let poly6 = Polynomial::new([0, 0, 0]);
+    let result6 = poly6.eval_mod(100, 13);
+    assert(result6 == 0);
+
+    // Test 7: Constant polynomial
+    let poly7 = Polynomial::new([42]);
+    let result7 = poly7.eval_mod(999, 13);
+    assert(result7 == 3); // 42 mod 13 = 3
 }
