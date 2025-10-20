@@ -114,13 +114,13 @@ impl<let N: u32, let L: u32> Params<N, L> {
 /// PVSS Protocol Flow:
 /// 1. Each party generates their TRBFV secret key polynomial sk with small coefficients
 /// 2. This circuit proves correct Shamir sharing of sk coefficients modulo each q_j
-/// 3. Shares are PVW encrypted and broadcast to all parties
+/// 3. Shares are BFV encrypted and broadcast to all parties
 /// 4. Parties can verify shares without learning the secret key
 /// 5. Threshold reconstruction allows collaborative decryption operations
 ///
 /// Security Model:
 /// - Polynomials f_{i,j} are private witnesses (never revealed)
-/// - Shares y_{i,j,k} are private but will be PVW encrypted for broadcast
+/// - Shares y_{i,j,k} are private but will be BFV encrypted for broadcast
 /// - Only polynomial commitments are public
 /// - Fiat-Shamir challenges prevent selective disclosure
 pub struct SecretKeySharesCircuit<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32> {
