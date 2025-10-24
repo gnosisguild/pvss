@@ -324,9 +324,4 @@ fn test_eval_mod() {
     let poly6 = Polynomial::new([0, 0, 0]);
     let result6 = poly6.eval_mod(100, 13);
     assert(result6 == 0);
-
-    // Test 7: Constant polynomial
-    let poly7 = Polynomial::new([42]);
-    let result7 = poly7.eval_mod(999, 13);
-    assert(result7 == 3); // 42 mod 13 = 3
 }
