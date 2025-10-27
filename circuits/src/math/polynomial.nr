@@ -26,21 +26,30 @@ impl<let N: u32> Polynomial<N> {
         }
         acc
     }
-    /// Evaluate a polynomial at a point modulo q
-    /// Optimized for: 56-bit coefficients, 56-bit q, x up to 1000
     pub fn eval_mod(self, x: Field, q: Field) -> Field {
         let mut acc = self.coefficients[0];
+        let len = self.coefficients.len();
 
-        for i in 1..self.coefficients.len() {
+        let x_u64 = x as u64;
+
+        // Adaptive reduction based on x value
+        let reduction_interval = if x_u64 < 64 {
+            20 // Safe for x < 64
+        } else if x_u64 < 512 {
+            15 // Safe for x < 512
+        } else {
+            12 // Safe for x up to 1000
+        };
+
+        for i in 1..len {
             acc = acc * x + self.coefficients[i];
 
-            // Reduce every 10 iterations to prevent overflow
-            if (i % 10 == 0) | (i == self.coefficients.len() - 1) {
+            if i % reduction_interval == 0 {
                 acc = mod_reduce(acc, q);
             }
         }
 
-        acc
+        mod_reduce(acc, q)
     }
 
     ///  Adds `upper_bound` to the coefficients of the polynomial and constrains them to be in the range `[0, 2 * upper_bound]`.
