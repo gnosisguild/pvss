@@ -1,8 +1,0 @@
-[package]
-name = "dec_bfv"
-type = "bin"
-authors = [""]
-
-[dependencies]
-greco = { tag = "v0.1.5", git = "https://github.com/gnosisguild/enclave", directory = "packages/circuits/crates/libs/greco"}
-polynomial = { tag = "v0.1.5", git = "https://github.com/gnosisguild/enclave", directory = "packages/circuits/crates/libs/polynomial"}
