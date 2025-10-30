@@ -1,4 +1,5 @@
-use crate::math::polynomial::Polynomial;
+use crate::math::poly::Polynomial;
+use polynomial::flatten;
 use safe::safe::SafeSponge;
 
 /// Cryptographic parameters for decryption share correctness circuit.
@@ -42,7 +43,7 @@ impl<let L: u32> BoundParams<L> {
         r1_up_bounds: [u64; L],
         r2_bounds: [u64; L],
     ) -> Self {
-        BoundParams { 
+        BoundParams {
             s_bound,
             e_bound,
             decryption_share_bound,
@@ -126,28 +127,28 @@ impl<let N: u32, let L: u32> Params<N, L> {
 pub struct DecryptionShareCorrectness<let N: u32, let L: u32> {
     /// Circuit parameters including bounds and cryptographic constants
     params: Params<N, L>,
-    
+
     /// Ciphertext components (public inputs)
     /// c_0 components for each CRT basis (degree N-1 polynomials with N coefficients)
     c_0: [Polynomial<N>; L],
     /// c_1 components for each CRT basis (degree N-1 polynomials with N coefficients)
     c_1: [Polynomial<N>; L],
-    
+
     /// Aggregated sum of shares s (secret witness, direct input)
     /// s[basis] - sum of valid shares for each CRT basis (degree N-1 with N coefficients)
     /// This has small coefficients since it's sum of small shares
     s: [Polynomial<N>; L],
-    
+
     /// Aggregated sum of noise e (secret witness, direct input)
     /// e[basis] - sum of noise shares for each CRT basis (degree N-1 with N coefficients)
     e: [Polynomial<N>; L],
-    
+
     /// Quotient polynomials for lifting to Z (secret witnesses)
     /// r_1[basis] - quotients from modulus q_i (degree 2N-2 with 2N-1 coefficients, can be negative)
     r_1: [Polynomial<2 * N - 1>; L],
     /// r_2[basis] - quotients from cyclotomic polynomial X^N + 1 (degree N-2 with N-1 coefficients)
     r_2: [Polynomial<N - 1>; L],
-    
+
     /// Party's computed decryption share (public output)
     /// d[basis] - decryption share computed by this party for each CRT basis (degree N-1 with N coefficients)
     /// This is what the party claims to have computed using the lifted formula
@@ -162,8 +163,8 @@ impl<let N: u32, let L: u32> DecryptionShareCorrectness<N, L> {
     /// * `params` - Circuit parameters including bounds and crypto constants
     /// * `c_0` - First ciphertext components for each CRT basis
     /// * `c_1` - Second ciphertext components for each CRT basis
-    /// * `s` - Aggregated sum of valid shares ∑ y_i for each CRT basis (direct input)
-    /// * `e` - Aggregated sum of noise shares ∑ e_i for each CRT basis (direct input)
+    /// * `s` - Aggregated sum of valid shares sum y_i for each CRT basis (direct input)
+    /// * `e` - Aggregated sum of noise shares sum e_i for each CRT basis (direct input)
     /// * `r_1` - Quotient polynomials for modulus q_i lifting (degree 2N-2 with 2N-1 coefficients each)
     /// * `r_2` - Quotient polynomials for cyclotomic polynomial lifting (degree N-2 with N-1 coefficients each)
     /// * `d` - Party's computed decryption share (public output to be shared with others)
@@ -180,46 +181,33 @@ impl<let N: u32, let L: u32> DecryptionShareCorrectness<N, L> {
         r_2: [Polynomial<N - 1>; L],
         d: [Polynomial<N>; L],
     ) -> Self {
-        DecryptionShareCorrectness {
-            params,
-            c_0,
-            c_1,
-            s,
-            e,
-            r_1,
-            r_2,
-            d,
-        }
+        DecryptionShareCorrectness { params, c_0, c_1, s, e, r_1, r_2, d }
     }
 
-    /// Flattens all witness data into a single array for Fiat-Shamir challenge generation
+    /// Flattens all witness data into a single vector for Fiat-Shamir challenge generation
     ///
     /// This creates a commitment to all the secret and public values used in the protocol.
     /// The ordering is deterministic to ensure reproducible challenge generation.
     ///
-    /// # Generic Parameters
-    /// * `SIZE` - The total size of the flattened array
-    ///
     /// # Returns
-    /// An array containing all witness data in flattened form
-    fn payload<let SIZE: u32>(self) -> [Field; SIZE] {
-        let mut inputs = [0; SIZE];
-        let mut offset = 0;
+    /// A vector containing all witness data in flattened form
+    fn payload(self) -> Vec<Field> {
+        let mut inputs = Vec::new();
 
         // Flatten ciphertext components (public inputs)
-        let (inputs, offset) = flatten(inputs, self.c_0, offset);
-        let (inputs, offset) = flatten(inputs, self.c_1, offset);
+        inputs = flatten(inputs, self.c_0);
+        inputs = flatten(inputs, self.c_1);
 
         // Flatten aggregated sums (secret witnesses)
-        let (inputs, offset) = flatten(inputs, self.s, offset);
-        let (inputs, offset) = flatten(inputs, self.e, offset);
+        inputs = flatten(inputs, self.s);
+        inputs = flatten(inputs, self.e);
 
         // Flatten quotient polynomials (secret witnesses)
-        let (inputs, offset) = flatten(inputs, self.r_1, offset);
-        let (inputs, offset) = flatten(inputs, self.r_2, offset);
+        inputs = flatten(inputs, self.r_1);
+        inputs = flatten(inputs, self.r_2);
 
         // Flatten decryption shares (public outputs - to be shared with other parties)
-        let (inputs, _) = flatten(inputs, self.d, offset);
+        inputs = flatten(inputs, self.d);
 
         inputs
     }
@@ -228,18 +216,17 @@ impl<let N: u32, let L: u32> DecryptionShareCorrectness<N, L> {
     ///
     /// This function implements the complete zero-knowledge proof by:
     /// 1. Performing range checks on all secret values
-    /// 2. Generating Fiat-Shamir challenges
-    /// 3. Verifying the decryption share computation formula at random points
+    /// 2. Generating a Fiat-Shamir challenge
+    /// 3. Verifying the decryption share computation formula at the random point
     pub fn verify_decryption_share_correctness(self) {
         // Step 1: Perform range checks on all secret witness values
         self.check_range_bounds();
 
-        // Step 2: Generate Fiat-Shamir challenges from the transcript
-        let gammas = self.generate_challenge();
+        // Step 2: Generate Fiat-Shamir challenge from the transcript
+        let gamma = self.generate_challenge();
 
-        // Step 3: Verify decryption share computation for each CRT basis
+        // Step 3: Verify decryption share computation for each CRT basis using the same gamma
         for i in 0..L {
-            let gamma = gammas.get(i);
             self.verify_decryption_share_computation(i, gamma);
         }
     }
@@ -269,14 +256,16 @@ impl<let N: u32, let L: u32> DecryptionShareCorrectness<N, L> {
         }
     }
 
-    /// Generates Fiat-Shamir challenge values using a cryptographic sponge
+    /// Generates Fiat-Shamir challenge value using a cryptographic sponge
     ///
-    /// The sponge absorbs all witness values and squeezes out deterministic random field elements
+    /// The sponge absorbs all witness values and squeezes out a deterministic random field element
     /// that will be used to evaluate polynomials for the Schwartz-Zippel lemma.
     ///
     /// # Returns
-    /// Vector of challenge values [gamma_0, gamma_1, ..., gamma_{L-1}]
-    fn generate_challenge(self) -> Vec<Field> {
+    /// A single challenge value gamma
+    fn generate_challenge(self) -> Field {
+        let inputs = self.payload();
+
         // Domain separator for decryption share circuit - "DecShare" in hex
         let domain_separator = [
             0x44, 0x65, 0x63, 0x53, 0x68, 0x61, 0x72, 0x65, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -286,17 +275,15 @@ impl<let N: u32, let L: u32> DecryptionShareCorrectness<N, L> {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
 
-        // Calculate input size: 2*L*N (ciphertexts) + 2*L*N (s,e) + L*(2*N-1) (r_1) + L*(N-1) (r_2) + L*N (d)
-        let input_size = (2 + 2 + 1) * L * N + L * (2 * N - 1) + L * (N - 1);
-        let io_pattern = [0x80000000 | input_size, 0x00000000 | L];
-
-        let inputs = self.payload::<(2 + 2 + 1) * L * N + L * (2 * N - 1) + L * (N - 1)>();
+        // IO Pattern: ABSORB(input_size), SQUEEZE(1)
+        let input_size = inputs.len();
+        let io_pattern = [0x80000000 | input_size, 0x00000001];
 
         let mut sponge = SafeSponge::start(io_pattern, domain_separator);
         sponge.absorb(inputs);
         let gammas = sponge.squeeze();
         sponge.finish();
-        gammas
+        gammas.get(0)
     }
 
     /// Verifies the lifted decryption share computation formula for a specific CRT basis
@@ -327,8 +314,8 @@ impl<let N: u32, let L: u32> DecryptionShareCorrectness<N, L> {
 
         // Compute expected decryption share using the lifted formula:
         // d_i = c_0i + c_1i * s + e_i + r_2_i * (X^N + 1) + r_1_i * q_i
-        let expected_decryption_share = c_0_at_gamma 
-            + c_1_at_gamma * s_at_gamma 
+        let expected_decryption_share = c_0_at_gamma
+            + c_1_at_gamma * s_at_gamma
             + e_at_gamma
             + r_2_at_gamma * cyclo_at_gamma
             + r_1_at_gamma * crypto_params.qis[basis_idx];
@@ -339,36 +326,4 @@ impl<let N: u32, let L: u32> DecryptionShareCorrectness<N, L> {
         // Enforce equality: computed decryption share must match expected value
         assert_eq(computed_decryption_share, expected_decryption_share);
     }
-}
-
-/// Helper function to flatten an array of polynomials into a 1D array
-///
-/// This function serializes polynomial coefficients for challenge generation
-/// in the Fiat-Shamir transform. It maintains deterministic ordering.
-///
-/// # Generic Parameters
-/// * `A` - The degree of each polynomial in the array
-/// * `L` - The number of polynomials in the array
-/// * `SIZE` - The total size of the target array
-///
-/// # Arguments
-/// * `inputs` - The target array to store flattened coefficients
-/// * `poly` - Array of polynomials to flatten
-/// * `offset` - Starting position in the inputs array
-///
-/// # Returns
-/// A tuple containing the updated inputs array and new offset
-fn flatten<let A: u32, let L: u32, let SIZE: u32>(
-    mut inputs: [Field; SIZE],
-    poly: [Polynomial<A>; L],
-    mut offset: u32,
-) -> ([Field; SIZE], u32) {
-    for j in 0..L {
-        for i in 0..A {
-            inputs[i + offset] = poly[j].coefficients[i];
-        }
-        offset += A;
-    }
-
-    (inputs, offset)
 }
