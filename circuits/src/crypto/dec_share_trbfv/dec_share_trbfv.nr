@@ -1,5 +1,4 @@
-use crate::math::poly::Polynomial;
-use polynomial::flatten;
+use crate::math::polynomial::{flatten_vector, Polynomial};
 use safe::SafeSponge;
 
 /// Cryptographic parameters for decryption share correctness circuit.
@@ -124,7 +123,7 @@ impl<let N: u32, let L: u32> Params<N, L> {
 /// # Generic Parameters
 /// * `N` - The number of coefficients in ring polynomials (polynomials have degree N-1)
 /// * `L` - The number of CRT (Chinese Remainder Theorem) bases
-pub struct DecryptionShareCorrectness<let N: u32, let L: u32> {
+pub struct DecryptionShareCorrectness<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_D: u32> {
     /// Circuit parameters including bounds and cryptographic constants
     params: Params<N, L>,
 
@@ -156,7 +155,7 @@ pub struct DecryptionShareCorrectness<let N: u32, let L: u32> {
     d: [Polynomial<N>; L],
 }
 
-impl<let N: u32, let L: u32> DecryptionShareCorrectness<N, L> {
+impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_D: u32> DecryptionShareCorrectness<N, L, BIT_CT, BIT_S, BIT_E, BIT_R1, BIT_R2, BIT_D> {
     /// Creates a new decryption share correctness circuit instance
     ///
     /// # Arguments
@@ -195,19 +194,19 @@ impl<let N: u32, let L: u32> DecryptionShareCorrectness<N, L> {
         let mut inputs = Vec::new();
 
         // Flatten ciphertext components (public inputs)
-        inputs = flatten(inputs, self.c_0);
-        inputs = flatten(inputs, self.c_1);
+        inputs = flatten_vector::<_, _, BIT_CT>(inputs, self.c_0);
+        inputs = flatten_vector::<_, _, BIT_CT>(inputs, self.c_1);
 
         // Flatten aggregated sums (secret witnesses)
-        inputs = flatten(inputs, self.s);
-        inputs = flatten(inputs, self.e);
+        inputs = flatten_vector::<_, _, BIT_S>(inputs, self.s);
+        inputs = flatten_vector::<_, _, BIT_E>(inputs, self.e);
 
         // Flatten quotient polynomials (secret witnesses)
-        inputs = flatten(inputs, self.r_1);
-        inputs = flatten(inputs, self.r_2);
+        inputs = flatten_vector::<_, _, BIT_R1>(inputs, self.r_1);
+        inputs = flatten_vector::<_, _, BIT_R2>(inputs, self.r_2);
 
         // Flatten decryption shares (public outputs - to be shared with other parties)
-        inputs = flatten(inputs, self.d);
+        inputs = flatten_vector::<_, _, BIT_D>(inputs, self.d);
 
         inputs
     }
@@ -240,19 +239,19 @@ impl<let N: u32, let L: u32> DecryptionShareCorrectness<N, L> {
 
         // Check aggregated sums are within bounds
         for basis_idx in 0..L {
-            self.s[basis_idx].range_check_1bound(bound_params.s_bound);
-            self.e[basis_idx].range_check_1bound(bound_params.e_bound);
+            self.s[basis_idx].range_check_1bound::<BIT_S>(bound_params.s_bound);
+            self.e[basis_idx].range_check_1bound::<BIT_E>(bound_params.e_bound);
         }
 
         // Check quotient polynomials are within bounds
         for basis_idx in 0..L {
             // r_1 quotients can be negative (modulus quotients)
-            self.r_1[basis_idx].range_check_2bounds(
+            self.r_1[basis_idx].range_check_2bounds::<BIT_R1>(
                 bound_params.r1_up_bounds[basis_idx],
                 bound_params.r1_low_bounds[basis_idx],
             );
             // r_2 quotients (cyclotomic quotients)
-            self.r_2[basis_idx].range_check_1bound(bound_params.r2_bounds[basis_idx]);
+            self.r_2[basis_idx].range_check_1bound::<BIT_R2>(bound_params.r2_bounds[basis_idx]);
         }
     }
 
