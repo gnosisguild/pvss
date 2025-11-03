@@ -1,5 +1,5 @@
 use crate::math::polynomial::{flatten_vector, Polynomial};
-use safe::safe::SafeSponge;
+use safe::SafeSponge;
 
 /// Cryptographic parameters for BFV public key circuit.
 /// Contains the core mathematical constants used in the BFV encryption scheme.
@@ -168,27 +168,26 @@ impl<let N: u32, let L: u32> BfvPublicKeyCircuit<N, L> {
 
     /// Flattens all witness data into a single array for Fiat-Shamir challenge generation
     /// This creates a commitment to all the secret and public values used in the protocol
-    fn payload<let SIZE: u32>(self) -> [Field; SIZE] {
-        let mut inputs = [0; SIZE];
-        let mut offset = 0;
+    fn payload(self) -> Vec<Field> {
+        let mut inputs = Vec::new();
 
         // Flatten CRS polynomials a (L polynomials of degree N)
         // These are public but included for completeness in the transcript
-        let (inputs, offset) = flatten_vector(inputs, self.a, offset);
+        inputs = flatten_vector::<_, _, 64>(inputs, self.a);
 
         // Flatten error polynomial eek (1 polynomial of degree N)
         // This is a secret witness that must remain hidden
-        let (inputs, offset) = flatten_vector(inputs, [self.eek], offset);
+        inputs = flatten_vector::<_, _, 64>(inputs, [self.eek]);
 
         // Flatten secret key polynomial sk (1 polynomial of degree N)
         // This is the most sensitive secret value
-        let (inputs, offset) = flatten_vector(inputs, [self.sk], offset);
+        inputs = flatten_vector::<_, _, 64>(inputs, [self.sk]);
 
         // Flatten quotient polynomials (L polynomials each)
         // r1: quotients from modulus switching (degree 2*N-1)
-        let (inputs, offset) = flatten_vector(inputs, self.r1, offset);
+        inputs = flatten_vector::<_, _, 64>(inputs, self.r1);
         // r2: quotients from cyclotomic reduction (degree N-1)
-        let (inputs, _) = flatten_vector(inputs, self.r2, offset);
+        inputs = flatten_vector::<_, _, 64>(inputs, self.r2);
 
         inputs
     }
@@ -229,8 +228,8 @@ impl<let N: u32, let L: u32> BfvPublicKeyCircuit<N, L> {
         ];
 
         // IO Pattern: ABSORB(input_size), SQUEEZE(2 * L)
-        let inputs = self.payload::<4 * L * N + 2 * N - 2 * L>();
-        let input_size = 4 * L * N + 2 * N - 2 * L;
+        let inputs = self.payload();
+        let input_size = inputs.len();
         let io_pattern = [0x80000000 | input_size, 0x00000000 | (2 * L)];
 
         let mut sponge = SafeSponge::start(io_pattern, domain_separator);
@@ -246,24 +245,24 @@ impl<let N: u32, let L: u32> BfvPublicKeyCircuit<N, L> {
 fn perform_range_checks<let N: u32, let L: u32>(circuit: BfvPublicKeyCircuit<N, L>) {
     // Check that error polynomial has small coefficients
     // Small errors are crucial for both security and correctness in BFV
-    circuit.eek.range_check_1bound(circuit.params.bounds.eek_bound);
+    circuit.eek.range_check_1bound::<64>(circuit.params.bounds.eek_bound);
 
     // Check that secret key polynomial has small coefficients
     // Secret key must be small (from CBD distribution) for security
-    circuit.sk.range_check_1bound(circuit.params.bounds.sk_bound);
+    circuit.sk.range_check_1bound::<64>(circuit.params.bounds.sk_bound);
 
     // Check quotient terms are within expected bounds (per modulus)
     for i in 0..L {
         // r1 quotients can be negative (modulus switching can produce negative quotients)
         // Use asymmetric bounds [R1_LOW_BOUNDS[i], R1_UP_BOUNDS[i]] for modulus i
-        circuit.r1[i].range_check_2bounds(
+        circuit.r1[i].range_check_2bounds::<64>(
             circuit.params.bounds.r1_up_bounds[i],
             circuit.params.bounds.r1_low_bounds[i],
         );
 
         // r2 quotients are typically positive (cyclotomic reduction quotients)
         // Use symmetric bounds [-R2_BOUNDS[i], R2_BOUNDS[i]] for modulus i
-        circuit.r2[i].range_check_1bound(circuit.params.bounds.r2_bounds[i]);
+        circuit.r2[i].range_check_1bound::<64>(circuit.params.bounds.r2_bounds[i]);
     }
 }
 
