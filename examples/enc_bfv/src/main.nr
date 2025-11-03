@@ -16,7 +16,7 @@ fn main(
     p1is: [Polynomial<16383>; 2],
     p2is: [Polynomial<8191>; 2],
 ) {
-    let greco: Greco<8192, 2, 54, 54, 5, 5, 20, 20, 54, 16, 54> = Greco::new(
+    let greco: Greco<8192, 2, 59, 59, 6, 6, 57, 57, 59, 18, 59> = Greco::new(
         params,
         pk0is,
         pk1is,
