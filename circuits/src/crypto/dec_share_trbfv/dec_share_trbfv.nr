@@ -18,10 +18,6 @@ impl<let L: u32> CryptographicParams<L> {
 /// Bound parameters for range checking in decryption share circuit.
 /// Contains all the bounds used to validate polynomial coefficients.
 pub struct BoundParams<let L: u32> {
-    /// Bound for aggregated shares sum s
-    pub s_bound: u64,
-    /// Bound for aggregated noise sum e
-    pub e_bound: u64,
     /// Bound for computed decryption share d
     pub decryption_share_bound: u64,
     /// Lower bounds for r_1 polynomials (modulus quotients, can be negative)
@@ -35,21 +31,12 @@ pub struct BoundParams<let L: u32> {
 impl<let L: u32> BoundParams<L> {
     /// Creates new bound parameters
     pub fn new(
-        s_bound: u64,
-        e_bound: u64,
         decryption_share_bound: u64,
         r1_low_bounds: [i64; L],
         r1_up_bounds: [u64; L],
         r2_bounds: [u64; L],
     ) -> Self {
-        BoundParams {
-            s_bound,
-            e_bound,
-            decryption_share_bound,
-            r1_low_bounds,
-            r1_up_bounds,
-            r2_bounds,
-        }
+        BoundParams { decryption_share_bound, r1_low_bounds, r1_up_bounds, r2_bounds }
     }
 }
 
@@ -60,36 +47,26 @@ pub struct Params<let N: u32, let L: u32> {
     pub crypto: CryptographicParams<L>,
     /// Bound parameters for range checking
     pub bounds: BoundParams<L>,
-    /// Ring dimension (number of polynomial coefficients)
-    pub n: u32,
-    /// Number of CRT bases
-    pub l: u32,
 }
 
 impl<let N: u32, let L: u32> Params<N, L> {
     /// Creates new complete parameters
     pub fn new(
         qis: [Field; L],
-        s_bound: u64,
-        e_bound: u64,
         decryption_share_bound: u64,
         r1_low_bounds: [i64; L],
         r1_up_bounds: [u64; L],
         r2_bounds: [u64; L],
-        n: u32,
-        l: u32,
     ) -> Self {
         let crypto = CryptographicParams::new(qis);
         let bounds = BoundParams::new(
-            s_bound,
-            e_bound,
             decryption_share_bound,
             r1_low_bounds,
             r1_up_bounds,
             r2_bounds,
         );
 
-        Params { crypto, bounds, n, l }
+        Params { crypto, bounds }
     }
 
     /// Convenience method to access cryptographic parameters
@@ -239,8 +216,8 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, le
 
         // Check aggregated sums are within bounds
         for basis_idx in 0..L {
-            self.s[basis_idx].range_check_1bound::<BIT_S>(bound_params.s_bound);
-            self.e[basis_idx].range_check_1bound::<BIT_E>(bound_params.e_bound);
+            self.s[basis_idx].range_check_1bound::<BIT_S>(bound_params.r2_bounds[basis_idx]);
+            self.e[basis_idx].range_check_1bound::<BIT_E>(bound_params.r2_bounds[basis_idx]);
         }
 
         // Check quotient polynomials are within bounds
