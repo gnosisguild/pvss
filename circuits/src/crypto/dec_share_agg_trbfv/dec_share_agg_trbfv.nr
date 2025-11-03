@@ -1,5 +1,5 @@
 use crate::math::polynomial::Polynomial;
-use safe::safe::SafeSponge;
+use safe::SafeSponge;
 use dep::bignum::runtime_bignum::{BigNumInstance, BigNumParamsTrait};
 
 /// Cryptographic parameters for decryption share aggregation circuit.

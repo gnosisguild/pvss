@@ -1,6 +1,6 @@
 use crate::math::poly::Polynomial;
 use polynomial::flatten;
-use safe::safe::SafeSponge;
+use safe::SafeSponge;
 
 /// Cryptographic parameters for decryption share correctness circuit.
 /// Contains the core mathematical constants used in the threshold scheme.
