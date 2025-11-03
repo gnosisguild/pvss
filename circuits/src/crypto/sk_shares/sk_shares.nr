@@ -1,5 +1,5 @@
 use crate::math::polynomial::{Matrix, Polynomial};
-use safe::safe::SafeSponge;
+use safe::SafeSponge;
 
 /// Cryptographic parameters for SK shares circuit.
 /// Contains the core mathematical constants used in the SK sharing scheme.
@@ -396,13 +396,16 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32> SecretKeySharesCirc
         let crypto_params = self.params.crypto_params();
 
         // Check secret key coefficients
-        self.sk.range_check_1bound(bound_params.sk_bound);
+        // TODO: FIX DUMMY BITS
+        self.sk.range_check_1bound::<64>(bound_params.sk_bound);
 
         // Check sharing polynomial coefficients
         for coefficient_idx in 0..N {
             for modulus_idx in 0..L {
                 let current_modulus = crypto_params.qis[modulus_idx];
-                self.f[coefficient_idx][modulus_idx].range_check_1bound(current_modulus as u64);
+                self.f[coefficient_idx][modulus_idx].range_check_1bound::<64>(
+                    current_modulus as u64,
+                );
             }
         }
 
