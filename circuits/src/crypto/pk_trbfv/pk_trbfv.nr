@@ -1,4 +1,4 @@
-use crate::math::polynomial::{flatten_vector, Polynomial};
+use crate::math::polynomial::{flatten, Polynomial};
 use safe::SafeSponge;
 
 /// Cryptographic parameters for BFV public key circuit.
@@ -173,21 +173,21 @@ impl<let N: u32, let L: u32> BfvPublicKeyCircuit<N, L> {
 
         // Flatten CRS polynomials a (L polynomials of degree N)
         // These are public but included for completeness in the transcript
-        inputs = flatten_vector::<_, _, 64>(inputs, self.a);
+        inputs = flatten::<_, _, 64>(inputs, self.a);
 
         // Flatten error polynomial eek (1 polynomial of degree N)
         // This is a secret witness that must remain hidden
-        inputs = flatten_vector::<_, _, 64>(inputs, [self.eek]);
+        inputs = flatten::<_, _, 64>(inputs, [self.eek]);
 
         // Flatten secret key polynomial sk (1 polynomial of degree N)
         // This is the most sensitive secret value
-        inputs = flatten_vector::<_, _, 64>(inputs, [self.sk]);
+        inputs = flatten::<_, _, 64>(inputs, [self.sk]);
 
         // Flatten quotient polynomials (L polynomials each)
         // r1: quotients from modulus switching (degree 2*N-1)
-        inputs = flatten_vector::<_, _, 64>(inputs, self.r1);
+        inputs = flatten::<_, _, 64>(inputs, self.r1);
         // r2: quotients from cyclotomic reduction (degree N-1)
-        inputs = flatten_vector::<_, _, 64>(inputs, self.r2);
+        inputs = flatten::<_, _, 64>(inputs, self.r2);
 
         inputs
     }
@@ -245,11 +245,11 @@ impl<let N: u32, let L: u32> BfvPublicKeyCircuit<N, L> {
 fn perform_range_checks<let N: u32, let L: u32>(circuit: BfvPublicKeyCircuit<N, L>) {
     // Check that error polynomial has small coefficients
     // Small errors are crucial for both security and correctness in BFV
-    circuit.eek.range_check_1bound::<64>(circuit.params.bounds.eek_bound);
+    circuit.eek.range_check_1bound::<64>(circuit.params.bounds.eek_bound as Field);
 
     // Check that secret key polynomial has small coefficients
     // Secret key must be small (from CBD distribution) for security
-    circuit.sk.range_check_1bound::<64>(circuit.params.bounds.sk_bound);
+    circuit.sk.range_check_1bound::<64>(circuit.params.bounds.sk_bound as Field);
 
     // Check quotient terms are within expected bounds (per modulus)
     for i in 0..L {
@@ -262,7 +262,7 @@ fn perform_range_checks<let N: u32, let L: u32>(circuit: BfvPublicKeyCircuit<N, 
 
         // r2 quotients are typically positive (cyclotomic reduction quotients)
         // Use symmetric bounds [-R2_BOUNDS[i], R2_BOUNDS[i]] for modulus i
-        circuit.r2[i].range_check_1bound::<64>(circuit.params.bounds.r2_bounds[i]);
+        circuit.r2[i].range_check_1bound::<64>(circuit.params.bounds.r2_bounds[i] as Field);
     }
 }
 

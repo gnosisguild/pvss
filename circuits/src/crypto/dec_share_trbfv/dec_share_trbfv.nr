@@ -1,4 +1,4 @@
-use crate::math::polynomial::{flatten_vector, Polynomial};
+use crate::math::polynomial::{flatten, Polynomial};
 use safe::SafeSponge;
 
 /// Cryptographic parameters for decryption share correctness circuit.
@@ -171,19 +171,19 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, le
         let mut inputs = Vec::new();
 
         // Flatten ciphertext components (public inputs)
-        inputs = flatten_vector::<_, _, BIT_CT>(inputs, self.c_0);
-        inputs = flatten_vector::<_, _, BIT_CT>(inputs, self.c_1);
+        inputs = flatten::<_, _, BIT_CT>(inputs, self.c_0);
+        inputs = flatten::<_, _, BIT_CT>(inputs, self.c_1);
 
         // Flatten aggregated sums (secret witnesses)
-        inputs = flatten_vector::<_, _, BIT_S>(inputs, self.s);
-        inputs = flatten_vector::<_, _, BIT_E>(inputs, self.e);
+        inputs = flatten::<_, _, BIT_S>(inputs, self.s);
+        inputs = flatten::<_, _, BIT_E>(inputs, self.e);
 
         // Flatten quotient polynomials (secret witnesses)
-        inputs = flatten_vector::<_, _, BIT_R1>(inputs, self.r_1);
-        inputs = flatten_vector::<_, _, BIT_R2>(inputs, self.r_2);
+        inputs = flatten::<_, _, BIT_R1>(inputs, self.r_1);
+        inputs = flatten::<_, _, BIT_R2>(inputs, self.r_2);
 
         // Flatten decryption shares (public outputs - to be shared with other parties)
-        inputs = flatten_vector::<_, _, BIT_D>(inputs, self.d);
+        inputs = flatten::<_, _, BIT_D>(inputs, self.d);
 
         inputs
     }
@@ -216,8 +216,12 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, le
 
         // Check aggregated sums are within bounds
         for basis_idx in 0..L {
-            self.s[basis_idx].range_check_1bound::<BIT_S>(bound_params.r2_bounds[basis_idx]);
-            self.e[basis_idx].range_check_1bound::<BIT_E>(bound_params.r2_bounds[basis_idx]);
+            self.s[basis_idx].range_check_1bound::<BIT_S>(
+                bound_params.r2_bounds[basis_idx] as Field,
+            );
+            self.e[basis_idx].range_check_1bound::<BIT_E>(
+                bound_params.r2_bounds[basis_idx] as Field,
+            );
         }
 
         // Check quotient polynomials are within bounds
@@ -228,7 +232,9 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, le
                 bound_params.r1_low_bounds[basis_idx],
             );
             // r_2 quotients (cyclotomic quotients)
-            self.r_2[basis_idx].range_check_1bound::<BIT_R2>(bound_params.r2_bounds[basis_idx]);
+            self.r_2[basis_idx].range_check_1bound::<BIT_R2>(
+                bound_params.r2_bounds[basis_idx] as Field,
+            );
         }
     }
 
