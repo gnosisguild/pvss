@@ -19,24 +19,21 @@ impl<let L: u32> CryptographicParams<L> {
 /// Contains all the bounds used to validate polynomial coefficients.
 pub struct BoundParams<let L: u32> {
     /// Bound for computed decryption share d
-    pub decryption_share_bound: u64,
-    /// Lower bounds for r_1 polynomials (modulus quotients, can be negative)
-    pub r1_low_bounds: [i64; L],
-    /// Upper bounds for r_1 polynomials (modulus quotients)
-    pub r1_up_bounds: [u64; L],
+    pub decryption_share_bound: Field,
+    /// Bounds for r_1 polynomials (modulus quotients)
+    pub r1_bounds: [Field; L],
     /// Bounds for r_2 polynomials (cyclotomic quotients)
-    pub r2_bounds: [u64; L],
+    pub r2_bounds: [Field; L],
 }
 
 impl<let L: u32> BoundParams<L> {
     /// Creates new bound parameters
     pub fn new(
-        decryption_share_bound: u64,
-        r1_low_bounds: [i64; L],
-        r1_up_bounds: [u64; L],
-        r2_bounds: [u64; L],
+        decryption_share_bound: Field,
+        r1_bounds: [Field; L],
+        r2_bounds: [Field; L],
     ) -> Self {
-        BoundParams { decryption_share_bound, r1_low_bounds, r1_up_bounds, r2_bounds }
+        BoundParams { decryption_share_bound, r1_bounds, r2_bounds }
     }
 }
 
@@ -53,18 +50,12 @@ impl<let N: u32, let L: u32> Params<N, L> {
     /// Creates new complete parameters
     pub fn new(
         qis: [Field; L],
-        decryption_share_bound: u64,
-        r1_low_bounds: [i64; L],
-        r1_up_bounds: [u64; L],
-        r2_bounds: [u64; L],
+        decryption_share_bound: Field,
+        r1_bounds: [Field; L],
+        r2_bounds: [Field; L],
     ) -> Self {
         let crypto = CryptographicParams::new(qis);
-        let bounds = BoundParams::new(
-            decryption_share_bound,
-            r1_low_bounds,
-            r1_up_bounds,
-            r2_bounds,
-        );
+        let bounds = BoundParams::new(decryption_share_bound, r1_bounds, r2_bounds);
 
         Params { crypto, bounds }
     }
@@ -216,11 +207,13 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, le
 
         // Check aggregated sums are within bounds
         for basis_idx in 0..L {
-            self.s[basis_idx].range_check_1bound::<BIT_S>(
-                bound_params.r2_bounds[basis_idx] as Field,
+            self.s[basis_idx].range_check_2bounds::<BIT_S>(
+                bound_params.r2_bounds[basis_idx],
+                bound_params.r2_bounds[basis_idx],
             );
-            self.e[basis_idx].range_check_1bound::<BIT_E>(
-                bound_params.r2_bounds[basis_idx] as Field,
+            self.e[basis_idx].range_check_2bounds::<BIT_E>(
+                bound_params.r2_bounds[basis_idx],
+                bound_params.r2_bounds[basis_idx],
             );
         }
 
@@ -228,12 +221,13 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, le
         for basis_idx in 0..L {
             // r_1 quotients can be negative (modulus quotients)
             self.r_1[basis_idx].range_check_2bounds::<BIT_R1>(
-                bound_params.r1_up_bounds[basis_idx],
-                bound_params.r1_low_bounds[basis_idx],
+                bound_params.r1_bounds[basis_idx],
+                bound_params.r1_bounds[basis_idx],
             );
             // r_2 quotients (cyclotomic quotients)
-            self.r_2[basis_idx].range_check_1bound::<BIT_R2>(
-                bound_params.r2_bounds[basis_idx] as Field,
+            self.r_2[basis_idx].range_check_2bounds::<BIT_R2>(
+                bound_params.r2_bounds[basis_idx],
+                bound_params.r2_bounds[basis_idx],
             );
         }
     }

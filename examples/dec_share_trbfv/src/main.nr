@@ -11,16 +11,9 @@ fn main(
     r_1: [Polynomial<16383>; 4],
     r_2: [Polynomial<8191>; 4],
     d: [Polynomial<8192>; 4],
-    // TODO: Other parameters...
 ) {
-    // TODO: Your logic here...
-
-    // Create Decryption Share Correctness circuit instance.
-    let dec_share: DecryptionShareCorrectness<8192, 4, 56, 56, 56, 18, 56, 56> =
+    let dec_share: DecryptionShareCorrectness<8192, 4, 56, 56, 56, 68, 56, 56> =
         DecryptionShareCorrectness::new(params, c_0, c_1, s, e, r_1, r_2, d);
 
-    // Verify decryption share correctness
     dec_share.verify_decryption_share_correctness();
-
-    // TODO: Your logic here...
 }

@@ -20,11 +20,7 @@ fn main(
     r2is: [Polynomial<8191>; 4],
     p1is: [Polynomial<16383>; 4],
     p2is: [Polynomial<8191>; 4],
-    // TODO: Other parameters...
 ) {
-    // TODO: Your logic here...
-
-    // Create Greco circuit instance.
     let greco: Greco<8192, 4, 56, 56, 2, 6, 110, 10, 55, 56, 55, 56> = Greco::new(
         params,
         pk0is,
@@ -44,5 +40,4 @@ fn main(
     let is_greco_valid = greco.verify();
 
     assert(is_greco_valid);
-    // TODO: Your logic here...
 }
