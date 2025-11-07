@@ -13,6 +13,8 @@ fn main(
     pk0is: [Polynomial<8192>; 4],
     pk1is: [Polynomial<8192>; 4],
 ) {
-    let circuit = BfvPublicKeyCircuit::new(params, a, eek, sk, r1is, r2is, pk0is, pk1is);
-    circuit.verify_correct_bfv_public_key();
+    let pk_trbfv: BfvPublicKeyCircuit<8192, 4, 6, 2, 18, 56> =
+        BfvPublicKeyCircuit::new(params, a, eek, sk, r1is, r2is, pk0is, pk1is);
+
+    pk_trbfv.verify_correct_public_key();
 }
