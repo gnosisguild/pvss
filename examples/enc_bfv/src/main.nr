@@ -8,6 +8,7 @@ fn main(
     ct1is: [Polynomial<8192>; 2],
     u: Polynomial<8192>,
     e0: Polynomial<8192>,
+    e1: Polynomial<8192>,
     e1is: [Polynomial<8192>; 2],
     k1: Polynomial<8192>,
     r1is: [Polynomial<16383>; 2],
@@ -15,7 +16,7 @@ fn main(
     p1is: [Polynomial<16383>; 2],
     p2is: [Polynomial<8191>; 2],
 ) {
-    let greco: Greco<8192, 2, 59, 59, 2, 6, 6, 57, 57, 59, 18, 59> = Greco::new(
+    let greco: Greco<8192, 2, 59, 59, 2, 6, 6, 58, 57, 59, 18, 59> = Greco::new(
         params,
         pk0is,
         pk1is,
@@ -23,6 +24,7 @@ fn main(
         ct1is,
         u,
         e0,
+        e1,
         e1is,
         k1,
         r1is,
