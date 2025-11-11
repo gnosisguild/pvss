@@ -1,5 +1,5 @@
 {
-  "circuits": ["enc_bfv", "dec_share_trbfv"],
+  "circuits": ["enc_bfv", "enc_trbfv", "pk_bfv", "pk_trbfv", "dec_share_trbfv"],
   "oracles": ["default", "keccak"],
   "examples_dir": "../examples",
   "output_dir": "results",
