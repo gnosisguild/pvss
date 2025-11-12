@@ -1,10 +1,7 @@
 /// Modular arithmetic operations for u128 values
-///
-/// Uses u128 conversions for proper integer arithmetic
 
 // ------------------------------ ARITHMETIC FUNCTIONS ------------------------------
 
-/// Negates a value modulo m: returns (m - val) mod m
 /// Negates a value modulo m: returns (m - val) mod m
 pub fn neg(val: Field, m: Field) -> Field {
     //Safety: __neg is safe because we verify val + result = 0 (mod m) below
@@ -57,10 +54,7 @@ pub fn inv_mod(val: Field, m: Field) -> Field {
     result
 }
 
-/// Divides two values with modular reduction
-/// Divides two values with modular reduction
 /// Computes: lhs * rhs^(-1) mod m
-/// Assumes: lhs and rhs are already in [0, m)
 pub fn div_mod(lhs: Field, rhs: Field, m: Field) -> Field {
     //Safety: __div_mod is safe because we verify result * rhs = lhs (mod m) below
     let result = unsafe { __div_mod(lhs, rhs, m) };
@@ -83,13 +77,10 @@ pub fn reduce_mod(value: Field, q: Field) -> Field {
     remainder
 }
 
-// Rest of the unconstrained functions remain the same...
 // ------------------------------ UNCONSTRAINED FUNCTIONS ------------------------------
 
 /// Compute quotient and remainder for value mod q (unconstrained)
-/// Adapted for u128
 pub unconstrained fn __compute_mod_reduction(value: Field, q: Field) -> (Field, Field) {
-    // Convert to u128 for proper integer division
     let value_u128 = value as u128;
     let q_u128 = q as u128;
 
