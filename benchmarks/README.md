@@ -35,14 +35,14 @@ Edit `config.json`:
 ```json
 {
   "circuits": ["pk_trbfv", "enc_trbfv"],
-  "oracles": ["default", "keccak"],
+  "oracles": ["default"],
   "examples_dir": "../examples",
   "output_dir": "results"
 }
 ```
 
 - **circuits**: All the circuits must be inside the `examples` folder at root repository level.
-- **oracles**: Oracle types to test (default and/or keccak)
+- **oracles**: Oracle types to test (only "default" is used)
 - **examples_dir**: Path to circuit examples
 - **output_dir**: Where to save results
 

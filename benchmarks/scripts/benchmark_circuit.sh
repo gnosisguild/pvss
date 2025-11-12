@@ -44,11 +44,6 @@ BB_WRITE_VK_CMD="bb write_vk"
 BB_PROVE_CMD="bb prove"
 BB_VERIFY_CMD="bb verify"
 
-# TODO: Update with correct oracle flag for your nargo version
-# if [ "$ORACLE_TYPE" = "keccak" ]; then
-#     NARGO_EXECUTE_CMD="$NARGO_EXECUTE_CMD --oracle_hash keccak"
-# fi
-
 # Initialize results
 COMPILE_TIME=0
 COMPILE_SUCCESS="false"
