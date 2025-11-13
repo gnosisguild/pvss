@@ -162,19 +162,19 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, le
         let mut inputs = Vec::new();
 
         // Flatten ciphertext components (public inputs)
-        inputs = flatten::<_, _, BIT_CT>(inputs, self.c_0);
-        inputs = flatten::<_, _, BIT_CT>(inputs, self.c_1);
+        inputs = flatten::<_, _>(inputs, self.c_0);
+        inputs = flatten::<_, _>(inputs, self.c_1);
 
         // Flatten aggregated sums (secret witnesses)
-        inputs = flatten::<_, _, BIT_S>(inputs, self.s);
-        inputs = flatten::<_, _, BIT_E>(inputs, self.e);
+        inputs = flatten::<_, _>(inputs, self.s);
+        inputs = flatten::<_, _>(inputs, self.e);
 
         // Flatten quotient polynomials (secret witnesses)
-        inputs = flatten::<_, _, BIT_R1>(inputs, self.r_1);
-        inputs = flatten::<_, _, BIT_R2>(inputs, self.r_2);
+        inputs = flatten::<_, _>(inputs, self.r_1);
+        inputs = flatten::<_, _>(inputs, self.r_2);
 
         // Flatten decryption shares (public outputs - to be shared with other parties)
-        inputs = flatten::<_, _, BIT_D>(inputs, self.d);
+        inputs = flatten::<_, _>(inputs, self.d);
 
         inputs
     }
@@ -303,3 +303,4 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, le
         assert_eq(computed_decryption_share, expected_decryption_share);
     }
 }
+

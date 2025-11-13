@@ -143,21 +143,21 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_R1: u32,
 
         // Flatten CRS polynomials a (L polynomials of degree N)
         // These are public but included for completeness in the transcript
-        inputs = flatten::<_, _, BIT_EEK>(inputs, self.a);
+        inputs = flatten::<_, _>(inputs, self.a);
 
         // Flatten error polynomial eek (1 polynomial of degree N)
         // This is a secret witness that must remain hidden
-        inputs = flatten::<_, _, BIT_EEK>(inputs, [self.eek]);
+        inputs = flatten::<_, _>(inputs, [self.eek]);
 
         // Flatten secret key polynomial sk (1 polynomial of degree N)
         // This is the most sensitive secret value
-        inputs = flatten::<_, _, BIT_SK>(inputs, [self.sk]);
+        inputs = flatten::<_, _>(inputs, [self.sk]);
 
         // Flatten quotient polynomials (L polynomials each)
         // r1: quotients from modulus switching (degree 2*N-1)
-        inputs = flatten::<_, _, BIT_R1>(inputs, self.r1);
+        inputs = flatten::<_, _>(inputs, self.r1);
         // r2: quotients from cyclotomic reduction (degree N-1)
-        inputs = flatten::<_, _, BIT_R2>(inputs, self.r2);
+        inputs = flatten::<_, _>(inputs, self.r2);
 
         inputs
     }
@@ -280,3 +280,4 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_R1: u32,
         assert_eq(pk1_at_gamma[i], a_at_gamma[i]);
     }
 }
+
