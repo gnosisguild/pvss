@@ -1,20 +1,20 @@
 use circuits::{crypto::greco::greco::{Greco, Params}, math::polynomial::Polynomial};
 
 fn main(
-    params: Params<256>,
-    pk0: Polynomial<256>,
-    pk1: Polynomial<256>,
-    ct0: Polynomial<256>,
-    ct1: Polynomial<256>,
-    u: Polynomial<256>,
-    e0: Polynomial<256>,
-    e1: Polynomial<256>,
-    k1: Polynomial<256>,
-    r2: Polynomial<255>,
-    p2: Polynomial<255>,
+    params: Params<2048>,
+    pk0: Polynomial<2048>,
+    pk1: Polynomial<2048>,
+    ct0: Polynomial<2048>,
+    ct1: Polynomial<2048>,
+    u: Polynomial<2048>,
+    e0: Polynomial<2048>,
+    e1: Polynomial<2048>,
+    k1: Polynomial<2048>,
+    r2: Polynomial<2047>,
+    p2: Polynomial<2047>,
 ) {
     // Create Greco circuit instance.
-    let greco: Greco<256, 41, 41, 2, 6, 6, 20, 20, 41> = Greco::new(
+    let greco: Greco<2048, 49, 49, 2, 6, 6, 20, 18, 49> = Greco::new(
         params,
         pk0,
         pk1,
@@ -31,4 +31,3 @@ fn main(
     let is_greco_valid = greco.verify();
     assert(is_greco_valid);
 }
-
