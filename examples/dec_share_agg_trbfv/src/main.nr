@@ -5,37 +5,35 @@ use circuits::{
 
 fn main(
     // Circuit parameters
-    qis: pub [Field; 4],
+    qis: pub [Field; 2],
     plaintext_modulus: pub Field,
     n: pub u32,
     l: pub u32,
     threshold: pub u32,
-    deltas: pub [Field; 4],
-    delta_halves: pub [Field; 4],
-    // Decryption shares from T+1 parties
-    decryption_shares: pub [[Polynomial<4>; 4]; 11],
-    // Party IDs (T+1 = 3 parties)
-    party_ids: pub [Field; 11],
+    delta: pub Field, // Global delta
+    delta_half: pub Field, // Global delta/2
+    // Decryption shares
+    decryption_shares: pub [[Polynomial<4>; 2]; 3],
+    // Party IDs
+    party_ids: pub [Field; 3],
     // Message polynomial
     message: pub Polynomial<4>,
+    // Global u polynomial (CRT reconstruction)
+    u_global: pub Polynomial<4>,
+    // CRT quotient polynomials
+    crt_quotients: pub [Polynomial<4>; 2],
 ) {
-    // Create parameters with explicit type annotations
-    // N=4, T=2, L=2
-    let params: Params<4, 10, 4> = Params::new(
-        qis,
-        plaintext_modulus,
-        n,
-        l,
-        threshold,
-        deltas,
-        delta_halves,
+    let params: Params<4, 2, 2> =
+        Params::new(qis, plaintext_modulus, n, l, threshold, delta, delta_half);
+
+    let circuit: DecryptionShareAggregation<4, 2, 2, 10> = DecryptionShareAggregation::new(
+        params,
+        decryption_shares,
+        party_ids,
+        message,
+        u_global,
+        crt_quotients,
     );
 
-    // Create circuit instance with explicit type annotation
-    // N=4, T=10, L=4, BIT_NOISE=30
-    let circuit: DecryptionShareAggregation<4, 10, 4, 30> =
-        DecryptionShareAggregation::new(params, decryption_shares, party_ids, message);
-
-    // Verify the decryption share aggregation
     circuit.verify();
 }
