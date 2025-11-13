@@ -1,5 +1,5 @@
 use crate::math::polynomial::{flatten, Polynomial};
-use safe::SafeSponge;
+use crate::math::safe::SafeSponge;
 
 /// Cryptographic parameters for BFV public key circuit.
 /// Contains the core mathematical constants used in the BFV encryption scheme.

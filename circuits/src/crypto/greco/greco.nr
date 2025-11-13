@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::math::polynomial::{flatten, Polynomial};
-use safe::SafeSponge;
+use crate::math::safe::SafeSponge;
 
 /// PLEASE NOTE THIS VERSION OF GRECO IS JUST USED FOR DEVELOPMENT.
 /// REFER TO THE ORIGINAL GRECO CIRCUIT FOR THE PRODUCTION VERSION IN ENCLAVE MONOREPO.
