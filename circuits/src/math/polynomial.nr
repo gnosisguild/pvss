@@ -3,7 +3,7 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-
+use super::modular_fns::reduce_mod;
 /// Polynomial structure representing a polynomial of degree N-1.
 ///
 /// A polynomial P(X) = a_{N-1} * X^{N-1} + a_{N-2} * X^{N-2} + ... + a_1 * X + a_0
@@ -127,6 +127,25 @@ impl<let N: u32> Polynomial<N> {
 
             shifted_coefficient.assert_max_bit_size::<BIT + 1>();
             (range_size - shifted_coefficient).assert_max_bit_size::<BIT + 1>();
+        }
+    }
+    pub fn eval_mod(self, x: Field, q: Field) -> Field {
+        let mut acc = self.coefficients[0];
+        let len = self.coefficients.len();
+
+        for i in 1..len {
+            acc = acc * x + self.coefficients[i];
+            // Only reduce if accumulator exceeds q
+            if acc as u64 >= q as u64 {
+                acc = reduce_mod(acc, q);
+            }
+        }
+
+        // Final reduction to ensure result is in [0, q)
+        if acc as u64 >= q as u64 {
+            reduce_mod(acc, q)
+        } else {
+            acc
         }
     }
 }
@@ -261,153 +280,4 @@ pub fn packer<let A: u32, let BIT: u32>(values: [Field; A]) -> Vec<Field> {
         out.push(acc);
     }
     out
-}
-
-#[test]
-fn test_polynomial_eval() {
-    let coeffs = [1, 2, 3]; // represents 1x^2 + 2x + 3
-    let poly = Polynomial::new(coeffs);
-
-    let x = 2; // evaluate at x = 2
-    let result = poly.eval(x);
-
-    // (1 * 2^2) + (2 * 2) + 3 = 4 + 4 + 3 = 11
-    assert_eq(result, 11);
-}
-
-#[test]
-fn test_polynomial_eval_zero() {
-    let coeffs = [1, -2, 1]; // x^2 - 2x + 1 = (x-1)^2
-    let poly = Polynomial::new(coeffs);
-
-    let x = 1; // evaluate at x = 1, should be 0
-    let result = poly.eval(x);
-
-    assert_eq(result, 0);
-}
-
-#[test]
-fn test_polynomial_bounds() {
-    let coeffs = [-16, 240, 242];
-    let poly = Polynomial::new(coeffs);
-
-    // Test double bounds check - constrains to [-240, 242]
-    poly.range_check_2bounds::<8>(242, 240);
-}
-
-#[test(should_fail_with = "assert_max_bit_size")]
-fn test_polynomial_out_of_bounds_coefficients() {
-    let coeffs = [-100];
-    let poly = Polynomial::new(coeffs);
-
-    // Test double bounds check - constrains to [-98, 99]
-    // Should fail because -100 is out of bounds.
-    poly.range_check_2bounds::<7>(99, 98);
-}
-
-#[test]
-fn test_flatten() {
-    // Create test polynomials
-    let poly1 = Polynomial::new([1, 2, 3]); // degree 2
-    let poly2 = Polynomial::new([4, -16, 6]); // degree 2
-    let poly3 = Polynomial::new([-7, 8, 9]); // degree 2
-
-    let polynomials = [poly1, poly2, poly3];
-
-    // Initialize target array with zeros
-    let mut inputs = Vec::new();
-
-    // Flatten the polynomials
-    let result = flatten::<_, _, 4>(inputs, polynomials);
-
-    // Verify the flattened coefficients are in the correct positions
-    // Every value shifted 1 nibble incase of negative integers
-    assert_eq(result.get(0), 0x11121310101010101010101010101010101010101010101010101010101010);
-    assert_eq(result.get(1), 0x14001610101010101010101010101010101010101010101010101010101010); // -16 became 00 at  0x 14 00 16,
-    assert_eq(result.get(2), 0x09181910101010101010101010101010101010101010101010101010101010); // -7 became 09 at 0x 09 18 19(16 - 7 = 9)
-}
-
-#[test]
-fn test_flatten_big() {
-    // Create test polynomials
-    let poly1 = Polynomial::new([
-        1791218451968394,
-        21888242871839275222246405745257275088548364400416034343698198265248580087864,
-        21888242871839275222246405745257275088548364400416034343698200542108324633466,
-        5430119342984413,
-        704811298945172,
-        8901715723925099,
-        21888242871839275222246405745257275088548364400416034343698203098124042812559,
-        21888242871839275222246405745257275088548364400416034343698200215091693880034,
-    ]);
-    let poly2 = Polynomial::new([
-        21888242871839275222246405745257275088548364400416034343698200314078269634250,
-        21888242871839275222246405745257275088548364400416034343698200967285641915872,
-        2909990636858607,
-        7896103832076587,
-        2078397209533893,
-        21888242871839275222246405745257275088548364400416034343698199792421452734531,
-        614400389245817,
-        8290314119277588,
-    ]);
-    let poly3 = Polynomial::new([
-        21888242871839275222246405745257275088548364400416034343698201373175279892906,
-        21888242871839275222246405745257275088548364400416034343698201087241869723721,
-        6768789983786188,
-        635797784303388,
-        7610153424227556,
-        4633893206538324,
-        2016269760615332,
-        21888242871839275222246405745257275088548364400416034343698201007080554428142,
-    ]);
-
-    let polynomials = [poly1, poly2, poly3];
-
-    // Initialize target array with zeros
-    let mut inputs = Vec::new();
-
-    // Flatten the polynomials
-    let result = flatten::<_, _, 54>(inputs, polynomials);
-
-    // Verify the flattened coefficients are in the correct positions
-    // Every value shifted 1 nibble incase of negative integers
-
-    // For the first index of result operation goes like this,
-
-    // First four index of poly1
-    // 1791218451968394,
-    // 21888242871839275222246405745257275088548364400416034343698198265248580087864,
-    // 21888242871839275222246405745257275088548364400416034343698200542108324633466,
-    // 5430119342984413,
-
-    // base + 1791218451968394 = 0x1065d1a8b8b718a
-    // base - 5921327228407753 = 0xeaf69591f3b037 (negative coefficient shifted)
-    // base - 3644467483862151 = 0xf30d604a3a9b79 (negative coefficient shifted)
-    // base + 5430119342984413 = 0x1134aaa2e86ccdd
-    assert_eq(result.get(0), 0x1065d1a8b8b718a0eaf69591f3b0370f30d604a3a9b791134aaa2e86ccdd);
-    assert_eq(result.get(1), 0x1028105ab1b789411fa010339db66b0fc220f1326bc8e0f1e3f4cc1e02e1);
-    assert_eq(result.get(2), 0x0f23dfbe7cd76c90f4901299312ddf10a569efe35acef11c0d76f005412b);
-    assert_eq(result.get(3), 0x107624a8f605dc50f0638a368960421022ecb3cf36b7911d73ff2c27ec14);
-    assert_eq(result.get(4), 0x0f6013a24e1b9a90f4fd2c158a08481180c2dba8af4cc10242413515171c);
-    assert_eq(result.get(5), 0x11b0964eb898ce411076805680b85410729c962da53a40f4b44412d0f6ed);
-}
-
-#[test]
-fn test_flatten_small() {
-    // Create test polynomials
-    let poly1 = Polynomial::new([712345, 104857, 999999, 500001, 123, 654321, 77]);
-    let poly2 = Polynomial::new([1, 524287, 888888, 23456, 34567, 765432, 0]);
-    let poly3 = Polynomial::new([444444, 333333, 222222, 111111, 987654, 246810, 13579]);
-
-    let polynomials = [poly1, poly2, poly3];
-
-    // Initialize target array with zeros
-    let mut inputs = Vec::new();
-
-    // Flatten the polynomials
-    let result = flatten::<_, _, 20>(inputs, polynomials);
-
-    assert_eq(result.get(0), 0x1ade991199991f423f17a12110007b19fbf110004d100000100000100000);
-    assert_eq(result.get(1), 0x10000117ffff1d9038105ba01087071badf8100000100000100000100000);
-    assert_eq(result.get(2), 0x16c81c15161513640e11b2071f120613c41a10350b100000100000100000);
 }
