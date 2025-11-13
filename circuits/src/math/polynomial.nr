@@ -164,41 +164,51 @@ fn packing_layout<let BIT: u32>() -> (u32, u32) {
     (nibble_bits, group)
 }
 
-/// Flatten `L` polynomials into a single linear stream of packed `Field` carriers.
+/// Flattens an array of polynomials into a 1D array of Field elements.
 ///
-/// ## What this does
-/// - For each CRT limb `j` in `0..L`, it packs the coefficients of `poly[j]`
-///   with `packer::<A, BIT>` and appends all resulting carriers to `inputs`.
-/// - The packing layout (nibble-aligned width and `group` size) is taken from
-///   `packing_layout::<BIT>()` and must match what `packer` uses.
+/// This helper function serializes polynomial coefficients maintaining a deterministic
+/// ordering of coefficients to ensure reproducible challenge values.
 ///
-/// ## Determinism & order
-/// - Preserves a stable order: iterate `j = 0..L`, then for each `j` append
-///   carriers in ascending chunk index `i = 0..num_chunks`.
-/// - This ensures transcripts remain deterministic across runs.
+/// # Generic Parameters
+/// * `A` - The degree of each polynomial in the array
+/// * `L` - The number of polynomials in the array
+/// * `SIZE` - The total size of the target array
 ///
-/// ## Generics
-/// - `A`: polynomial degree (number of coefficients per polynomial).
-/// - `L`: number of CRT bases (polynomials).
-/// - `BIT`: per-coefficient bit bound used by the packing layout (compile-time).
+/// # Arguments
+/// * `inputs` - The target array to store flattened coefficients
+/// * `poly` - Array of polynomials to flatten
+/// * `offset` - Starting position in the inputs array
 ///
-/// ## Returns
-/// - The same `inputs` vector, extended with all carriers in deterministic order.
-pub fn flatten<let A: u32, let L: u32, let BIT: u32>(
+/// # Returns
+/// A tuple containing:
+/// * The updated inputs array with flattened coefficients
+/// * The new offset position after flattening
+pub fn flatten_vector<let A: u32, let L: u32, let SIZE: u32>(
+    mut inputs: [Field; SIZE],
+    poly: [Polynomial<A>; L],
+    mut offset: u32,
+) -> ([Field; SIZE], u32) {
+    for j in 0..L {
+        for i in 0..A {
+            inputs[i + offset] = poly[j].coefficients[i];
+        }
+        offset += A;
+    }
+
+    (inputs, offset)
+}
+
+/// Flattens an array of polynomials into a `Vec<Field>`, appending coefficients directly.
+pub fn flatten<let A: u32, let L: u32>(
     mut inputs: Vec<Field>,
     poly: [Polynomial<A>; L],
 ) -> Vec<Field> {
     for j in 0..L {
-        // Pack its A coefficients into `num_chunks` carriers using the same BIT layout.
-        let packed = packer::<A, BIT>(poly[j].coefficients);
-
-        // Append carriers in-order to `inputs` to keep a stable transcript layout.
-        for i in 0..packed.len() {
-            inputs.push(packed.get(i));
+        for i in 0..A {
+            inputs.push(poly[j].coefficients[i]);
         }
     }
 
-    // Return the extended input stream.
     inputs
 }
 
@@ -318,7 +328,7 @@ fn test_flatten() {
     let mut inputs = Vec::new();
 
     // Flatten the polynomials
-    let result = flatten::<_, _, 4>(inputs, polynomials);
+    let result = flatten::<_, _>(inputs, polynomials);
 
     // Verify the flattened coefficients are in the correct positions
     // Every value shifted 1 nibble incase of negative integers
@@ -367,7 +377,7 @@ fn test_flatten_big() {
     let mut inputs = Vec::new();
 
     // Flatten the polynomials
-    let result = flatten::<_, _, 54>(inputs, polynomials);
+    let result = flatten::<_, _>(inputs, polynomials);
 
     // Verify the flattened coefficients are in the correct positions
     // Every value shifted 1 nibble incase of negative integers
@@ -405,9 +415,10 @@ fn test_flatten_small() {
     let mut inputs = Vec::new();
 
     // Flatten the polynomials
-    let result = flatten::<_, _, 20>(inputs, polynomials);
+    let result = flatten::<_, _>(inputs, polynomials);
 
     assert_eq(result.get(0), 0x1ade991199991f423f17a12110007b19fbf110004d100000100000100000);
     assert_eq(result.get(1), 0x10000117ffff1d9038105ba01087071badf8100000100000100000100000);
     assert_eq(result.get(2), 0x16c81c15161513640e11b2071f120613c41a10350b100000100000100000);
 }
+

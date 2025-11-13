@@ -12,132 +12,84 @@ use safe::SafeSponge;
 
 /// Cryptographic parameters for Greco circuit.
 /// Contains the core mathematical constants used in the encryption scheme.
-pub struct CryptographicParams<let L: u32> {
+pub struct CryptographicParams {
     /// Plaintext modulus: q mod t
     pub q_mod_t: Field,
-    /// CRT moduli for each basis: [q_0, q_1, ..., q_{L-1}]
-    pub qis: [Field; L],
-    /// Scaling factors for each basis: [k0_0, k0_1, ..., k0_{L-1}]
-    pub k0is: [Field; L],
+    /// Ciphertext modulus (prime field)
+    pub q: Field,
+    /// Scaling factor for ciphertext component
+    pub k0: Field,
 }
 
-impl<let L: u32> CryptographicParams<L> {
+impl CryptographicParams {
     /// Creates new cryptographic parameters
-    pub fn new(q_mod_t: Field, qis: [Field; L], k0is: [Field; L]) -> Self {
-        CryptographicParams { q_mod_t, qis, k0is }
+    pub fn new(q_mod_t: Field, q: Field, k0: Field) -> Self {
+        CryptographicParams { q_mod_t, q, k0 }
     }
 }
 
 /// Bound parameters for range checking.
 /// Contains all the bounds used to validate polynomial coefficients.
-pub struct BoundParams<let L: u32> {
-    /// Bounds for public key polynomials for each CRT basis
-    pub pk_bounds: [Field; L],
+pub struct BoundParams {
     /// Bounds for error polynomials (e0)
     pub e0_bound: Field,
     /// Bounds for error polynomials (e1)
     pub e1_bound: Field,
     /// Bound for secret polynomial u (ternary distribution)
     pub u_bound: Field,
-    /// Lower bounds for r1 polynomials (modulus switching quotients)
-    pub r1_low_bounds: [Field; L],
-    /// Upper bounds for r1 polynomials (modulus switching quotients)
-    pub r1_up_bounds: [Field; L],
-    /// Bounds for r2 polynomials (cyclotomic reduction quotients)
-    pub r2_bounds: [Field; L],
-    /// Bounds for p1 polynomials (modulus switching quotients)
-    pub p1_bounds: [Field; L],
-    /// Bounds for p2 polynomials (cyclotomic reduction quotients)
-    pub p2_bounds: [Field; L],
     /// Lower bound for k1 polynomial (scaled message)
     pub k1_low_bound: Field,
     /// Upper bound for k1 polynomial (scaled message)
     pub k1_up_bound: Field,
 }
 
-impl<let L: u32> BoundParams<L> {
+impl BoundParams {
     /// Creates new bound parameters
     pub fn new(
-        pk_bounds: [Field; L],
         e0_bound: Field,
         e1_bound: Field,
         u_bound: Field,
-        r1_low_bounds: [Field; L],
-        r1_up_bounds: [Field; L],
-        r2_bounds: [Field; L],
-        p1_bounds: [Field; L],
-        p2_bounds: [Field; L],
         k1_low_bound: Field,
         k1_up_bound: Field,
     ) -> Self {
-        BoundParams {
-            pk_bounds,
-            e0_bound,
-            e1_bound,
-            u_bound,
-            r1_low_bounds,
-            r1_up_bounds,
-            r2_bounds,
-            p1_bounds,
-            p2_bounds,
-            k1_low_bound,
-            k1_up_bound,
-        }
+        BoundParams { e0_bound, e1_bound, u_bound, k1_low_bound, k1_up_bound }
     }
 }
 
 /// Complete parameters for Greco circuit.
 /// Combines cryptographic parameters, bounds, and circuit-specific parameters.
-pub struct Params<let N: u32, let L: u32> {
+pub struct Params<let N: u32> {
     /// Cryptographic parameters (moduli, scaling factors)
-    pub crypto: CryptographicParams<L>,
+    pub crypto: CryptographicParams,
     /// Bound parameters for range checking
-    pub bounds: BoundParams<L>,
+    pub bounds: BoundParams,
 }
 
-impl<let N: u32, let L: u32> Params<N, L> {
+impl<let N: u32> Params<N> {
     /// Creates new complete parameters
     pub fn new(
         q_mod_t: Field,
-        pk_bounds: [Field; L],
         e0_bound: Field,
         e1_bound: Field,
         u_bound: Field,
-        r1_low_bounds: [Field; L],
-        r1_up_bounds: [Field; L],
-        r2_bounds: [Field; L],
-        p1_bounds: [Field; L],
-        p2_bounds: [Field; L],
         k1_low_bound: Field,
         k1_up_bound: Field,
-        qis: [Field; L],
-        k0is: [Field; L],
+        q: Field,
+        k0: Field,
     ) -> Self {
-        let crypto = CryptographicParams::new(q_mod_t, qis, k0is);
-        let bounds = BoundParams::new(
-            pk_bounds,
-            e0_bound,
-            e1_bound,
-            u_bound,
-            r1_low_bounds,
-            r1_up_bounds,
-            r2_bounds,
-            p1_bounds,
-            p2_bounds,
-            k1_low_bound,
-            k1_up_bound,
-        );
+        let crypto = CryptographicParams::new(q_mod_t, q, k0);
+        let bounds = BoundParams::new(e0_bound, e1_bound, u_bound, k1_low_bound, k1_up_bound);
 
         Params { crypto, bounds }
     }
 
     /// Convenience method to access cryptographic parameters
-    pub fn crypto_params(self) -> CryptographicParams<L> {
+    pub fn crypto_params(self) -> CryptographicParams {
         self.crypto
     }
 
     /// Convenience method to access bound parameters
-    pub fn bound_params(self) -> BoundParams<L> {
+    pub fn bound_params(self) -> BoundParams {
         self.bounds
     }
 }
@@ -151,10 +103,10 @@ impl<let N: u32, let L: u32> Params<N, L> {
 /// components (pk0, pk1) and the encryption randomness.
 ///
 /// The circuit enforces the following core constraints:
-/// 1. Range checks on all polynomial coefficients to ensure they are within expected bounds
+/// 1. Range checks on relevant polynomial coefficients to ensure they are within expected bounds
 /// 2. Correct encryption equations:
-///    a. ct0i(gamma) = pk0i(gamma) * u(gamma) + e0(gamma) + k1(gamma) * k0i + r1i(gamma) * qi + r2i(gamma) * cyclo(gamma)
-///    b. ct1i(gamma) = pk1i(gamma) * u(gamma) + e1(gamma) + p1i(gamma) * qi + p2i(gamma) * cyclo(gamma)
+///    a. ct0(gamma) = pk0(gamma) * u(gamma) + e0(gamma) + k1(gamma) * k0 + r2(gamma) * cyclo(gamma)
+///    b. ct1(gamma) = pk1(gamma) * u(gamma) + e1(gamma) + p2(gamma) * cyclo(gamma)
 ///
 /// DISCLAIMER
 /// The circuit is a porting of the Halo2 circuit from Greco paper author @ PSE.
@@ -162,45 +114,58 @@ impl<let N: u32, let L: u32> Params<N, L> {
 ///
 /// # Generic Parameters
 /// * `N` - The degree of polynomials (ring dimension)
-/// * `L` - The number of CRT (Chinese Remainder Theorem) bases
-/// * `BIT_PK` - Bit-width bound per coefficient for public keys `pk0is`/`pk1is`
-/// * `BIT_CT` - Bit-width bound per coefficient for cipher texts `ct0is`/`ct1is`
+/// * `BIT_PK` - Bit-width bound per coefficient for public keys `pk0`/`pk1`
+/// * `BIT_CT` - Bit-width bound per coefficient for ciphertexts `ct0`/`ct1`
 /// * `BIT_U` - Bit-width bound per coefficient for the ternary secret `u`
 /// * `BIT_E0` - Bit-width bound per coefficient for error polynomial `e0`
-/// * `BIT_E1` - Bit-width bound per coefficient for error polynomials `e1`
+/// * `BIT_E1` - Bit-width bound per coefficient for error polynomial `e1`
 /// * `BIT_K` - Bit-width bound per coefficient for the scaled message polynomial `k1`
-/// * `BIT_R1` - Bit-width bound per coefficient for randomness polynomials `r1is`
-/// * `BIT_R2` - Bit-width bound per coefficient for randomness polynomials `r2is`
-/// * `BIT_P1` - Bit-width bound per coefficient for randomness polynomials `p1is`
-/// * `BIT_P2` - Bit-width bound per coefficient for randomness polynomials `p2is`
+/// * `BIT_R2` - Bit-width bound per coefficient for randomness polynomial `r2`
+/// * `BIT_P2` - Bit-width bound per coefficient for randomness polynomial `p2`
 ///
 /// # Circuit Inputs
-/// * `pk0is`, `pk1is` - Public key polynomials
-/// * `ct0is`, `ct1is` - Ciphertext polynomials
+/// * `pk0`, `pk1` - Public key polynomials
+/// * `ct0`, `ct1` - Ciphertext polynomials
 /// * `u` - Secret polynomial sampled from ternary distribution
 /// * `e0`, `e1` - Error polynomials sampled from discrete Gaussian distribution
 /// * `k1` - Scaled message polynomial
-/// * `r1is`, `r2is` - Randomness polynomials for each i-th CRT basis.
-/// * `p1is`, `p2is` - Randomness polynomials for each i-th CRT basis.
-pub struct Greco<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_K: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> {
+/// * `r2`, `p2` - Randomness polynomials for cyclotomic reductions.
+pub struct Greco<
+    let N: u32,
+    let BIT_PK: u32,
+    let BIT_CT: u32,
+    let BIT_U: u32,
+    let BIT_E0: u32,
+    let BIT_E1: u32,
+    let BIT_K: u32,
+    let BIT_R2: u32,
+    let BIT_P2: u32,
+> {
     /// Cryptographic parameters including bounds, moduli, and constants.
-    params: Params<N, L>,
-    pk0is: [Polynomial<N>; L],
-    pk1is: [Polynomial<N>; L],
-    ct0is: [Polynomial<N>; L],
-    ct1is: [Polynomial<N>; L],
+    params: Params<N>,
+    pk0: Polynomial<N>,
+    pk1: Polynomial<N>,
+    ct0: Polynomial<N>,
+    ct1: Polynomial<N>,
     u: Polynomial<N>,
     e0: Polynomial<N>,
     e1: Polynomial<N>,
-    e1is: [Polynomial<N>; L],
     k1: Polynomial<N>,
-    r1is: [Polynomial<(2 * N) - 1>; L],
-    r2is: [Polynomial<N - 1>; L],
-    p1is: [Polynomial<(2 * N) - 1>; L],
-    p2is: [Polynomial<N - 1>; L],
+    r2: Polynomial<N - 1>,
+    p2: Polynomial<N - 1>,
 }
 
-impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_K: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> Greco<N, L, BIT_PK, BIT_CT, BIT_U, BIT_E0, BIT_E1, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
+impl<
+        let N: u32,
+        let BIT_PK: u32,
+        let BIT_CT: u32,
+        let BIT_U: u32,
+        let BIT_E0: u32,
+        let BIT_E1: u32,
+        let BIT_K: u32,
+        let BIT_R2: u32,
+        let BIT_P2: u32,
+    > Greco<N, BIT_PK, BIT_CT, BIT_U, BIT_E0, BIT_E1, BIT_K, BIT_R2, BIT_P2> {
     /// Creates a new Greco instance.
     ///
     /// This constructor initializes all the polynomials and parameters needed for
@@ -208,38 +173,33 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     ///
     /// # Arguments
     /// * `params` - Cryptographic parameters including bounds and moduli
-    /// * `pk0is` - Public key polynomials pk0i = [ai*s + E] for each CRT basis
-    /// * `pk1is` - Public key polynomials pk1i = -[ai] for each CRT basis
-    /// * `ct0is` - First ciphertext component for each CRT basis
-    /// * `ct1is` - Second ciphertext component for each CRT basis
+    /// * `pk0` - Public key polynomial pk0 = a * s + e
+    /// * `pk1` - Public key polynomial pk1 = -a
+    /// * `ct0` - First ciphertext component
+    /// * `ct1` - Second ciphertext component
     /// * `u` - Secret polynomial from ternary distribution
     /// * `e0` - Error polynomial sampled from discrete Gaussian distribution
     /// * `e1` - Error polynomial sampled from discrete Gaussian distribution
     /// * `k1` - Scaled message polynomial
-    /// * `r1is` - Randomness polynomials for ct0 computation
-    /// * `r2is` - Randomness polynomials for ct0 computation
-    /// * `p1is` - Randomness polynomials for ct1 computation
-    /// * `p2is` - Randomness polynomials for ct1 computation
+    /// * `r2` - Randomness polynomial for ct0 computation (cyclotomic quotient)
+    /// * `p2` - Randomness polynomial for ct1 computation (cyclotomic quotient)
     ///
     /// # Returns
     /// A new Greco instance ready for constraint checking
     pub fn new(
-        params: Params<N, L>,
-        pk0is: [Polynomial<N>; L],
-        pk1is: [Polynomial<N>; L],
-        ct0is: [Polynomial<N>; L],
-        ct1is: [Polynomial<N>; L],
+        params: Params<N>,
+        pk0: Polynomial<N>,
+        pk1: Polynomial<N>,
+        ct0: Polynomial<N>,
+        ct1: Polynomial<N>,
         u: Polynomial<N>,
         e0: Polynomial<N>,
         e1: Polynomial<N>,
-        e1is: [Polynomial<N>; L],
         k1: Polynomial<N>,
-        r1is: [Polynomial<2 * N - 1>; L],
-        r2is: [Polynomial<N - 1>; L],
-        p1is: [Polynomial<2 * N - 1>; L],
-        p2is: [Polynomial<N - 1>; L],
-    ) -> Greco<N, L, BIT_PK, BIT_CT, BIT_U, BIT_E0, BIT_E1, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
-        Greco { params, pk0is, pk1is, ct0is, ct1is, u, e0, e1, e1is, k1, r1is, r2is, p1is, p2is }
+        r2: Polynomial<N - 1>,
+        p2: Polynomial<N - 1>,
+    ) -> Greco<N, BIT_PK, BIT_CT, BIT_U, BIT_E0, BIT_E1, BIT_K, BIT_R2, BIT_P2> {
+        Greco { params, pk0, pk1, ct0, ct1, u, e0, e1, k1, r2, p2 }
     }
 
     /// Flattens all polynomials coefficients into a single array for challenge generation.
@@ -255,22 +215,20 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         let mut inputs = Vec::new();
 
         // Flatten public key and ciphertext polynomials first (public inputs)
-        inputs = flatten::<_, _, BIT_PK>(inputs, self.pk0is);
-        inputs = flatten::<_, _, BIT_PK>(inputs, self.pk1is);
-        inputs = flatten::<_, _, BIT_CT>(inputs, self.ct0is);
-        inputs = flatten::<_, _, BIT_CT>(inputs, self.ct1is);
+        inputs = flatten::<_, _>(inputs, [self.pk0]);
+        inputs = flatten::<_, _>(inputs, [self.pk1]);
+        inputs = flatten::<_, _>(inputs, [self.ct0]);
+        inputs = flatten::<_, _>(inputs, [self.ct1]);
 
-        // Flatten common polynomials (used across all CRT bases)
-        inputs = flatten::<_, _, BIT_E0>(inputs, [self.e0]);
-        inputs = flatten::<_, _, BIT_E1>(inputs, [self.e1]);
-        inputs = flatten::<_, _, BIT_U>(inputs, [self.u]);
-        inputs = flatten::<_, _, BIT_K>(inputs, [self.k1]);
+        // Flatten common polynomials
+        inputs = flatten::<_, _>(inputs, [self.e0]);
+        inputs = flatten::<_, _>(inputs, [self.e1]);
+        inputs = flatten::<_, _>(inputs, [self.u]);
+        inputs = flatten::<_, _>(inputs, [self.k1]);
 
-        // Flatten randomness polynomials for each CRT basis
-        inputs = flatten::<_, _, BIT_R1>(inputs, self.r1is);
-        inputs = flatten::<_, _, BIT_R2>(inputs, self.r2is);
-        inputs = flatten::<_, _, BIT_P1>(inputs, self.p1is);
-        inputs = flatten::<_, _, BIT_P2>(inputs, self.p2is);
+        // Flatten cyclotomic quotient polynomials
+        inputs = flatten::<_, _>(inputs, [self.r2]);
+        inputs = flatten::<_, _>(inputs, [self.p2]);
 
         inputs
     }
@@ -287,14 +245,12 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     /// high probability.
     ///
     /// # Encryption Equations
-    /// For each CRT basis i:
-    /// * ct0i(gamma) = pk0i(gamma) * u(gamma) + e0(gamma) + k1(gamma) * k0i + r1i(gamma) * qi + r2i(gamma) * cyclo
-    /// * ct1i(gamma) = pk1i(gamma) * u(gamma) + e1(gamma) + p1i(gamma) * qi + p2i(gamma) * cyclo
+    /// * ct0(gamma) = pk0(gamma) * u(gamma) + e0(gamma) + k1(gamma) * k0 + r2(gamma) * cyclo(gamma)
+    /// * ct1(gamma) = pk1(gamma) * u(gamma) + e1(gamma) + p2(gamma) * cyclo(gamma)
     ///
     /// Where:
-    /// * cyclo(gamma) = gamma^N + 1 (cyclotomic polynomial)
-    /// * qi, k0i are constants from the cryptographic parameters
-    /// * r1i, r2i, p1i, p2i are randomness polynomials for each i-th CRT basis.
+    /// * `k0` is a constant from the cryptographic parameters.
+    /// * `cyclo(gamma) = gamma^N + 1` is the value of the cyclotomic polynomial at `gamma`.
     ///
     /// # Returns
     /// True if the encryption constraints are satisfied, false otherwise.
@@ -303,10 +259,10 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         self.check_range_bounds();
 
         // Step 2: Generate Fiat-Shamir challenges
-        let gammas = self.generate_challenge();
+        let (gamma_eval, gamma_lc) = self.generate_challenges();
 
-        // Step 3: Verify encryption constraints using challenges
-        self.verify_evaluations(gammas)
+        // Step 3: Verify encryption constraints using the challenges
+        self.verify_evaluations(gamma_eval, gamma_lc)
     }
 
     /// Performs range checks on all polynomial coefficients
@@ -325,38 +281,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         self.e1.range_check_2bounds::<BIT_E1>(bound_params.e1_bound, bound_params.e1_bound);
         self.k1.range_check_2bounds::<BIT_K>(bound_params.k1_up_bound, bound_params.k1_low_bound);
 
-        // CRT basis-specific polynomials
-        for i in 0..L {
-            // Public key polynomials must be within bounds for each CRT basis
-            self.pk0is[i].range_check_2bounds::<BIT_PK>(
-                bound_params.pk_bounds[i],
-                bound_params.pk_bounds[i],
-            );
-            self.pk1is[i].range_check_2bounds::<BIT_PK>(
-                bound_params.pk_bounds[i],
-                bound_params.pk_bounds[i],
-            );
-
-            // Randomness polynomials for ct0 computation
-            self.r1is[i].range_check_2bounds::<BIT_R1>(
-                bound_params.r1_up_bounds[i],
-                bound_params.r1_low_bounds[i],
-            );
-            self.r2is[i].range_check_2bounds::<BIT_R2>(
-                bound_params.r2_bounds[i],
-                bound_params.r2_bounds[i],
-            );
-
-            // Randomness polynomials for ct1 computation
-            self.p1is[i].range_check_2bounds::<BIT_P1>(
-                bound_params.p1_bounds[i],
-                bound_params.p1_bounds[i],
-            );
-            self.p2is[i].range_check_2bounds::<BIT_P2>(
-                bound_params.p2_bounds[i],
-                bound_params.p2_bounds[i],
-            );
-        }
+        // No range checks are required for ciphertext, public key, or cyclotomic quotient polynomials in this setting.
     }
 
     /// Generates Fiat-Shamir challenge values using a cryptographic sponge
@@ -365,8 +290,8 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     /// that will be used to evaluate polynomials for the Schwartz-Zippel lemma.
     ///
     /// # Returns
-    /// Vector of challenge values [gamma_0, gamma_1, ..., gamma_{2L-1}]
-    fn generate_challenge(self) -> Vec<Field> {
+    /// Tuple `(gamma_eval, gamma_lc)` containing the evaluation point and the linear-combination weight.
+    fn generate_challenges(self) -> (Field, Field) {
         let inputs = self.payload();
 
         // Domain separator for Greco circuit - "Greco" in hex
@@ -378,83 +303,49 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
 
-        // IO Pattern: ABSORB(input_size), SQUEEZE(2*L)
+        // IO Pattern: ABSORB(input_size), SQUEEZE(2)
         let input_size = inputs.len();
-        let io_pattern = [0x80000000 | input_size, 0x00000000 | (2 * L)];
+        let io_pattern = [0x80000000 | input_size, 0x00000000 | 2];
 
         let mut sponge = SafeSponge::start(io_pattern, domain_separator);
         sponge.absorb(inputs);
         let gammas = sponge.squeeze();
         sponge.finish();
-        gammas
+        (gammas.get(0), gammas.get(1))
     }
 
     /// Verifies encryption constraints using Fiat-Shamir challenges
     ///
-    /// For each CRT basis i, proves that LHS(gamma) = RHS(gamma)
+    /// Proves that LHS(gamma) = RHS(gamma) for both ciphertext components.
     /// This uses the Schwartz-Zippel lemma for polynomial identity testing.
     ///
     /// # Arguments
-    /// * `gammas` - Vector of challenge values [gamma_0, gamma_1, ..., gamma_{2L-1}]
-    fn verify_evaluations(self, gammas: Vec<Field>) -> bool {
+    /// * `gamma_eval` - Challenge value used for evaluating the polynomials
+    /// * `gamma_lc` - Challenge value used for the random linear combination
+    fn verify_evaluations(self, gamma_eval: Field, gamma_lc: Field) -> bool {
         let crypto_params = self.params.crypto_params();
-        let gamma = gammas.get(0);
-        // Cyclotomic polynomial evaluation: cyclo(x) = x^N + 1
-        let cyclo_at_gamma = gamma.pow_32(N as Field) + 1;
-        let u_at_gamma = self.u.eval(gamma);
-        let e0_at_gamma = self.e0.eval(gamma);
-        let k1_at_gamma = self.k1.eval(gamma);
+        let cyclo_at_gamma = gamma_eval.pow_32(N as Field) + 1;
+        let u_at_gamma = self.u.eval(gamma_eval);
+        let e0_at_gamma = self.e0.eval(gamma_eval);
+        let e1_at_gamma = self.e1.eval(gamma_eval);
+        let k1_at_gamma = self.k1.eval(gamma_eval);
 
-        let mut sum = (0, 0);
-        for i in 0..L {
-            // Check ct0i(gamma) = pk0i(gamma) * u(gamma) + e0(gamma) + k1(gamma) * k0i + r1i(gamma) * qi + r2i(gamma) * cyclo(gamma)
-            // Evaluate polynomials at gamma for ct0
-            let pk0is_at_gamma = self.pk0is[i].eval(gamma);
-            let r1i_at_gamma = self.r1is[i].eval(gamma);
-            let r2i_at_gamma = self.r2is[i].eval(gamma);
+        // Evaluate polynomials at gamma
+        let pk0_at_gamma = self.pk0.eval(gamma_eval);
+        let pk1_at_gamma = self.pk1.eval(gamma_eval);
+        let ct0_lhs = self.ct0.eval(gamma_eval);
+        let ct1_lhs = self.ct1.eval(gamma_eval);
+        let r2_at_gamma = self.r2.eval(gamma_eval);
+        let p2_at_gamma = self.p2.eval(gamma_eval);
+        // Compute right-hand sides of the encryption equations
+        let ct0_rhs = (pk0_at_gamma * u_at_gamma)
+            + e0_at_gamma
+            + (k1_at_gamma * crypto_params.k0)
+            + (r2_at_gamma * cyclo_at_gamma);
+        let ct1_rhs =
+            (pk1_at_gamma * u_at_gamma) + e1_at_gamma + (p2_at_gamma * cyclo_at_gamma);
 
-            // Step 1: pk0_u = pk0i(gamma) * u(gamma) + e0(gamma)
-            let pk0_u = (pk0is_at_gamma * u_at_gamma) + e0_at_gamma;
-
-            // Step 2: rhs = pk0_u + k1(gamma) * k0i
-            let mut ct0_rhs = pk0_u + (k1_at_gamma * crypto_params.k0is[i]);
-
-            // Step 3: rhs = rhs + r1i(gamma) * qi
-            ct0_rhs += r1i_at_gamma * crypto_params.qis[i];
-
-            // Step 4: rhs = rhs + r2i(gamma) * cyclo(gamma)
-            ct0_rhs += r2i_at_gamma * cyclo_at_gamma;
-
-            // Left-hand side: ct0i(gamma)
-            let ct0_lhs = self.ct0is[i].eval(gamma);
-
-            // Checks that ct1i(gamma) = pk1i(gamma) * u(gamma) + e1(gamma) + p1i(gamma) * qi + p2i(gamma) * cyclo(gamma)
-            // Evaluate polynomials at gamma for ct1
-            let pk1is_at_gamma = self.pk1is[i].eval(gamma);
-            let p1is_at_gamma = self.p1is[i].eval(gamma);
-            let p2is_at_gamma = self.p2is[i].eval(gamma);
-            let e1is_at_gamma = self.e1is[i].eval(gamma);
-
-            // Step 1: pk1_u = pk1i(gamma) * u(gamma) + e1(gamma)
-            let pk1_u = (pk1is_at_gamma * u_at_gamma) + e1is_at_gamma;
-
-            // Step 2: rhs = pk1_u + p2i(gamma) * cyclo(gamma)
-            let mut ct1_rhs = pk1_u + p2is_at_gamma * cyclo_at_gamma;
-
-            // Step 3: rhs = rhs + p1i(gamma) * qi
-            ct1_rhs += p1is_at_gamma * crypto_params.qis[i];
-
-            // Left-hand side: ct1i(gamma)
-            let ct1_lhs = self.ct1is[i].eval(gamma);
-
-            let gamma_i = if i == 0 { 1 } else { gammas.get(i) };
-
-            sum = (
-                sum.0 + ct0_lhs * gamma_i + ct1_lhs * gammas.get(i + L),
-                sum.1 + ct0_rhs * gamma_i + ct1_rhs * gammas.get(i + L),
-            );
-        }
-
-        sum.0 == sum.1
+        ct0_lhs + gamma_lc * ct1_lhs == ct0_rhs + gamma_lc * ct1_rhs
     }
 }
+
