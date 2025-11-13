@@ -1,4 +1,4 @@
-use crate::math::mod_fns::{div_mod, mul_mod, reduce_mod, sub};
+use crate::math::modular_fns::{div_mod, mul_mod, reduce_mod, sub};
 use crate::math::polynomial::Polynomial;
 
 /// Cryptographic parameters for decryption share aggregation circuit.
