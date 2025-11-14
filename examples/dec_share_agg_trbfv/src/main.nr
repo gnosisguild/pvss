@@ -4,29 +4,14 @@ use circuits::{
 };
 
 fn main(
-    // Circuit parameters
-    qis: pub [Field; 2],
-    plaintext_modulus: pub Field,
-    n: pub u32,
-    l: pub u32,
-    threshold: pub u32,
-    delta: pub Field, // Global delta
-    delta_half: pub Field, // Global delta/2
-    // Decryption shares
-    decryption_shares: pub [[Polynomial<4>; 2]; 3],
-    // Party IDs
-    party_ids: pub [Field; 3],
-    // Message polynomial
-    message: pub Polynomial<4>,
-    // Global u polynomial (CRT reconstruction)
-    u_global: pub Polynomial<4>,
-    // CRT quotient polynomials
-    crt_quotients: pub [Polynomial<4>; 2],
+    params: Params<8192, 4, 2>,
+    decryption_shares: [[Polynomial<8192>; 4]; 3],
+    party_ids: [Field; 3],
+    message: Polynomial<8192>,
+    u_global: Polynomial<8192>,
+    crt_quotients: [Polynomial<8192>; 4],
 ) {
-    let params: Params<4, 2, 2> =
-        Params::new(qis, plaintext_modulus, n, l, threshold, delta, delta_half);
-
-    let circuit: DecryptionShareAggregation<4, 2, 2, 10> = DecryptionShareAggregation::new(
+    let dec_share_agg: DecryptionShareAggregation<8192, 4, 2, 222> = DecryptionShareAggregation::new(
         params,
         decryption_shares,
         party_ids,
@@ -35,5 +20,5 @@ fn main(
         crt_quotients,
     );
 
-    circuit.verify();
+    dec_share_agg.verify();
 }
