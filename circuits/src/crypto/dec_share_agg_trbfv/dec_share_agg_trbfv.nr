@@ -1,5 +1,7 @@
 use crate::math::modular_fns::{div_mod, mul_mod, reduce_mod};
 use crate::math::polynomial::Polynomial;
+use dep::bignum::BigNum;
+use dep::bignum::Enclave_100;
 
 /// Cryptographic parameters for decryption share aggregation circuit.
 pub struct CryptographicParams<let L: u32> {
@@ -262,19 +264,29 @@ impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggr
             }
         }
     }
-
+    #[allow(brillig_constraint_warning)]
     fn verify_global_noise_bound(self) {
         let bound_params = self.params.bound_params();
 
         // Compute delta * m
         let delta_m = self.message.mul_scalar(bound_params.delta);
 
-        // Compute noise = u_global - delta * m
-        // Note: This is direct Field subtraction, no modular arithmetic needed
+        // Compute noise = u_global - delta * m using Enclave_100
         let mut noise_coeffs = [0 as Field; N];
         for coeff_idx in 0..N {
+            // Convert Field values to Enclave_100
+            let u_global_bn = Enclave_100::from(self.u_global.coefficients[coeff_idx]);
+            let delta_m_bn = Enclave_100::from(delta_m.coefficients[coeff_idx]);
+
+            // Perform constrained subtraction
+            let noise_bn: Enclave_100 = u_global_bn - delta_m_bn;
+
+            // Convert back to Field using limbs_to_field
+            let limbs = noise_bn.get_limbs();
+
+            // Convert back to Field: limbs[0] + limbs[1] * 2^120
             noise_coeffs[coeff_idx] =
-                self.u_global.coefficients[coeff_idx] - delta_m.coefficients[coeff_idx];
+                (limbs[0] as Field) + (limbs[1] as Field) * (2 as Field).pow_32(120);
         }
 
         // Verify noise bound: |noise| < delta_half
