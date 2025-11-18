@@ -4,8 +4,10 @@ use crate::math::polynomial::Polynomial;
 use dep::bignum::BigNum;
 use dep::bignum::BigNum::__invmod;
 use dep::bignum::BigNum::umod;
+use dep::bignum::bignum::to_field;
 use dep::bignum::Enclave_100;
 use dep::bignum::Enclave_100_Pt_Mod;
+use bignum::fields::enclave_100_pt_mod;
 
 /// Cryptographic parameters for decryption share aggregation circuit.
 pub struct CryptographicParams<let L: u32> {
@@ -332,15 +334,12 @@ impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggr
             let t_bn_q = Enclave_100::from(t);
             let t_times_u_bn_q = t_bn_q * u_bn_q;
 
-            // Get limbs from the Q modulus result
-            let limbs_q = t_times_u_bn_q.get_limbs(); // [u128; 2]
+            // Reduce modulo 100: returns Enclave_100 but value is 0-99
+            let t_times_u_mod_t = t_times_u_bn_q.umod(t_bn_q);
 
-            // Reduce limbs_q modulo 100 using the constraint function
-            //fix this part
-            let t_times_u_mod_t_limbs = umod(&limbs_q, t);
-
-            // Convert result to Enclave_100_Pt_Mod (result is 0-99, fits in first limb)
-            let t_times_u_mod_t_bn = Enclave_100_Pt_Mod::from(t_times_u_mod_t_limbs[0] as Field);
+            // Extract the limbs and create Enclave_100_Pt_Mod
+            let t_times_u_mod_t_field = to_field(t_times_u_mod_t);
+            let t_times_u_mod_t_bn = Enclave_100_Pt_Mod::from(t_times_u_mod_t_field);
 
             // Compute: Q^{-1} * (t*u)_Q mod t
             let temp_bn = q_inv_mod_t_bn * t_times_u_mod_t_bn;
