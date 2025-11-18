@@ -9,15 +9,11 @@ pub struct CryptographicParams<let L: u32> {
     pub qis: [Field; L],
     /// Plaintext modulus
     pub plaintext_modulus: Field,
-    /// Modulus for the CRT reconstruction
-    pub q_modulus: Field,
-    /// Half of the modulus for the CRT reconstruction
-    pub q_half: Field,
 }
 
 impl<let L: u32> CryptographicParams<L> {
-    pub fn new(qis: [Field; L], plaintext_modulus: Field, q_modulus: Field, q_half: Field) -> Self {
-        CryptographicParams { qis, plaintext_modulus, q_modulus, q_half }
+    pub fn new(qis: [Field; L], plaintext_modulus: Field) -> Self {
+        CryptographicParams { qis, plaintext_modulus }
     }
 }
 
@@ -44,15 +40,8 @@ pub struct Params<let N: u32, let L: u32, let T: u32> {
 }
 
 impl<let N: u32, let L: u32, let T: u32> Params<N, L, T> {
-    pub fn new(
-        qis: [Field; L],
-        plaintext_modulus: Field,
-        q_modulus: Field,
-        q_half: Field,
-        delta: Field,
-        delta_half: Field,
-    ) -> Self {
-        let crypto = CryptographicParams::new(qis, plaintext_modulus, q_modulus, q_half);
+    pub fn new(qis: [Field; L], plaintext_modulus: Field, delta: Field, delta_half: Field) -> Self {
+        let crypto = CryptographicParams::new(qis, plaintext_modulus);
         let bounds = BoundParams::new(delta, delta_half);
         Params { crypto, bounds }
     }
