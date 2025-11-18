@@ -9,11 +9,13 @@ pub struct CryptographicParams<let L: u32> {
     pub qis: [Field; L],
     /// Plaintext modulus
     pub plaintext_modulus: Field,
+    q_modulus: Field,
+    q_half: Field,
 }
 
 impl<let L: u32> CryptographicParams<L> {
-    pub fn new(qis: [Field; L], plaintext_modulus: Field) -> Self {
-        CryptographicParams { qis, plaintext_modulus }
+    pub fn new(qis: [Field; L], plaintext_modulus: Field, q_modulus: Field, q_half: Field) -> Self {
+        CryptographicParams { qis, plaintext_modulus, q_modulus, q_half }
     }
 }
 
@@ -40,8 +42,15 @@ pub struct Params<let N: u32, let L: u32, let T: u32> {
 }
 
 impl<let N: u32, let L: u32, let T: u32> Params<N, L, T> {
-    pub fn new(qis: [Field; L], plaintext_modulus: Field, delta: Field, delta_half: Field) -> Self {
-        let crypto = CryptographicParams::new(qis, plaintext_modulus);
+    pub fn new(
+        qis: [Field; L],
+        plaintext_modulus: Field,
+        q_modulus: Field,
+        q_half: Field,
+        delta: Field,
+        delta_half: Field,
+    ) -> Self {
+        let crypto = CryptographicParams::new(qis, plaintext_modulus, q_modulus, q_half);
         let bounds = BoundParams::new(delta, delta_half);
         Params { crypto, bounds }
     }
@@ -264,33 +273,37 @@ impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggr
             }
         }
     }
-    #[allow(brillig_constraint_warning)]
+
     fn verify_global_noise_bound(self) {
         let bound_params = self.params.bound_params();
-
-        // Compute delta * m
+        let crypto_params = self.params.crypto_params();
         let delta_m = self.message.mul_scalar(bound_params.delta);
 
-        // Compute noise = u_global - delta * m using Enclave_100
-        let mut noise_coeffs = [0 as Field; N];
+        let q_bn = Enclave_100::modulus();
+        let q_half_bn = Enclave_100::from(crypto_params.q_half);
+
+        let mut noise_centered_fields = [0 as Field; N];
+
         for coeff_idx in 0..N {
-            // Convert Field values to Enclave_100
             let u_global_bn = Enclave_100::from(self.u_global.coefficients[coeff_idx]);
             let delta_m_bn = Enclave_100::from(delta_m.coefficients[coeff_idx]);
+            let noise_bn = u_global_bn - delta_m_bn;
 
-            // Perform constrained subtraction
-            let noise_bn: Enclave_100 = u_global_bn - delta_m_bn;
+            // Center and take absolute value in BigNum (must be done here!)
+            let noise_centered_bn = if noise_bn > q_half_bn {
+                q_bn - noise_bn
+            } else {
+                noise_bn
+            };
 
-            // Convert back to Field using limbs_to_field
-            let limbs = noise_bn.get_limbs();
-
-            // Convert back to Field: limbs[0] + limbs[1] * 2^120
-            noise_coeffs[coeff_idx] =
+            // Convert absolute value to Field
+            let limbs = noise_centered_bn.get_limbs();
+            noise_centered_fields[coeff_idx] =
                 (limbs[0] as Field) + (limbs[1] as Field) * (2 as Field).pow_32(120);
         }
 
-        // Verify noise bound: |noise| < delta_half
-        let noise_poly = Polynomial::new(noise_coeffs);
+        // Range check
+        let noise_poly = Polynomial::new(noise_centered_fields);
         noise_poly.range_check_2bounds::<BIT_NOISE>(
             bound_params.delta_half,
             bound_params.delta_half,
