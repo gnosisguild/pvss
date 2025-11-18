@@ -1,6 +1,7 @@
 use crate::math::modular_fns::{div_mod, mul_mod, reduce_mod};
 use crate::math::polynomial::Polynomial;
 use dep::bignum::BigNum;
+use dep::bignum::bignum::to_field;
 use dep::bignum::Enclave_100;
 
 /// Cryptographic parameters for decryption share aggregation circuit.
@@ -287,9 +288,7 @@ impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggr
             };
 
             // Convert absolute value to Field
-            let limbs = noise_centered_bn.get_limbs();
-            noise_centered_fields[coeff_idx] =
-                (limbs[0] as Field) + (limbs[1] as Field) * (2 as Field).pow_32(120);
+            noise_centered_fields[coeff_idx] = to_field(noise_centered_bn);
         }
 
         // Range check
