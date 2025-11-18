@@ -9,8 +9,10 @@ pub struct CryptographicParams<let L: u32> {
     pub qis: [Field; L],
     /// Plaintext modulus
     pub plaintext_modulus: Field,
-    q_modulus: Field,
-    q_half: Field,
+    /// Modulus for the CRT reconstruction
+    pub q_modulus: Field,
+    /// Half of the modulus for the CRT reconstruction
+    pub q_half: Field,
 }
 
 impl<let L: u32> CryptographicParams<L> {
@@ -276,11 +278,10 @@ impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggr
 
     fn verify_global_noise_bound(self) {
         let bound_params = self.params.bound_params();
-        let crypto_params = self.params.crypto_params();
         let delta_m = self.message.mul_scalar(bound_params.delta);
 
         let q_bn = Enclave_100::modulus();
-        let q_half_bn = Enclave_100::from(crypto_params.q_half);
+        let q_half_bn = q_bn.udiv(Enclave_100::from(2));
 
         let mut noise_centered_fields = [0 as Field; N];
 

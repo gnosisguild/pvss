@@ -11,7 +11,7 @@ fn main(
     u_global: Polynomial<8192>,
     crt_quotients: [Polynomial<8192>; 4],
 ) {
-    let dec_share_agg: DecryptionShareAggregation<8192, 4, 2, 222> = DecryptionShareAggregation::new(
+    let dec_share_agg: DecryptionShareAggregation<8192, 4, 2, 201> = DecryptionShareAggregation::new(
         params,
         decryption_shares,
         party_ids,
