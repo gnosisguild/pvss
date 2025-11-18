@@ -1,7 +1,11 @@
 use crate::math::modular_fns::{div_mod, mul_mod, reduce_mod};
+
 use crate::math::polynomial::Polynomial;
 use dep::bignum::BigNum;
+use dep::bignum::BigNum::__invmod;
+use dep::bignum::BigNum::umod;
 use dep::bignum::Enclave_100;
+use dep::bignum::Enclave_100_Pt_Mod;
 
 /// Cryptographic parameters for decryption share aggregation circuit.
 pub struct CryptographicParams<let L: u32> {
@@ -9,11 +13,12 @@ pub struct CryptographicParams<let L: u32> {
     pub qis: [Field; L],
     /// Plaintext modulus
     pub plaintext_modulus: Field,
+    pub q_inverse_mod_t: Field,
 }
 
 impl<let L: u32> CryptographicParams<L> {
-    pub fn new(qis: [Field; L], plaintext_modulus: Field) -> Self {
-        CryptographicParams { qis, plaintext_modulus }
+    pub fn new(qis: [Field; L], plaintext_modulus: Field, q_inverse_mod_t: Field) -> Self {
+        CryptographicParams { qis, plaintext_modulus, q_inverse_mod_t }
     }
 }
 
@@ -40,8 +45,14 @@ pub struct Params<let N: u32, let L: u32, let T: u32> {
 }
 
 impl<let N: u32, let L: u32, let T: u32> Params<N, L, T> {
-    pub fn new(qis: [Field; L], plaintext_modulus: Field, delta: Field, delta_half: Field) -> Self {
-        let crypto = CryptographicParams::new(qis, plaintext_modulus);
+    pub fn new(
+        qis: [Field; L],
+        plaintext_modulus: Field,
+        q_inverse_mod_t: Field,
+        delta: Field,
+        delta_half: Field,
+    ) -> Self {
+        let crypto = CryptographicParams::new(qis, plaintext_modulus, q_inverse_mod_t);
         let bounds = BoundParams::new(delta, delta_half);
         Params { crypto, bounds }
     }
@@ -134,7 +145,7 @@ impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggr
         self.verify_crt_reconstruction(u_crts);
 
         // Step 4: Verify global noise bound
-        self.verify_global_noise_bound();
+        self.verify_decoding_alternative();
     }
 
     /// Computes all Lagrange coefficients using optimized modular arithmetic
@@ -264,39 +275,88 @@ impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggr
             }
         }
     }
+    // fn verify_global_noise_bound(self) {
+    //     let bound_params = self.params.bound_params();
+    //     let delta_m = self.message.mul_scalar(bound_params.delta);
+    //     let q_bn = Enclave_100::modulus();
+    //     let q_half_bn = q_bn.udiv(Enclave_100::from(2));
+    //     let mut noise_centered_fields = [0 as Field; N];
+    //     for coeff_idx in 0..N {
+    //         let u_global_bn = Enclave_100::from(self.u_global.coefficients[coeff_idx]);
+    //         let delta_m_bn = Enclave_100::from(delta_m.coefficients[coeff_idx]);
+    //         let noise_bn = u_global_bn - delta_m_bn;
+    //         // Center and take absolute value in BigNum
+    //         let noise_centered_bn = if noise_bn > q_half_bn {
+    //             q_bn - noise_bn
+    //         } else {
+    //             noise_bn
+    //         };
+    //         // Convert absolute value to Field
+    //         let limbs = noise_centered_bn.get_limbs();
+    //         noise_centered_fields[coeff_idx] =
+    //             (limbs[0] as Field) + (limbs[1] as Field) * (2 as Field).pow_32(120);
+    //     }
+    //     // Range check
+    //     let noise_poly = Polynomial::new(noise_centered_fields);
+    //     noise_poly.range_check_2bounds::<BIT_NOISE>(
+    //         bound_params.delta_half,
+    //         bound_params.delta_half,
+    //     );
+    // }
+    /// Alternative decoding verification using the formula:
+    /// message = -Q^{-1} * (t * u_global)_Q mod t
+    ///
+    /// Where:
+    /// - t = plaintext_modulus
+    /// - u_global = decryption result (in Z_Q)
+    /// - Q = global modulus (product of all q_i)
+    /// - Q^{-1} = modular inverse of Q modulo t (precomputed)
+    /// - (t * u_global)_Q = (t * u_global) mod Q
+    ///
+    /// This directly checks the BFV decoding formula instead of checking noise bounds.
 
-    fn verify_global_noise_bound(self) {
-        let bound_params = self.params.bound_params();
-        let delta_m = self.message.mul_scalar(bound_params.delta);
+    /// Alternative decoding verification using the formula:
+    /// message = -Q^{-1} * (t * u_global)_Q mod t
+    ///
+    /// Uses BigNum arithmetic modulo t (plaintext_modulus) for all operations.
 
-        let q_bn = Enclave_100::modulus();
-        let q_half_bn = q_bn.udiv(Enclave_100::from(2));
+    fn verify_decoding_alternative(self) {
+        let t: Field = self.params.crypto.plaintext_modulus;
+        let q_inv_mod_t_bn = Enclave_100_Pt_Mod::from(self.params.crypto.q_inverse_mod_t);
 
-        let mut noise_centered_fields = [0 as Field; N];
+        std::println("=== Alternative Decoding Verification ===");
 
         for coeff_idx in 0..N {
-            let u_global_bn = Enclave_100::from(self.u_global.coefficients[coeff_idx]);
-            let delta_m_bn = Enclave_100::from(delta_m.coefficients[coeff_idx]);
-            let noise_bn = u_global_bn - delta_m_bn;
+            // Compute (t * u_global) mod Q
+            let u_bn_q = Enclave_100::from(self.u_global.coefficients[coeff_idx]);
+            let t_bn_q = Enclave_100::from(t);
+            let t_times_u_bn_q = t_bn_q * u_bn_q;
 
-            // Center and take absolute value in BigNum (must be done here!)
-            let noise_centered_bn = if noise_bn > q_half_bn {
-                q_bn - noise_bn
-            } else {
-                noise_bn
-            };
+            // Get limbs from the Q modulus result
+            let limbs_q = t_times_u_bn_q.get_limbs(); // [u128; 2]
 
-            // Convert absolute value to Field
-            let limbs = noise_centered_bn.get_limbs();
-            noise_centered_fields[coeff_idx] =
-                (limbs[0] as Field) + (limbs[1] as Field) * (2 as Field).pow_32(120);
+            // Reduce limbs_q modulo 100 using the constraint function
+            //fix this part
+            let t_times_u_mod_t_limbs = umod(&limbs_q, t);
+
+            // Convert result to Enclave_100_Pt_Mod (result is 0-99, fits in first limb)
+            let t_times_u_mod_t_bn = Enclave_100_Pt_Mod::from(t_times_u_mod_t_limbs[0] as Field);
+
+            // Compute: Q^{-1} * (t*u)_Q mod t
+            let temp_bn = q_inv_mod_t_bn * t_times_u_mod_t_bn;
+
+            // Negate: -temp mod t = t - temp
+            let t_mod_t_bn = Enclave_100_Pt_Mod::from(t);
+            let computed_message_bn = t_mod_t_bn - temp_bn;
+
+            // Convert to Field
+            let computed_limbs = computed_message_bn.get_limbs();
+            let computed_message = computed_limbs[0] as Field;
+
+            // Verify
+            assert(computed_message == self.message.coefficients[coeff_idx]);
         }
 
-        // Range check
-        let noise_poly = Polynomial::new(noise_centered_fields);
-        noise_poly.range_check_2bounds::<BIT_NOISE>(
-            bound_params.delta_half,
-            bound_params.delta_half,
-        );
+        std::println("=== All verified ===");
     }
 }
