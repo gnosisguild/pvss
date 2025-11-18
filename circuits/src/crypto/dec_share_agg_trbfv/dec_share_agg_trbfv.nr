@@ -1,4 +1,4 @@
-use crate::math::modular_fns::{div_mod, mul_mod, reduce_mod};
+use crate::math::modular_fns::{div_mod, mul_mod, reduce_mod, sub};
 
 use crate::math::polynomial::Polynomial;
 use dep::bignum::BigNum;
@@ -324,7 +324,7 @@ impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggr
 
     fn verify_decoding_alternative(self) {
         let t: Field = self.params.crypto.plaintext_modulus;
-        let q_inv_mod_t_bn = Enclave_100_Pt_Mod::from(self.params.crypto.q_inverse_mod_t);
+        // let q_inv_mod_t_bn = Enclave_100_Pt_Mod::from(self.params.crypto.q_inverse_mod_t);
 
         std::println("=== Alternative Decoding Verification ===");
 
@@ -338,19 +338,19 @@ impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggr
             let t_times_u_mod_t = t_times_u_bn_q.umod(t_bn_q);
 
             // Extract the limbs and create Enclave_100_Pt_Mod
-            let t_times_u_mod_t_field = to_field(t_times_u_mod_t);
-            let t_times_u_mod_t_bn = Enclave_100_Pt_Mod::from(t_times_u_mod_t_field);
+            // let t_times_u_mod_t_field = to_field(t_times_u_mod_t);
+            let limbs = t_times_u_mod_t.get_limbs();
+            let t_times_u_mod_t_field = limbs[0] as Field;
+
+            //let limbs = t_times_u_mod_t.get_limbs();
+            //let t_times_u_mod_t_bn = Enclave_100_Pt_Mod::from_limbs([limbs[0]]);
 
             // Compute: Q^{-1} * (t*u)_Q mod t
-            let temp_bn = q_inv_mod_t_bn * t_times_u_mod_t_bn;
+            //  let temp_bn = q_inv_mod_t_bn * t_times_u_mod_t_bn;
+            let temp = mul_mod(self.params.crypto.q_inverse_mod_t, t_times_u_mod_t_field, t);
 
-            // Negate: -temp mod t = t - temp
-            let t_mod_t_bn = Enclave_100_Pt_Mod::from(t);
-            let computed_message_bn = t_mod_t_bn - temp_bn;
-
-            // Convert to Field
-            let computed_limbs = computed_message_bn.get_limbs();
-            let computed_message = computed_limbs[0] as Field;
+            // Negate: -temp mod t = t - temp using modular subtraction
+            let computed_message = sub(t, temp, t);
 
             // Verify
             assert(computed_message == self.message.coefficients[coeff_idx]);
