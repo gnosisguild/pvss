@@ -1,5 +1,8 @@
 use crate::math::modular_fns::{div_mod, mul_mod, reduce_mod};
 use crate::math::polynomial::Polynomial;
+use dep::bignum::BigNum;
+use dep::bignum::bignum::to_field;
+use dep::bignum::Enclave_100;
 
 /// Cryptographic parameters for decryption share aggregation circuit.
 pub struct CryptographicParams<let L: u32> {
@@ -15,38 +18,41 @@ impl<let L: u32> CryptographicParams<L> {
     }
 }
 
-/// Complete parameters for decryption share aggregation circuit.
-pub struct Params<let N: u32, let T: u32, let L: u32> {
-    /// Cryptographic parameters (moduli)
-    pub crypto: CryptographicParams<L>,
-    /// Ring dimension (number of polynomial coefficients)
-    pub n: u32,
-    /// Number of CRT bases
-    pub l: u32,
-    /// Threshold (number of parties needed - 1, we need t+1 parties)
-    pub threshold: u32,
+pub struct BoundParams {
     /// Global delta value: delta = floor(q/t) where q = product of all q_i
     pub delta: Field,
     /// Global half-delta value for noise bound checking: delta_half = floor(delta / 2)
     pub delta_half: Field,
 }
 
-impl<let N: u32, let T: u32, let L: u32> Params<N, T, L> {
-    pub fn new(
-        qis: [Field; L],
-        plaintext_modulus: Field,
-        n: u32,
-        l: u32,
-        threshold: u32,
-        delta: Field,
-        delta_half: Field,
-    ) -> Self {
+impl BoundParams {
+    /// Creates new bound parameters
+    pub fn new(delta: Field, delta_half: Field) -> Self {
+        BoundParams { delta, delta_half }
+    }
+}
+
+/// Complete parameters for decryption share aggregation circuit.
+pub struct Params<let N: u32, let L: u32, let T: u32> {
+    /// Cryptographic parameters (moduli)
+    pub crypto: CryptographicParams<L>,
+    /// Bound parameters for range checking
+    pub bounds: BoundParams,
+}
+
+impl<let N: u32, let L: u32, let T: u32> Params<N, L, T> {
+    pub fn new(qis: [Field; L], plaintext_modulus: Field, delta: Field, delta_half: Field) -> Self {
         let crypto = CryptographicParams::new(qis, plaintext_modulus);
-        Params { crypto, n, l, threshold, delta, delta_half }
+        let bounds = BoundParams::new(delta, delta_half);
+        Params { crypto, bounds }
     }
 
     pub fn crypto_params(self) -> CryptographicParams<L> {
         self.crypto
+    }
+
+    pub fn bound_params(self) -> BoundParams {
+        self.bounds
     }
 }
 
@@ -72,12 +78,12 @@ impl<let N: u32, let T: u32, let L: u32> Params<N, T, L> {
 ///
 /// # Generic Parameters
 /// * `N` - The message degree (number of coefficients in the message and decryption share polynomials)
-/// * `T` - The threshold value (we need T+1 parties to reconstruct)
 /// * `L` - The number of CRT (Chinese Remainder Theorem) bases
+/// * `T` - The threshold value (we need T+1 parties to reconstruct)
 /// * `BIT_NOISE` - Bit-width bound for noise coefficients
-pub struct DecryptionShareAggregation<let N: u32, let T: u32, let L: u32, let BIT_NOISE: u32> {
+pub struct DecryptionShareAggregation<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> {
     /// Circuit parameters including crypto constants
-    params: Params<N, T, L>,
+    params: Params<N, L, T>,
 
     /// Decryption shares from t+1 parties (public inputs)
     decryption_shares: [[Polynomial<N>; L]; T + 1],
@@ -97,10 +103,10 @@ pub struct DecryptionShareAggregation<let N: u32, let T: u32, let L: u32, let BI
     crt_quotients: [Polynomial<N>; L],
 }
 
-impl<let N: u32, let T: u32, let L: u32, let BIT_NOISE: u32> DecryptionShareAggregation<N, T, L, BIT_NOISE> {
+impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggregation<N, L, T, BIT_NOISE> {
     /// Creates a new decryption share aggregation circuit instance
     pub fn new(
-        params: Params<N, T, L>,
+        params: Params<N, L, T>,
         decryption_shares: [[Polynomial<N>; L]; T + 1],
         party_ids: [Field; T + 1],
         message: Polynomial<N>,
@@ -260,27 +266,36 @@ impl<let N: u32, let T: u32, let L: u32, let BIT_NOISE: u32> DecryptionShareAggr
         }
     }
 
-    /// Verifies the global noise bound
-    ///
-    /// Computes noise = u_global - delta * m and verifies |noise| < delta/2
-    /// This proves the message was correctly decoded.
     fn verify_global_noise_bound(self) {
-        let delta = self.params.delta;
-        let delta_half = self.params.delta_half;
+        let bound_params = self.params.bound_params();
+        let delta_m = self.message.mul_scalar(bound_params.delta);
 
-        // Compute delta * m
-        let delta_m = self.message.mul_scalar(delta);
+        let q_bn = Enclave_100::modulus();
+        let q_half_bn = q_bn.udiv(Enclave_100::from(2));
 
-        // Compute noise = u_global - delta * m
-        // Note: This is direct Field subtraction, no modular arithmetic needed
-        let mut noise_coeffs = [0 as Field; N];
+        let mut noise_centered_fields = [0 as Field; N];
+
         for coeff_idx in 0..N {
-            noise_coeffs[coeff_idx] =
-                self.u_global.coefficients[coeff_idx] - delta_m.coefficients[coeff_idx];
+            let u_global_bn = Enclave_100::from(self.u_global.coefficients[coeff_idx]);
+            let delta_m_bn = Enclave_100::from(delta_m.coefficients[coeff_idx]);
+            let noise_bn = u_global_bn - delta_m_bn;
+
+            // Center and take absolute value in BigNum (must be done here!)
+            let noise_centered_bn = if noise_bn > q_half_bn {
+                q_bn - noise_bn
+            } else {
+                noise_bn
+            };
+
+            // Convert absolute value to Field
+            noise_centered_fields[coeff_idx] = to_field(noise_centered_bn);
         }
 
-        // Verify noise bound: |noise| < delta_half
-        let noise_poly = Polynomial::new(noise_coeffs);
-        noise_poly.range_check_2bounds::<BIT_NOISE>(delta_half, delta_half);
+        // Range check
+        let noise_poly = Polynomial::new(noise_centered_fields);
+        noise_poly.range_check_2bounds::<BIT_NOISE>(
+            bound_params.delta_half,
+            bound_params.delta_half,
+        );
     }
 }
