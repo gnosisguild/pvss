@@ -1,7 +1,7 @@
 use crate::math::modular_fns::{div_mod, mul_mod, reduce_mod};
 use crate::math::polynomial::Polynomial;
 use dep::bignum::BigNum;
-use dep::bignum::Enclave_100;
+use dep::bignum::Enclave_Bfv_100;
 
 /// Cryptographic parameters for decryption share aggregation circuit.
 pub struct CryptographicParams<let L: u32> {
@@ -269,14 +269,14 @@ impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggr
         let bound_params = self.params.bound_params();
         let delta_m = self.message.mul_scalar(bound_params.delta);
 
-        let q_bn = Enclave_100::modulus();
-        let q_half_bn = q_bn.udiv(Enclave_100::from(2));
+        let q_bn = Enclave_Bfv_100::modulus();
+        let q_half_bn = q_bn.udiv(Enclave_Bfv_100::from(2));
 
         let mut noise_centered_fields = [0 as Field; N];
 
         for coeff_idx in 0..N {
-            let u_global_bn = Enclave_100::from(self.u_global.coefficients[coeff_idx]);
-            let delta_m_bn = Enclave_100::from(delta_m.coefficients[coeff_idx]);
+            let u_global_bn = Enclave_Bfv_100::from(self.u_global.coefficients[coeff_idx]);
+            let delta_m_bn = Enclave_Bfv_100::from(delta_m.coefficients[coeff_idx]);
             let noise_bn = u_global_bn - delta_m_bn;
 
             // Center and take absolute value in BigNum (must be done here!)

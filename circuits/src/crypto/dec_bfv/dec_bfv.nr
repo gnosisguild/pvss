@@ -1,10 +1,10 @@
 use crate::math::modular_fns::{reduce_mod, sub};
 use crate::math::polynomial::{flatten, Polynomial};
 use crate::math::safe::SafeSponge;
-// use dep::bignum::BigNum;
-// use dep::bignum::bignum::to_field;
-// use dep::bignum::Enclave_Bfv_100;
-// use std::ops::Div;
+use dep::bignum::BigNum;
+use dep::bignum::bignum::to_field;
+use dep::bignum::Enclave_Bfv_100;
+use std::ops::Div;
 
 /// Cryptographic parameters for honest ciphertext aggregation and decryption circuit
 pub struct CryptographicParams<let L: u32> {
@@ -32,6 +32,10 @@ pub struct BoundParams<let L: u32> {
     pub r1_bounds: [Field; L],
     /// Bounds for r_2 polynomials (cyclotomic quotients)
     pub r2_bounds: [Field; L],
+    /// Global delta value: delta = floor(q/t) where q = product of all q_i
+    pub delta: Field,
+    /// Global half-delta value: delta_half = floor(delta / 2)
+    pub delta_half: Field,
 }
 
 impl<let L: u32> BoundParams<L> {
@@ -41,8 +45,10 @@ impl<let L: u32> BoundParams<L> {
         u_global_bound: Field,
         r1_bounds: [Field; L],
         r2_bounds: [Field; L],
+        delta: Field,
+        delta_half: Field,
     ) -> Self {
-        BoundParams { s_bound, u_i_bounds, u_global_bound, r1_bounds, r2_bounds }
+        BoundParams { s_bound, u_i_bounds, u_global_bound, r1_bounds, r2_bounds, delta, delta_half }
     }
 }
 
@@ -52,10 +58,6 @@ pub struct Params<let N: u32, let H: u32, let L: u32> {
     pub crypto: CryptographicParams<L>,
     /// Bound parameters for range checking
     pub bounds: BoundParams<L>,
-    /// Global delta value: delta = floor(q/t) where q = product of all q_i
-    pub delta: Field,
-    /// Global half-delta value: delta_half = floor(delta / 2)
-    pub delta_half: Field,
 }
 
 impl<let N: u32, let H: u32, let L: u32> Params<N, H, L> {
@@ -71,8 +73,16 @@ impl<let N: u32, let H: u32, let L: u32> Params<N, H, L> {
         delta_half: Field,
     ) -> Self {
         let crypto = CryptographicParams::new(qis, plaintext_modulus);
-        let bounds = BoundParams::new(s_bound, u_i_bounds, u_global_bound, r1_bounds, r2_bounds);
-        Params { crypto, bounds, delta, delta_half }
+        let bounds = BoundParams::new(
+            s_bound,
+            u_i_bounds,
+            u_global_bound,
+            r1_bounds,
+            r2_bounds,
+            delta,
+            delta_half,
+        );
+        Params { crypto, bounds }
     }
 
     pub fn crypto_params(self) -> CryptographicParams<L> {
@@ -388,11 +398,16 @@ impl<let N: u32, let H: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BI
         }
     }
     fn verify_decoding(self) {
-        let params = self.params;
-        let delta_m = self.message.mul_scalar(params.delta);
-        let q_modulus = params.crypto.qis[0] * params.crypto.qis[1];
+        let crypto_params = self.params.crypto_params();
+        let bound_params = self.params.bound_params();
+        let delta_m = self.message.mul_scalar(bound_params.delta);
 
-        let q_half = q_modulus as u128 / 2; // TRUE integer division
+        let mut q_modulus = 1;
+        for l in 0..L {
+            q_modulus *= crypto_params.qis[l];
+        }
+
+        let q_half = q_modulus as u128 / 2;
         let mut noise_centered = [0 as Field; N];
 
         for coeff_idx in 0..N {
@@ -410,30 +425,44 @@ impl<let N: u32, let H: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BI
         }
         // Range check
         let noise_poly = Polynomial::new(noise_centered);
-        noise_poly.range_check_2bounds::<BIT_NOISE>(params.delta_half, params.delta_half);
+        noise_poly.range_check_2bounds::<BIT_NOISE>(
+            bound_params.delta_half,
+            bound_params.delta_half,
+        );
     }
     //Use this function if BFV_modulus > 128 bits
     // fn verify_decoding(self) {
-    //     let params = self.params;
-    //     let delta_m = self.message.mul_scalar(params.delta);
+    //     let bound_params = self.params.bound_params();
+    //     let delta_m = self.message.mul_scalar(bound_params.delta);
+
     //     let q_bn = Enclave_Bfv_100::modulus();
     //     let q_half_bn = q_bn.udiv(Enclave_Bfv_100::from(2));
+        
     //     let mut noise_centered_fields = [0 as Field; N];
+        
     //     for coeff_idx in 0..N {
     //         let u_global_bn = Enclave_Bfv_100::from(self.u_global.coefficients[coeff_idx]);
     //         let delta_m_bn = Enclave_Bfv_100::from(delta_m.coefficients[coeff_idx]);
     //         let noise_bn = u_global_bn - delta_m_bn;
+        
     //         // Center and take absolute value in BigNum (must be done here!)
     //         let noise_centered_bn = if noise_bn > q_half_bn {
     //             q_bn - noise_bn
     //         } else {
     //             noise_bn
     //         };
+        
     //         // Convert absolute value to Field
-    //         noise_centered_fields[coeff_idx] = to_field(noise_centered_bn);
+    //         let limbs = noise_centered_bn.get_limbs();
+    //         noise_centered_fields[coeff_idx] =
+    //             (limbs[0] as Field) + (limbs[1] as Field) * (2 as Field).pow_32(120);
     //     }
+
     //     // Range check
     //     let noise_poly = Polynomial::new(noise_centered_fields);
-    //     noise_poly.range_check_2bounds::<BIT_NOISE>(params.delta_half, params.delta_half);
+    //     noise_poly.range_check_2bounds::<BIT_NOISE>(
+    //         bound_params.delta_half,
+    //         bound_params.delta_half,
+    //     );
     // }
 }
