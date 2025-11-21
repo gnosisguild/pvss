@@ -20,8 +20,7 @@ fn main(
     // TODO: Your logic here...
 
     // Create Honest Ciphertext Aggregation Decryption circuit instance
-    let dec_bfv: HonestCiphertextAggregationDecryption<8192, 3, 2, 57, 2, 114, 15, 57, 59> = 
-        HonestCiphertextAggregationDecryption::new(
+    let dec_bfv: HonestCiphertextAggregationDecryption<8192, 3, 2, 57, 2, 114, 15, 57, 59> = HonestCiphertextAggregationDecryption::new(
         params,
         honest_c0,
         honest_c1,

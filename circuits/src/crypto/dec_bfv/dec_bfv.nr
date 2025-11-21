@@ -434,30 +434,24 @@ impl<let N: u32, let H: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BI
     // fn verify_decoding(self) {
     //     let bound_params = self.params.bound_params();
     //     let delta_m = self.message.mul_scalar(bound_params.delta);
-
     //     let q_bn = Enclave_Bfv_100::modulus();
     //     let q_half_bn = q_bn.udiv(Enclave_Bfv_100::from(2));
-        
     //     let mut noise_centered_fields = [0 as Field; N];
-        
     //     for coeff_idx in 0..N {
     //         let u_global_bn = Enclave_Bfv_100::from(self.u_global.coefficients[coeff_idx]);
     //         let delta_m_bn = Enclave_Bfv_100::from(delta_m.coefficients[coeff_idx]);
     //         let noise_bn = u_global_bn - delta_m_bn;
-        
     //         // Center and take absolute value in BigNum (must be done here!)
     //         let noise_centered_bn = if noise_bn > q_half_bn {
     //             q_bn - noise_bn
     //         } else {
     //             noise_bn
     //         };
-        
     //         // Convert absolute value to Field
     //         let limbs = noise_centered_bn.get_limbs();
     //         noise_centered_fields[coeff_idx] =
     //             (limbs[0] as Field) + (limbs[1] as Field) * (2 as Field).pow_32(120);
     //     }
-
     //     // Range check
     //     let noise_poly = Polynomial::new(noise_centered_fields);
     //     noise_poly.range_check_2bounds::<BIT_NOISE>(

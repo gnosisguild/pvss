@@ -1,9 +1,8 @@
 use crate::math::modular_fns::{div_mod, mul_mod, reduce_mod};
 use crate::math::polynomial::Polynomial;
 use dep::bignum::BigNum;
-use dep::bignum::Enclave_TrBfv_100;
 use dep::bignum::bignum::to_field;
-
+use dep::bignum::Enclave_TrBfv_100;
 
 /// Cryptographic parameters for decryption share aggregation circuit.
 pub struct CryptographicParams<let L: u32> {
