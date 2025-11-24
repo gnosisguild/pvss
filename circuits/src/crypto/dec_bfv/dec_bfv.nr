@@ -3,7 +3,7 @@ use crate::math::polynomial::{flatten, Polynomial};
 use crate::math::safe::SafeSponge;
 use dep::bignum::BigNum;
 use dep::bignum::bignum::to_field;
-use dep::bignum::Enclave_Bfv_100;
+use dep::bignum::Enclave_BFV_8192;
 use std::ops::Div;
 
 /// Cryptographic parameters for honest ciphertext aggregation and decryption circuit
