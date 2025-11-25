@@ -6,3 +6,4 @@ authors = ["Gnosis Guild / Enclave"]
 license = "MIT"
 
 [dependencies]
+circuits = { path = "../circuits" }

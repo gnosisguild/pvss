@@ -1,5 +1,5 @@
-use circuits::{crypto::greco::greco::{Constants, Greco}, math::polynomial::Polynomial};
-use constants::set_bfv_8192_100::*;
+use circuits::{crypto::greco::greco::Greco, math::polynomial::Polynomial};
+use constants::set_bfv_8192_100::{CONSTANTS, N, L, BIT_PK, BIT_CT, BIT_U, BIT_E0, BIT_E1, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2};
 
 fn main(
     commitment_pk_ct: pub Field,
@@ -18,22 +18,7 @@ fn main(
     p2is: [Polynomial<N - 1>; L],
 ) {
     let greco: Greco<N, L, BIT_PK, BIT_CT, BIT_U, BIT_E0, BIT_E1, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2> = Greco::new(
-        Constants::new(
-            Q_MOD_T,
-            QIS,
-            K0IS,
-            PK_BOUNDS,
-            E0_BOUND,
-            E1_BOUND,
-            U_BOUND,
-            R1_LOW_BOUNDS,
-            R1_UP_BOUNDS,
-            R2_BOUNDS,
-            P1_BOUNDS,
-            P2_BOUNDS,
-            K1_LOW_BOUND,
-            K1_UP_BOUND,
-        ),
+        CONSTANTS,
         commitment_pk_ct,
         pk0is,
         pk1is,

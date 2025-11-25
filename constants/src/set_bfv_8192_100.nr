@@ -1,3 +1,4 @@
+use circuits::crypto::greco::greco::Constants;
 pub global N: u32 = 8192;
 pub global L: u32 = 2;
 pub global QIS: [Field; 2] = [72057594082099201, 72057594062438401];
@@ -27,3 +28,20 @@ pub global R2_BOUNDS: [Field; 2] = [36028797041049600, 36028797031219200];
 pub global U_BOUND: Field = 1;
 
 pub global K0IS: [Field; 2] = [70854796903366627, 47439047573780733];
+
+pub global CONSTANTS: Constants<N, L> = Constants::new(
+    Q_MOD_T,
+    QIS,
+    K0IS,
+    PK_BOUNDS,
+    E0_BOUND,
+    E1_BOUND,
+    U_BOUND,
+    R1_LOW_BOUNDS,
+    R1_UP_BOUNDS,
+    R2_BOUNDS,
+    P1_BOUNDS,
+    P2_BOUNDS,
+    K1_LOW_BOUND,
+    K1_UP_BOUND,
+);
