@@ -98,7 +98,7 @@ impl<let N: u32, let L: u32> Constants<N, L> {
 
 pub struct Greco<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_K: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> {
     constants: Constants<N, L>,
-    commitment_pk_ct: Field,
+    pk_commitment: Field,
     pk0is: [Polynomial<N>; L],
     pk1is: [Polynomial<N>; L],
     ct0is: [Polynomial<N>; L],
@@ -117,7 +117,7 @@ pub struct Greco<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let B
 impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_K: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> Greco<N, L, BIT_PK, BIT_CT, BIT_U, BIT_E0, BIT_E1, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
     pub fn new(
         constants: Constants<N, L>,
-        commitment_pk_ct: Field,
+        pk_commitment: Field,
         pk0is: [Polynomial<N>; L],
         pk1is: [Polynomial<N>; L],
         ct0is: [Polynomial<N>; L],
@@ -134,7 +134,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     ) -> Greco<N, L, BIT_PK, BIT_CT, BIT_U, BIT_E0, BIT_E1, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
         Greco {
             constants,
-            commitment_pk_ct,
+            pk_commitment,
             pk0is,
             pk1is,
             ct0is,
@@ -161,8 +161,6 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
 
         inputs = flatten::<_, _, BIT_PK>(inputs, self.pk0is);
         inputs = flatten::<_, _, BIT_PK>(inputs, self.pk1is);
-        inputs = flatten::<_, _, BIT_CT>(inputs, self.ct0is);
-        inputs = flatten::<_, _, BIT_CT>(inputs, self.ct1is);
 
         inputs
     }
@@ -170,7 +168,11 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     fn gammas_payload(self) -> Vec<Field> {
         let mut inputs = Vec::new();
 
-        inputs.push(self.commitment_pk_ct);
+        inputs.push(self.pk_commitment);
+
+        inputs = flatten::<_, _, BIT_CT>(inputs, self.ct0is);
+        inputs = flatten::<_, _, BIT_CT>(inputs, self.ct1is);
+
         // Flatten common polynomials (used across all CRT bases)
         inputs = flatten::<_, _, BIT_E0>(inputs, [self.e0]);
         inputs = flatten::<_, _, BIT_E1>(inputs, [self.e1]);
@@ -245,7 +247,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
 
         print(commitment);
 
-        assert_eq(commitment.get(0), self.commitment_pk_ct);
+        assert_eq(commitment.get(0), self.pk_commitment);
 
         // IO Pattern: ABSORB(input_size), SQUEEZE(2*L)
         let inputs = self.gammas_payload();
