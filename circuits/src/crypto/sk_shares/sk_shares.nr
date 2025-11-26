@@ -1,5 +1,5 @@
-use crate::math::polynomial::{Matrix, Polynomial};
-use safe::SafeSponge;
+use crate::math::polynomial::Polynomial;
+use crate::math::safe::SafeSponge;
 
 /// Cryptographic parameters for SK shares circuit.
 /// Contains the core mathematical constants used in the SK sharing scheme.
@@ -19,22 +19,22 @@ impl<let L: u32> CryptographicParams<L> {
 /// Contains all the bounds used to validate polynomial coefficients.
 pub struct BoundParams {
     /// Bound for secret key polynomials (sk)
-    pub sk_bound: u64,
+    pub sk_bound: Field,
     /// Lower bound for r polynomials (share consistency quotients)
-    pub r_lower_bound: i64,
+    pub r_lower_bound: Field,
     /// Upper bound for r polynomials (share consistency quotients)
-    pub r_upper_bound: u64,
+    pub r_upper_bound: Field,
     /// Bound for randomness values
-    pub randomness_bound: u64,
+    pub randomness_bound: Field,
 }
 
 impl BoundParams {
     /// Creates new bound parameters
     pub fn new(
-        sk_bound: u64,
-        r_lower_bound: i64,
-        r_upper_bound: u64,
-        randomness_bound: u64,
+        sk_bound: Field,
+        r_lower_bound: Field,
+        r_upper_bound: Field,
+        randomness_bound: Field,
     ) -> Self {
         BoundParams { sk_bound, r_lower_bound, r_upper_bound, randomness_bound }
     }
@@ -73,10 +73,10 @@ impl<let N: u32, let L: u32> Params<N, L> {
     /// Creates new complete parameters
     pub fn new(
         qis: [Field; L],
-        sk_bound: u64,
-        r_lower_bound: i64,
-        r_upper_bound: u64,
-        randomness_bound: u64,
+        sk_bound: Field,
+        r_lower_bound: Field,
+        r_upper_bound: Field,
+        randomness_bound: Field,
         n: u32,
         n_parties: u32,
         t: u32,
@@ -161,7 +161,7 @@ pub struct SecretKeySharesCircuit<let N: u32, let L: u32, let N_PARTIES: u32, le
     /// Since TRBFV secret key has N coefficients (a_0, ..., a_{N-1}), we have N polynomials
     /// Polynomial<T+1> has T+1 coefficients and degree T
     /// Requires T+1 parties to reconstruct the secret
-    f: Matrix<N, L, T + 1>,
+    f: [[Polynomial<T + 1>; L]; N],
     /// Randomness used in polynomial commitments for hiding
     f_randomness: [[Field; L]; N],
 
@@ -183,7 +183,7 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32> SecretKeySharesCirc
         x_coords: [Field; N_PARTIES],
         y: [[[Field; N_PARTIES]; L]; N],
         sk: Polynomial<N>,
-        f: Matrix<N, L, T + 1>,
+        f: [[Polynomial<T + 1>; L]; N],
         f_randomness: [[Field; L]; N],
         r: [[[Field; N_PARTIES]; L]; N],
         d: [[Field; L]; N],
@@ -288,12 +288,12 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32> SecretKeySharesCirc
     /// Generates Fiat-Shamir challenge
     fn generate_challenge(self) -> Field {
         // Updated array size: x_coords + polynomial commitments + y values + r values
-        let mut transcript = [0; N_PARTIES + N * L + N * L * N_PARTIES + N * L * N_PARTIES];
+        let mut transcript: Vec<Field> = Vec::new();
         let mut offset = 0;
 
         // Add public evaluation points to transcript
         for i in 0..N_PARTIES {
-            transcript[offset] = self.x_coords[i];
+            transcript.push(self.x_coords[i]);
             offset += 1;
         }
 
@@ -305,7 +305,7 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32> SecretKeySharesCirc
 
                 // Compute commitment and add to transcript
                 let commitment = Self::compute_polynomial_commitment(polynomial, randomness);
-                transcript[offset] = commitment;
+                transcript.push(commitment);
                 offset += 1;
             }
         }
@@ -314,7 +314,7 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32> SecretKeySharesCirc
         for coefficient_idx in 0..N {
             for modulus_idx in 0..L {
                 for party_idx in 0..N_PARTIES {
-                    transcript[offset] = self.y[coefficient_idx][modulus_idx][party_idx];
+                    transcript.push(self.y[coefficient_idx][modulus_idx][party_idx]);
                     offset += 1;
                 }
             }
@@ -324,7 +324,7 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32> SecretKeySharesCirc
         for coefficient_idx in 0..N {
             for modulus_idx in 0..L {
                 for party_idx in 0..N_PARTIES {
-                    transcript[offset] = self.r[coefficient_idx][modulus_idx][party_idx];
+                    transcript.push(self.r[coefficient_idx][modulus_idx][party_idx]);
                     offset += 1;
                 }
             }
@@ -358,15 +358,15 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32> SecretKeySharesCirc
         // Hash-based commitment: SafeSponge(polynomial_coefficients || randomness)
         // This provides computational binding and hiding properties
 
-        let mut commitment_input = [0; T + 2]; // (T+1) coefficients + 1 randomness
+        let mut commitment_input: Vec<Field> = Vec::new(); // (T+1) coefficients + 1 randomness
 
         // Add polynomial coefficients (Polynomial<T+1> has T+1 coefficients: a_0, a_1, ..., a_T)
         for deg in 0..(T + 1) {
-            commitment_input[deg] = polynomial.coefficients[deg];
+            commitment_input.push(polynomial.coefficients[deg]);
         }
 
         // Add randomness for hiding property
-        commitment_input[T + 1] = randomness;
+        commitment_input.push(randomness);
 
         // Use SafeSponge to compute commitment hash
         // Domain separator for PVSS_sk_shares circuit - "PVSS_sk_shares" in hex
@@ -397,14 +397,15 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32> SecretKeySharesCirc
 
         // Check secret key coefficients
         // TODO: FIX DUMMY BITS
-        self.sk.range_check_1bound::<64>(bound_params.sk_bound);
+        self.sk.range_check_2bounds::<64>(bound_params.sk_bound, bound_params.sk_bound);
 
         // Check sharing polynomial coefficients
         for coefficient_idx in 0..N {
             for modulus_idx in 0..L {
                 let current_modulus = crypto_params.qis[modulus_idx];
-                self.f[coefficient_idx][modulus_idx].range_check_1bound::<64>(
-                    current_modulus as u64,
+                self.f[coefficient_idx][modulus_idx].range_check_2bounds::<64>(
+                    current_modulus,
+                    current_modulus,
                 );
             }
         }
