@@ -324,7 +324,16 @@ impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggr
 
     fn verify_decoding_alternative(self) {
         let t: Field = self.params.crypto.plaintext_modulus;
-        // let q_inv_mod_t_bn = Enclave_100_Pt_Mod::from(self.params.crypto.q_inverse_mod_t);
+        // Compute Q as product of all CRT moduli
+        let mut q_modulus = 1;
+        for l in 0..L {
+            q_modulus *= self.params.crypto.qis[l];
+        }
+
+        // For centered arithmetic
+        let q_bn = Enclave_100::from(q_modulus);
+
+        let q_half_bn = q_bn.udiv(Enclave_100::from(2));
 
         std::println("=== Alternative Decoding Verification ===");
 
@@ -334,24 +343,30 @@ impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggr
             let t_bn_q = Enclave_100::from(t);
             let t_times_u_bn_q = t_bn_q * u_bn_q;
 
-            // Reduce modulo 100: returns Enclave_100 but value is 0-99
-            let t_times_u_mod_t = t_times_u_bn_q.umod(t_bn_q);
+            // Check if centering is needed
+            let needs_centering = t_times_u_bn_q > q_half_bn;
 
-            // Extract the limbs and create Enclave_100_Pt_Mod
-            // let t_times_u_mod_t_field = to_field(t_times_u_mod_t);
-            let limbs = t_times_u_mod_t.get_limbs();
-            let t_times_u_mod_t_field = limbs[0] as Field;
+            let computed_message = if needs_centering {
+                // When (t*u) mod Q >= Q/2: treat as negative in centered form
+                // Centered value is conceptually negative: (t_times_u_mod_q - Q)
+                // -Q^{-1} * (negative) = positive result
+                let centered_positive = q_bn - t_times_u_bn_q;
+                let centered_positive_mod_t = centered_positive.umod(t_bn_q);
+                let centered_field = to_field(centered_positive_mod_t);
+                mul_mod(self.params.crypto.q_inverse_mod_t, centered_field, t)
+            } else {
+                // When (t*u) mod Q < Q/2: stays positive in centered form
+                // -Q^{-1} * (positive) = negative result = t - result
+                let t_times_u_bn_t = t_times_u_bn_q.umod(t_bn_q);
+                let t_times_u_field = to_field(t_times_u_bn_t);
+                let product = mul_mod(self.params.crypto.q_inverse_mod_t, t_times_u_field, t);
+                if product == 0 {
+                    0
+                } else {
+                    t - product
+                }
+            };
 
-            //let limbs = t_times_u_mod_t.get_limbs();
-            //let t_times_u_mod_t_bn = Enclave_100_Pt_Mod::from_limbs([limbs[0]]);
-
-            // Compute: Q^{-1} * (t*u)_Q mod t
-            //  let temp_bn = q_inv_mod_t_bn * t_times_u_mod_t_bn;
-            let temp = mul_mod(self.params.crypto.q_inverse_mod_t, t_times_u_mod_t_field, t);
-
-            // Negate: -temp mod t = t - temp using modular subtraction
-            let computed_message = sub(t, temp, t);
-            
             // Verify: only check non-zero coefficients
             if self.message.coefficients[coeff_idx] != 0 {
                 assert(computed_message == self.message.coefficients[coeff_idx]);
