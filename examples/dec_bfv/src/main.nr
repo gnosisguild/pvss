@@ -4,23 +4,23 @@ use circuits::{
 };
 
 fn main(
-    params: Params<8192, 3, 2>,
-    honest_c0: [[Polynomial<8192>; 2]; 3],
-    honest_c1: [[Polynomial<8192>; 2]; 3],
-    sum_c0: [Polynomial<8192>; 2],
-    sum_c1: [Polynomial<8192>; 2],
-    s: [Polynomial<8192>; 2],
-    u_i: [Polynomial<8192>; 2],
-    r_1: [Polynomial<16383>; 2],
-    r_2: [Polynomial<8191>; 2],
-    u_global: Polynomial<8192>,
-    crt_quotients: [Polynomial<8192>; 2],
-    message: Polynomial<8192>,
+    params: Params<512, 3, 1>,
+    honest_c0: [[Polynomial<512>; 1]; 3],
+    honest_c1: [[Polynomial<512>; 1]; 3],
+    sum_c0: [Polynomial<512>; 1],
+    sum_c1: [Polynomial<512>; 1],
+    s: [Polynomial<512>; 1],
+    u_i: [Polynomial<512>; 1],
+    r_1: [Polynomial<1023>; 1],
+    r_2: [Polynomial<511>; 1],
+    u_global: Polynomial<512>,
+    crt_quotients: [Polynomial<512>; 1],
+    message: Polynomial<512>,
 ) {
     // TODO: Your logic here...
 
     // Create Honest Ciphertext Aggregation Decryption circuit instance
-    let dec_bfv: HonestCiphertextAggregationDecryption<8192, 3, 2, 57, 2, 114, 15, 57, 59> = HonestCiphertextAggregationDecryption::new(
+    let dec_bfv: HonestCiphertextAggregationDecryption<512, 3, 1, 51, 2, 61, 11, 51, 16> = HonestCiphertextAggregationDecryption::new(
         params,
         honest_c0,
         honest_c1,
