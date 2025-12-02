@@ -83,11 +83,11 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32> Params<N, H, L, L_PRI
 /// BFV Decryption and TRBFV Share Aggregation Circuit
 ///
 /// This circuit verifies:
-/// 1. BFV decryption of H×L ciphertexts (H honest parties × L TRBFV bases)
+/// 1. BFV decryption of H*L ciphertexts (H honest parties * L TRBFV bases)
 /// 2. Each ciphertext decrypts using L' BFV RNS bases
-/// 3. CRT reconstruction for each ciphertext → u_global
-/// 4. Decoding each u_global → decrypted_share
-/// 5. For each TRBFV basis l: Σ_h decrypted_shares[h][l] mod trbfv_qi[l] = expected_share[l]
+/// 3. CRT reconstruction for each ciphertext to u_global
+/// 4. Decoding each u_global to decrypted_share
+/// 5. For each TRBFV basis l: sigma_h decrypted_shares[h][l] mod trbfv_qi[l] = expected_share[l]
 ///
 /// # Generic Parameters
 /// * `N` - Number of polynomial coefficients
@@ -100,14 +100,14 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32> Params<N, H, L, L_PRI
 /// * `BIT_R1` - Bit width for r_1 quotients
 /// * `BIT_R2` - Bit width for r_2 quotients
 /// * `BIT_MSG` - Bit width for decoded message coefficients
-pub struct BfvDecryptionTrbfvAggregation<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_U: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_MSG: u32> {
+pub struct HonestCiphertextAggregationDecryptionNoHomAdd<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_U: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_MSG: u32> {
     /// Circuit parameters
     params: Params<N, H, L, L_PRIME>,
 
-    /// H×L ciphertexts, each with L' BFV RNS components
-    /// ciphertexts_c0[party_idx][trbfv_basis][bfv_basis]
-    ciphertexts_c0: [[[Polynomial<N>; L_PRIME]; L]; H],
-    ciphertexts_c1: [[[Polynomial<N>; L_PRIME]; L]; H],
+    /// H*L ciphertexts, each with L_prime BFV RNS components
+    /// honest_c0[party_idx][trbfv_basis][bfv_basis]
+    honest_c0: [[[Polynomial<N>; L_PRIME]; L]; H],
+    honest_c1: [[[Polynomial<N>; L_PRIME]; L]; H],
 
     /// BFV secret key - single polynomial (same for all bases because it's small)
     s: Polynomial<N>,
@@ -121,7 +121,7 @@ pub struct BfvDecryptionTrbfvAggregation<let N: u32, let H: u32, let L: u32, let
     r_1: [[[Polynomial<2 * N - 1>; L_PRIME]; L]; H],
     r_2: [[[Polynomial<N - 1>; L_PRIME]; L]; H],
 
-    /// Per-ciphertext CRT reconstructed result (one per H×L ciphertext)
+    /// Per-ciphertext CRT reconstructed result (one per H*L ciphertext)
     /// u_global[party_idx][trbfv_basis]
     u_global: [[Polynomial<N>; L]; H],
 
@@ -129,7 +129,7 @@ pub struct BfvDecryptionTrbfvAggregation<let N: u32, let H: u32, let L: u32, let
     /// crt_quotients[party_idx][trbfv_basis][bfv_basis]
     crt_quotients: [[[Polynomial<N>; L_PRIME]; L]; H],
 
-    /// Decoded shares (one per H×L ciphertext)
+    /// Decoded shares (message) (one per H*L ciphertext)
     /// decrypted_shares[party_idx][trbfv_basis]
     decrypted_shares: [[Polynomial<N>; L]; H],
 
@@ -138,12 +138,12 @@ pub struct BfvDecryptionTrbfvAggregation<let N: u32, let H: u32, let L: u32, let
     expected_aggregated_shares: [Polynomial<N>; L],
 }
 
-impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_U: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_MSG: u32> BfvDecryptionTrbfvAggregation<N, H, L, L_PRIME, BIT_CT, BIT_S, BIT_U, BIT_R1, BIT_R2, BIT_MSG> {
+impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_U: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_MSG: u32> HonestCiphertextAggregationDecryptionNoHomAdd<N, H, L, L_PRIME, BIT_CT, BIT_S, BIT_U, BIT_R1, BIT_R2, BIT_MSG> {
     /// Creates a new circuit instance
     pub fn new(
         params: Params<N, H, L, L_PRIME>,
-        ciphertexts_c0: [[[Polynomial<N>; L_PRIME]; L]; H],
-        ciphertexts_c1: [[[Polynomial<N>; L_PRIME]; L]; H],
+        honest_c0: [[[Polynomial<N>; L_PRIME]; L]; H],
+        honest_c1: [[[Polynomial<N>; L_PRIME]; L]; H],
         s: Polynomial<N>,
         u_i: [[[Polynomial<N>; L_PRIME]; L]; H],
         r_1: [[[Polynomial<2 * N - 1>; L_PRIME]; L]; H],
@@ -153,10 +153,10 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
         decrypted_shares: [[Polynomial<N>; L]; H],
         expected_aggregated_shares: [Polynomial<N>; L],
     ) -> Self {
-        BfvDecryptionTrbfvAggregation {
+        HonestCiphertextAggregationDecryptionNoHomAdd {
             params,
-            ciphertexts_c0,
-            ciphertexts_c1,
+            honest_c0,
+            honest_c1,
             s,
             u_i,
             r_1,
@@ -239,11 +239,11 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
     fn payload(self) -> Vec<Field> {
         let mut inputs = Vec::new();
 
-        // Flatten ciphertexts
+        // Flatten honest ciphertexts
         for party_idx in 0..H {
             for trbfv_idx in 0..L {
-                inputs = flatten::<_, _, BIT_CT>(inputs, self.ciphertexts_c0[party_idx][trbfv_idx]);
-                inputs = flatten::<_, _, BIT_CT>(inputs, self.ciphertexts_c1[party_idx][trbfv_idx]);
+                inputs = flatten::<_, _, BIT_CT>(inputs, self.honest_c0[party_idx][trbfv_idx]);
+                inputs = flatten::<_, _, BIT_CT>(inputs, self.honest_c1[party_idx][trbfv_idx]);
             }
         }
 
@@ -313,19 +313,13 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
 
     /// Verifies BFV decryption formula for one ciphertext at one BFV basis
     ///
-    /// Checks: u_i(γ) = c_0(γ) + c_1(γ) * s(γ) + r_2(γ) * (γ^N + 1) + r_1(γ) * q'_i
-    fn verify_decryption_formula(
-        self,
-        party_idx: u32,
-        trbfv_idx: u32,
-        bfv_idx: u32,
-        gamma: Field,
-    ) {
+    /// Checks: u_i(gamma) = c_0(gamma) + c_1(gamma) * s(gamma) + r_2(gamma) * (gamma^N + 1) + r_1(gamma) * bfv_q_i
+    fn verify_decryption_formula(self, party_idx: u32, trbfv_idx: u32, bfv_idx: u32, gamma: Field) {
         let crypto = self.params.crypto;
 
         // Evaluate ciphertext at gamma
-        let c_0_at_gamma = self.ciphertexts_c0[party_idx][trbfv_idx][bfv_idx].eval(gamma);
-        let c_1_at_gamma = self.ciphertexts_c1[party_idx][trbfv_idx][bfv_idx].eval(gamma);
+        let c_0_at_gamma = self.honest_c0[party_idx][trbfv_idx][bfv_idx].eval(gamma);
+        let c_1_at_gamma = self.honest_c1[party_idx][trbfv_idx][bfv_idx].eval(gamma);
 
         // Evaluate secret key at gamma (same s for all)
         let s_at_gamma = self.s.eval(gamma);
@@ -357,7 +351,8 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
             let q_l = crypto.bfv_qis[bfv_idx];
 
             // quotient * q'_l
-            let quotient_times_q = self.crt_quotients[party_idx][trbfv_idx][bfv_idx].mul_scalar(q_l);
+            let quotient_times_q =
+                self.crt_quotients[party_idx][trbfv_idx][bfv_idx].mul_scalar(q_l);
 
             // u_i + quotient * q'_l
             let reconstructed = self.u_i[party_idx][trbfv_idx][bfv_idx].add(quotient_times_q);
@@ -373,7 +368,7 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
         }
     }
 
-    /// Verifies BFV decoding: u_global → decrypted_share
+    /// Verifies BFV decoding: u_global to decrypted_share
     fn verify_decoding(self, party_idx: u32, trbfv_idx: u32) {
         let t = self.params.crypto.bfv_plaintext_modulus;
 
@@ -386,8 +381,11 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
         let q_half = (q_modulus as u128) / 2;
 
         for coeff_idx in 0..N {
-            let t_times_u_q =
-                mul_mod(t, self.u_global[party_idx][trbfv_idx].coefficients[coeff_idx], q_modulus);
+            let t_times_u_q = mul_mod(
+                t,
+                self.u_global[party_idx][trbfv_idx].coefficients[coeff_idx],
+                q_modulus,
+            );
 
             let needs_centering = (t_times_u_q as u128) > q_half;
 
@@ -414,7 +412,7 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
     }
 
     /// Verifies TRBFV share aggregation
-    /// For each TRBFV basis l: Σ_h decrypted_shares[h][l] mod trbfv_qi[l] = expected[l]
+    /// For each TRBFV basis l: sigma_h decrypted_shares[h][l] mod trbfv_qi[l] = expected[l]
     fn verify_trbfv_aggregation(self) {
         let crypto = self.params.crypto;
 
@@ -433,7 +431,8 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
 
                 // Verify against expected
                 assert(
-                    sum_reduced == self.expected_aggregated_shares[trbfv_idx].coefficients[coeff_idx],
+                    sum_reduced
+                        == self.expected_aggregated_shares[trbfv_idx].coefficients[coeff_idx],
                     "TRBFV share aggregation failed",
                 );
             }
