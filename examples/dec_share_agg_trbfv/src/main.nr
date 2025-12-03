@@ -4,14 +4,15 @@ use circuits::{
 };
 
 fn main(
-    params: Params<8192, 4, 2>,
-    decryption_shares: [[Polynomial<8192>; 4]; 3],
+    //N, L, T
+    params: Params<5, 2, 2>,
+    decryption_shares: [[Polynomial<5>; 2]; 3],
     party_ids: [Field; 3],
-    message: Polynomial<8192>,
-    u_global: Polynomial<8192>,
-    crt_quotients: [Polynomial<8192>; 4],
+    message: Polynomial<5>,
+    u_global: Polynomial<5>,
+    crt_quotients: [Polynomial<5>; 2],
 ) {
-    let dec_share_agg: DecryptionShareAggregation<8192, 4, 2, 201> = DecryptionShareAggregation::new(
+    let dec_share_agg: DecryptionShareAggregation<5, 2, 2, 50> = DecryptionShareAggregation::new(
         params,
         decryption_shares,
         party_ids,
