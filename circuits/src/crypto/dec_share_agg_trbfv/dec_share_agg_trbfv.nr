@@ -10,11 +10,18 @@ pub struct CryptographicParams<let L: u32> {
     pub qis: [Field; L],
     /// Plaintext modulus
     pub plaintext_modulus: Field,
+    pub q_mod_t: Field,
+    pub t_inv_mod_q: Field,
 }
 
 impl<let L: u32> CryptographicParams<L> {
-    pub fn new(qis: [Field; L], plaintext_modulus: Field) -> Self {
-        CryptographicParams { qis, plaintext_modulus }
+    pub fn new(
+        qis: [Field; L],
+        plaintext_modulus: Field,
+        q_mod_t: Field,
+        t_inv_mod_q: Field,
+    ) -> Self {
+        CryptographicParams { qis, plaintext_modulus, q_mod_t, t_inv_mod_q }
     }
 }
 
@@ -41,8 +48,15 @@ pub struct Params<let N: u32, let L: u32, let T: u32> {
 }
 
 impl<let N: u32, let L: u32, let T: u32> Params<N, L, T> {
-    pub fn new(qis: [Field; L], plaintext_modulus: Field, delta: Field, delta_half: Field) -> Self {
-        let crypto = CryptographicParams::new(qis, plaintext_modulus);
+    pub fn new(
+        qis: [Field; L],
+        plaintext_modulus: Field,
+        delta: Field,
+        delta_half: Field,
+        q_mod_t: Field,
+        t_inv_mod_q: Field,
+    ) -> Self {
+        let crypto = CryptographicParams::new(qis, plaintext_modulus, q_mod_t, t_inv_mod_q);
         let bounds = BoundParams::new(delta, delta_half);
         Params { crypto, bounds }
     }
@@ -268,7 +282,9 @@ impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggr
 
     fn verify_global_noise_bound(self) {
         let bound_params = self.params.bound_params();
-        let delta_m = self.message.mul_scalar(bound_params.delta);
+        let params = self.params.crypto_params();
+        let t = params.plaintext_modulus;
+        let t_half = (t as u64) / 2;
 
         let q_bn = Enclave_TrBfv_100::modulus();
         let q_half_bn = q_bn.udiv(Enclave_TrBfv_100::from(2));
@@ -277,17 +293,53 @@ impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggr
 
         for coeff_idx in 0..N {
             let u_global_bn = Enclave_TrBfv_100::from(self.u_global.coefficients[coeff_idx]);
-            let delta_m_bn = Enclave_TrBfv_100::from(delta_m.coefficients[coeff_idx]);
+
+            // Step 1: Calculate (Q*m) mod t
+            let q_times_m_mod_t = mul_mod(
+                params.q_mod_t,
+                self.message.coefficients[coeff_idx],
+                params.plaintext_modulus,
+            );
+
+            // Step 2: Check if centering is needed
+            let needs_centering = q_times_m_mod_t as u64 > t_half;
+
+            // Step 3: Apply the formula -t^{-1} * (Q*m mod_centered t) mod Q
+            let delta_m_bn = if needs_centering {
+                // When (Q*m) mod t > t/2: treat as negative in centered form
+                // Conceptually: (Q*m mod t) - t  (negative value)
+                // -t^{-1} * (negative) = positive result
+
+                // Compute t^{-1} * (t - (Q*m mod t)) mod Q
+                // This is equivalent to -t^{-1} * ((Q*m mod t) - t) mod Q
+                let t_minus_qm = t - q_times_m_mod_t;
+                let t_minus_qm_bn = Enclave_TrBfv_100::from(t_minus_qm);
+                let t_inv_mod_q_bn = Enclave_TrBfv_100::from(params.t_inv_mod_q);
+
+                t_minus_qm_bn * t_inv_mod_q_bn // Positive result
+            } else {
+                // When (Q*m) mod t <= t/2: stays positive in centered form
+                // -t^{-1} * (positive) = negative result
+
+                let q_times_m_bn = Enclave_TrBfv_100::from(q_times_m_mod_t);
+                let t_inv_mod_q_bn = Enclave_TrBfv_100::from(params.t_inv_mod_q);
+                let product = q_times_m_bn * t_inv_mod_q_bn;
+
+                // Compute -product mod Q = Q - product
+                q_bn - product // Negative result (Q - value in mod Q arithmetic)
+            };
+
+            // Step 4: Compute noise = u_global - delta_m
             let noise_bn = u_global_bn - delta_m_bn;
 
-            // Center and take absolute value in BigNum (must be done here!)
+            // Step 5: Center the noise for absolute value
             let noise_centered_bn = if noise_bn > q_half_bn {
                 q_bn - noise_bn
             } else {
                 noise_bn
             };
 
-            // Convert absolute value to Field
+            // Convert to Field for range check
             noise_centered_fields[coeff_idx] = to_field(noise_centered_bn);
         }
 
