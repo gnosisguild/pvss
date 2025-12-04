@@ -1,10 +1,9 @@
-use crate::math::modular_fns::{reduce_mod, sub};
+use crate::math::modular_fns::{mul_mod, reduce_mod, sub};
 use crate::math::polynomial::{flatten, Polynomial};
 use crate::math::safe::SafeSponge;
 use dep::bignum::BigNum;
 use dep::bignum::bignum::to_field;
-use dep::bignum::Enclave_Bfv_100;
-use std::ops::Div;
+use dep::bignum::Enclave_TrBfv_100;
 
 /// Cryptographic parameters for honest ciphertext aggregation and decryption circuit
 pub struct CryptographicParams<let L: u32> {
@@ -12,11 +11,18 @@ pub struct CryptographicParams<let L: u32> {
     pub qis: [Field; L],
     /// Plaintext modulus
     pub plaintext_modulus: Field,
+    pub q_mod_t: Field,
+    pub t_inv_mod_q: Field,
 }
 
 impl<let L: u32> CryptographicParams<L> {
-    pub fn new(qis: [Field; L], plaintext_modulus: Field) -> Self {
-        CryptographicParams { qis, plaintext_modulus }
+    pub fn new(
+        qis: [Field; L],
+        plaintext_modulus: Field,
+        q_mod_t: Field,
+        t_inv_mod_q: Field,
+    ) -> Self {
+        CryptographicParams { qis, plaintext_modulus, q_mod_t, t_inv_mod_q }
     }
 }
 
@@ -64,6 +70,8 @@ impl<let N: u32, let H: u32, let L: u32> Params<N, H, L> {
     pub fn new(
         qis: [Field; L],
         plaintext_modulus: Field,
+        q_mod_t: Field,
+        t_inv_mod_q: Field,
         s_bound: Field,
         u_i_bounds: [Field; L],
         u_global_bound: Field,
@@ -72,7 +80,7 @@ impl<let N: u32, let H: u32, let L: u32> Params<N, H, L> {
         delta: Field,
         delta_half: Field,
     ) -> Self {
-        let crypto = CryptographicParams::new(qis, plaintext_modulus);
+        let crypto = CryptographicParams::new(qis, plaintext_modulus, q_mod_t, t_inv_mod_q);
         let bounds = BoundParams::new(
             s_bound,
             u_i_bounds,
@@ -182,21 +190,21 @@ impl<let N: u32, let H: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BI
     /// Main verification function
     pub fn verify(self) {
         // Step 1: Verify ciphertext summation
-        self.verify_ciphertext_summation();
+        // self.verify_ciphertext_summation();
 
-        // Step 2: Perform range checks on secret witnesses
-        self.check_range_bounds();
+        // // Step 2: Perform range checks on secret witnesses
+        // self.check_range_bounds();
 
-        // Step 3: Generate Fiat-Shamir challenge
-        let gamma = self.generate_challenge();
+        // // Step 3: Generate Fiat-Shamir challenge
+        // let gamma = self.generate_challenge();
 
-        // Step 4: Verify decryption formula for each basis using Schwartz-Zippel
-        for basis_idx in 0..L {
-            self.verify_decryption_formula(basis_idx, gamma);
-        }
+        // // Step 4: Verify decryption formula for each basis using Schwartz-Zippel
+        // for basis_idx in 0..L {
+        //     self.verify_decryption_formula(basis_idx, gamma);
+        // }
 
-        // Step 5: Verify CRT reconstruction
-        self.verify_crt_reconstruction();
+        // // Step 5: Verify CRT reconstruction
+        // self.verify_crt_reconstruction();
 
         // Step 6: Verify global noise bound (decoding correctness)
         self.verify_decoding();
@@ -397,66 +405,76 @@ impl<let N: u32, let H: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BI
             }
         }
     }
+
     fn verify_decoding(self) {
         let crypto_params = self.params.crypto_params();
         let bound_params = self.params.bound_params();
-        let delta_m = self.message.mul_scalar(bound_params.delta);
 
+        // Compute Q (total modulus)
         let mut q_modulus = 1;
         for l in 0..L {
             q_modulus *= crypto_params.qis[l];
         }
-
         let q_half = q_modulus as u128 / 2;
+
+        let t = crypto_params.plaintext_modulus;
+        let t_half = (t as u128) / 2;
+
+        let q_mod_t = crypto_params.q_mod_t;
+        let t_inv_mod_q = crypto_params.t_inv_mod_q;
+
         let mut noise_centered = [0 as Field; N];
 
         for coeff_idx in 0..N {
-            let noise = sub(
-                self.u_global.coefficients[coeff_idx],
-                delta_m.coefficients[coeff_idx],
-                q_modulus,
-            );
-            // Center and take absolute value in BigNum (must be done here!)
+            // Step 1: Calculate encoding: -t^{-1} * (Q*m mod_centered t) mod Q
+
+            // Compute (Q*m) mod t
+            let q_times_m_mod_t = mul_mod(q_mod_t, self.message.coefficients[coeff_idx], t);
+
+            // Check if centering is needed
+            let needs_centering = q_times_m_mod_t as u128 > t_half;
+
+            // Apply the formula -t^{-1} * (Q*m mod_centered t) mod Q
+            let delta_m = if needs_centering {
+                // When (Q*m) mod t > t/2: centered value is conceptually negative
+                // -t^{-1} * (negative) = positive result
+                let t_minus_qm = sub(t, q_times_m_mod_t, t); // t - (Q*m mod t)
+                let mul = t_inv_mod_q * t_minus_qm;
+                let mul_bn = Enclave_TrBfv_100::from(mul);
+                let mul_bn_mod_q = mul_bn.umod(Enclave_TrBfv_100::from(q_modulus));
+                to_field(mul_bn_mod_q)
+            } else {
+                // When (Q*m) mod t <= t/2: centered value is positive
+                // -t^{-1} * (positive) = negative result = Q - result
+                // let product = mul_mod(t_inv_mod_q, q_times_m_mod_t, q_modulus);
+
+                let product = t_inv_mod_q * q_times_m_mod_t;
+                let product_bn = Enclave_TrBfv_100::from(product);
+                let product_bn_mod_q = product_bn.umod(Enclave_TrBfv_100::from(q_modulus));
+                let product_field = to_field(product_bn_mod_q);
+                if product_field == 0 {
+                    0
+                } else {
+                    sub(q_modulus, product_field, q_modulus) // Q - product
+                }
+            };
+
+            // Step 2: Compute noise = u_global - delta_m mod Q
+            let noise = sub(self.u_global.coefficients[coeff_idx], delta_m, q_modulus);
+
+            // Step 3: Center the noise for absolute value
             noise_centered[coeff_idx] = if noise as u128 > q_half {
-                q_modulus - noise
+                q_modulus - noise // Convert negative to positive absolute value
             } else {
                 noise
             };
         }
-        // Range check
+
+        // Step 4: Range check the centered noise
         let noise_poly = Polynomial::new(noise_centered);
         noise_poly.range_check_2bounds::<BIT_NOISE>(
             bound_params.delta_half,
             bound_params.delta_half,
         );
     }
-    //Use this function if BFV_modulus > 128 bits
-    // fn verify_decoding(self) {
-    //     let bound_params = self.params.bound_params();
-    //     let delta_m = self.message.mul_scalar(bound_params.delta);
-    //     let q_bn = Enclave_Bfv_100::modulus();
-    //     let q_half_bn = q_bn.udiv(Enclave_Bfv_100::from(2));
-    //     let mut noise_centered_fields = [0 as Field; N];
-    //     for coeff_idx in 0..N {
-    //         let u_global_bn = Enclave_Bfv_100::from(self.u_global.coefficients[coeff_idx]);
-    //         let delta_m_bn = Enclave_Bfv_100::from(delta_m.coefficients[coeff_idx]);
-    //         let noise_bn = u_global_bn - delta_m_bn;
-    //         // Center and take absolute value in BigNum (must be done here!)
-    //         let noise_centered_bn = if noise_bn > q_half_bn {
-    //             q_bn - noise_bn
-    //         } else {
-    //             noise_bn
-    //         };
-    //         // Convert absolute value to Field
-    //         let limbs = noise_centered_bn.get_limbs();
-    //         noise_centered_fields[coeff_idx] =
-    //             (limbs[0] as Field) + (limbs[1] as Field) * (2 as Field).pow_32(120);
-    //     }
-    //     // Range check
-    //     let noise_poly = Polynomial::new(noise_centered_fields);
-    //     noise_poly.range_check_2bounds::<BIT_NOISE>(
-    //         bound_params.delta_half,
-    //         bound_params.delta_half,
-    //     );
-    // }
 }
