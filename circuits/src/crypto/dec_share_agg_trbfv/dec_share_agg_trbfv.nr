@@ -1,13 +1,8 @@
-use crate::math::modular_fns::{div_mod, mul_mod, reduce_mod, sub};
-
+use crate::math::modular_fns::{div_mod, mul_mod, reduce_mod};
 use crate::math::polynomial::Polynomial;
 use dep::bignum::BigNum;
-use dep::bignum::BigNum::__invmod;
-use dep::bignum::BigNum::umod;
 use dep::bignum::bignum::to_field;
-use dep::bignum::Enclave_100;
-use dep::bignum::Enclave_100_Pt_Mod;
-use bignum::fields::enclave_100_pt_mod;
+use dep::bignum::Enclave_TRBFV_8192;
 
 /// Cryptographic parameters for decryption share aggregation circuit.
 pub struct CryptographicParams<let L: u32> {
@@ -331,16 +326,16 @@ impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggr
         }
 
         // For centered arithmetic
-        let q_bn = Enclave_100::from(q_modulus);
+        let q_bn = Enclave_TRBFV_8192::from(q_modulus);
 
-        let q_half_bn = q_bn.udiv(Enclave_100::from(2));
+        let q_half_bn = q_bn.udiv(Enclave_TRBFV_8192::from(2));
 
         std::println("=== Alternative Decoding Verification ===");
 
         for coeff_idx in 0..N {
             // Compute (t * u_global) mod Q using BigNum
-            let u_bn_q = Enclave_100::from(self.u_global.coefficients[coeff_idx]);
-            let t_bn_q = Enclave_100::from(t);
+            let u_bn_q = Enclave_TRBFV_8192::from(self.u_global.coefficients[coeff_idx]);
+            let t_bn_q = Enclave_TRBFV_8192::from(t);
             let t_times_u_bn_q = t_bn_q * u_bn_q;
 
             // Check if centering is needed
