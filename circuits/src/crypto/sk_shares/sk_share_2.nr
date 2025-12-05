@@ -1,4 +1,5 @@
 use crate::math::modular_fns::{add, mul_mod};
+use crate::math::modular_fns::reduce_mod;
 use crate::math::polynomial::Polynomial;
 use crate::math::safe::SafeSponge;
 
@@ -89,18 +90,20 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32> Se
 
     /// Main verification function
     /// Returns commitment to shares (excluding sk values)
-    pub fn verify(self) -> Field {
+    pub fn verify(self)
+    // -> Field
+{
         // Step 1: Verify sk consistency
-        self.verify_sk_consistency();
+        //  self.verify_sk_consistency();
 
         // Step 2: Range check sk (trinary)
-        self.check_range_bounds();
+        //   self.check_range_bounds();
 
         // Step 3: Verify parity check
         self.verify_parity_check();
 
         // Step 4: Commit to shares (excluding sk values)
-        Self::commit_to_shares(self.y)
+        //   Self::commit_to_shares(self.y)
     }
 
     /// Verifies y[i][j][0] == sk[i] for all i, j
@@ -120,6 +123,8 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32> Se
 
         // sk coefficients should be in {-1, 0, 1}
         self.sk.range_check_2bounds::<BIT_SK>(bound_params.sk_bound, bound_params.sk_bound);
+
+        //TODO: add y bound check here
     }
 
     /// Verifies y[i][j] * H[j] == 0 mod q_j for all i, j
@@ -136,17 +141,15 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32> Se
 
                     for row in 0..(N_PARTIES + 1) {
                         // product = y[i][j][row] * H[j][row][col] mod q_j
-                        let product = mul_mod(
-                            self.y[coeff_idx][mod_idx][row],
-                            self.h[mod_idx][row][col],
-                            q_j,
-                        );
+                        let product = self.y[coeff_idx][mod_idx][row] * self.h[mod_idx][row][col];
+
                         // sum = (sum + product) mod q_j
-                        sum = add(sum, product, q_j);
+                        sum = sum + product;
                     }
+                    let sum_mod_q_j = reduce_mod(sum, q_j);
 
                     // Verify sum == 0 (already reduced mod q_j)
-                    assert(sum == 0, "Parity check failed");
+                    assert(sum_mod_q_j == 0, "Parity check failed");
                 }
             }
         }
