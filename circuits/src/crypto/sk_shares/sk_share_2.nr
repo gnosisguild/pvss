@@ -66,7 +66,7 @@ impl<let L: u32> Params<L> {
 /// * `N_PARTIES` - Number of parties (shares per coefficient)
 /// * `T` - Threshold (degree of sharing polynomial)
 /// * `BIT_SK` - Bit width for secret key bounds
-pub struct SecretKeySharesVerificationCircuit<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32> {
+pub struct SecretKeySharesVerificationCircuit<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32, let BIT_Y: u32> {
     params: Params<L>,
     /// Secret key polynomial (trinary coefficients)
     sk: Polynomial<N>,
@@ -78,7 +78,7 @@ pub struct SecretKeySharesVerificationCircuit<let N: u32, let L: u32, let N_PART
     h: [[[Field; N_PARTIES + 1 - T]; N_PARTIES + 1]; L],
 }
 
-impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32> SecretKeySharesVerificationCircuit<N, L, N_PARTIES, T, BIT_SK> {
+impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32, let BIT_Y: u32> SecretKeySharesVerificationCircuit<N, L, N_PARTIES, T, BIT_SK, BIT_Y> {
     pub fn new(
         params: Params<L>,
         sk: Polynomial<N>,
@@ -90,20 +90,18 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32> Se
 
     /// Main verification function
     /// Returns commitment to shares (excluding sk values)
-    pub fn verify(self)
-    // -> Field
-{
+    pub fn verify(self) -> Field {
         // Step 1: Verify sk consistency
-        //  self.verify_sk_consistency();
+        self.verify_sk_consistency();
 
         // Step 2: Range check sk (trinary)
-        //   self.check_range_bounds();
+        self.check_range_bounds();
 
         // Step 3: Verify parity check
         self.verify_parity_check();
 
         // Step 4: Commit to shares (excluding sk values)
-        //   Self::commit_to_shares(self.y)
+        Self::commit_to_shares(self.y)
     }
 
     /// Verifies y[i][j][0] == sk[i] for all i, j
@@ -118,13 +116,26 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32> Se
     }
 
     /// Range check for trinary sk coefficients
+    /// Range checks for sk and shares
     fn check_range_bounds(self) {
         let bound_params = self.params.bound_params();
+        let crypto_params = self.params.crypto_params();
 
-        // sk coefficients should be in {-1, 0, 1}
+        // Check sk coefficients (trinary)
         self.sk.range_check_2bounds::<BIT_SK>(bound_params.sk_bound, bound_params.sk_bound);
 
-        //TODO: add y bound check here
+        // Check shares: y[i][j][k] for k >= 1 should be in [0, q_j)
+        for mod_idx in 0..L {
+            let q_j = crypto_params.qis[mod_idx];
+
+            for coeff_idx in 0..N {
+                for party_idx in 1..(N_PARTIES + 1) {
+                    let share = self.y[coeff_idx][mod_idx][party_idx];
+                    share.assert_max_bit_size::<BIT_Y>();
+                    (q_j - 1 - share).assert_max_bit_size::<BIT_Y>();
+                }
+            }
+        }
     }
 
     /// Verifies y[i][j] * H[j] == 0 mod q_j for all i, j
