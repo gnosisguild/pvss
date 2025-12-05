@@ -105,8 +105,9 @@ pub struct Greco<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let B
     ct1is: [Polynomial<N>; L],
     u: Polynomial<N>,
     e0: Polynomial<N>,
-    e1: Polynomial<N>,
     e0is: [Polynomial<N>; L],
+    e0_quotients: [Polynomial<N>; L],
+    e1: Polynomial<N>,
     k1: Polynomial<N>,
     r1is: [Polynomial<(2 * N) - 1>; L],
     r2is: [Polynomial<N - 1>; L],
@@ -115,6 +116,30 @@ pub struct Greco<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let B
 }
 
 impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_K: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> Greco<N, L, BIT_PK, BIT_CT, BIT_U, BIT_E0, BIT_E1, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
+    /// Creates a new Greco instance.
+    ///
+    /// This constructor initializes all the polynomials and parameters needed for
+    /// the zero-knowledge proof of correct ciphertext formation.
+    ///
+    /// # Arguments
+    /// * `params` - Cryptographic parameters including bounds and moduli
+    /// * `pk0is` - Public key polynomials pk0i = [ai*s + E] for each CRT basis
+    /// * `pk1is` - Public key polynomials pk1i = -[ai] for each CRT basis
+    /// * `ct0is` - First ciphertext component for each CRT basis
+    /// * `ct1is` - Second ciphertext component for each CRT basis
+    /// * `u` - Secret polynomial from ternary distribution
+    /// * `e0` - Error polynomial sampled from discrete Gaussian distribution
+    /// * `e0is` - CRT decomposition of e0 for each CRT basis
+    /// * `e0_quotients` - Quotient witnesses for CRT checking of e0
+    /// * `e1` - Error polynomial sampled from discrete Gaussian distribution
+    /// * `k1` - Scaled message polynomial
+    /// * `r1is` - Randomness polynomials for ct0 computation
+    /// * `r2is` - Randomness polynomials for ct0 computation
+    /// * `p1is` - Randomness polynomials for ct1 computation
+    /// * `p2is` - Randomness polynomials for ct1 computation
+    ///
+    /// # Returns
+    /// A new Greco instance ready for constraint checking
     pub fn new(
         constants: Constants<N, L>,
         pk_commitment: Field,
@@ -124,8 +149,9 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         ct1is: [Polynomial<N>; L],
         u: Polynomial<N>,
         e0: Polynomial<N>,
-        e1: Polynomial<N>,
         e0is: [Polynomial<N>; L],
+        e0_quotients: [Polynomial<N>; L],
+        e1: Polynomial<N>,
         k1: Polynomial<N>,
         r1is: [Polynomial<2 * N - 1>; L],
         r2is: [Polynomial<N - 1>; L],
@@ -141,19 +167,15 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
             ct1is,
             u,
             e0,
-            e1,
             e0is,
+            e0_quotients,
+            e1,
             k1,
             r1is,
             r2is,
             p1is,
             p2is,
         }
-    }
-
-    pub fn verify(self) -> bool {
-        self.check_range_bounds();
-        self.verify_evaluations(self.generate_challenge())
     }
 
     fn commitment_payload(self) -> Vec<Field> {
@@ -188,6 +210,77 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         inputs
     }
 
+    /// Performs coefficient-wise CRT consistency check for e0 polynomial.
+    ///
+    /// Verifies that for each CRT basis i and each coefficient j:
+    /// e0.coefficients[j] = e0is[i].coefficients[j] + e0_quotients[i].coefficients[j] * qi
+    ///
+    /// This ensures that e0 == e0is[i] (mod qi) for all coefficients, which is
+    /// much more secure than checking equality at a single evaluation point.
+    ///
+    /// # Security
+    /// Coefficient-wise checking prevents attacks where a malicious prover could
+    /// construct different polynomials that happen to evaluate to the same value
+    /// at a single challenge point.
+    fn check_e0_crt_consistency(self) {
+        for i in 0..L {
+            // Check each coefficient satisfies the CRT relationship
+            for j in 0..N {
+                // Verify: e0_coeff = e0i_coeff + quotient_coeff * qi
+                assert(
+                    self.e0.coefficients[j]
+                        == self.e0is[i].coefficients[j]
+                            + self.e0_quotients[i].coefficients[j] * self.constants.qis[i],
+                );
+            }
+        }
+    }
+
+    /// Verifies the correct encryption constraints for the Greco circuit.
+    ///
+    /// This function implements the core zero-knowledge proof by checking:
+    /// 1. Binary constraint on k1 polynomial
+    /// 2. Range constraints on all polynomials coefficients
+    /// 3. CRT consistency for e0 polynomial
+    /// 4. Correct encryption equations
+    ///
+    /// The proof uses the Schwartz-Zippel lemma: if polynomial equations hold
+    /// when evaluated at random points, then the polynomials are identical with
+    /// high probability.
+    ///
+    /// # Encryption Equations
+    /// For each CRT basis i:
+    /// * ct0i(gamma) = pk0i(gamma) * u(gamma) + e0(gamma) + k1(gamma) * k0i + r1i(gamma) * qi + r2i(gamma) * cyclo
+    /// * ct1i(gamma) = pk1i(gamma) * u(gamma) + e1(gamma) + p1i(gamma) * qi + p2i(gamma) * cyclo
+    ///
+    /// Where:
+    /// * cyclo(gamma) = gamma^N + 1 (cyclotomic polynomial)
+    /// * qi, k0i are constants from the cryptographic parameters
+    /// * r1i, r2i, p1i, p2i are randomness polynomials for each i-th CRT basis.
+    ///
+    /// # Returns
+    /// True if the encryption constraints are satisfied, false otherwise.
+    pub fn verify(self) -> bool {
+        // Step 1: Perform range checks on all polynomial coefficients
+        self.check_range_bounds();
+
+        // Step 2: Check CRT consistency for e0 polynomial
+        self.check_e0_crt_consistency();
+
+        // Step 3: Generate Fiat-Shamir challenges
+        let gammas = self.generate_challenge();
+
+        // Step 4: Verify encryption constraints using challenges
+        self.verify_evaluations(gammas)
+    }
+
+    /// Performs range checks on all polynomial coefficients
+    ///
+    /// Checks that all polynomial coefficients are within their expected bounds.
+    /// This prevents attacks where coefficients are outside the valid range.
+    ///
+    /// # Returns
+    /// True if the range bounds are satisfied, false otherwise.
     fn check_range_bounds(self) {
         let bound_params = self.constants.bounds;
 

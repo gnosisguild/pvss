@@ -5,3 +5,4 @@ authors = [""]
 
 [dependencies]
 circuits = { path = "../../circuits" }
+constants = { path = "../../constants" }
