@@ -192,11 +192,11 @@ unconstrained fn unconstrained_check_coefficient<let BIT: u32>(
     let max_value = 2.pow_32((BIT + 1) as Field);
 
     // Check if shifted fits in BIT+1 bits
-    let shifted_fits = (shifted as u64) < (max_value as u64);
+    let shifted_fits = (shifted as u128) < (max_value as u128);
 
     // Check if (range_size - shifted) fits in BIT+1 bits
     let range_diff = range_size - shifted;
-    let range_fits = (range_diff as u64) < (max_value as u64);
+    let range_fits = (range_diff as u128) < (max_value as u128);
 
     // Both checks must pass for this coefficient to be in range
     let check_passed = if shifted_fits { range_fits } else { false };
