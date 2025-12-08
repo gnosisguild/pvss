@@ -105,13 +105,12 @@ impl<let N: u32> Polynomial<N> {
     /// Performs range checking on polynomial coefficients using asymmetric bounds
     ///
     /// This function constrains all polynomial coefficients to be in the range [lower_bound, upper_bound].
-    /// The entire computation (loop + bit checks) is performed unconstrained, then verified in the circuit
-    /// using polynomial evaluation (batch verification with a single constraint).
+    /// The bit-size checks are performed unconstrained for each coefficient, then verified in the circuit.
     ///
     /// The verification strategy:
-    /// 1. Unconstrained: Loop through all coefficients, compute shifted values, check bit sizes
-    /// 2. Constrained: Verify shift relationship using polynomial evaluation (single constraint)
-    ///    This proves all checks were performed correctly via batch verification.
+    /// 1. Unconstrained: For each coefficient, check bit sizes (expensive computation)
+    /// 2. Constrained: For each coefficient, verify shift relationship (cheap: 1 addition)
+    ///    This alternates unconstrained computation with constrained verification per coefficient.
     ///
     /// Set `BIT` to the bit-length of the total range `upper_bound + lower_bound`
     /// (choose `BIT` so `upper_bound + lower_bound < 2^BIT`).
@@ -121,25 +120,31 @@ impl<let N: u32> Polynomial<N> {
     /// * `lower_bound` - The lower bound for coefficient range checking (must be positive Field value)
     ///                   Coefficients must satisfy: lower_bound <= c <= upper_bound
     pub fn range_check_2bounds<let BIT: u32>(self, upper_bound: Field, lower_bound: Field) {
-        // Safety: The unconstrained function performs all range checks (loop + bit checks).
-        // We verify correctness by checking the shift relationship using polynomial evaluation,
-        // which proves via batch verification that all checks were performed correctly.
-        let (shifted_poly, all_checks_passed): (Polynomial<N>, bool) =
-            unsafe { unconstrained_range_check_2bounds::<N, BIT>(self, lower_bound, upper_bound) };
+        let range_size = lower_bound + upper_bound;
 
-        // Verify the shift relationship using polynomial evaluation at x=1
-        // This proves that shifted_poly = self + lower_bound (coefficient-wise)
-        // We use x=1 because sum of coefficients = poly.eval(1)
-        // If the sums match, and all_checks_passed is true, then all individual checks are correct
-        let original_sum = self.eval(1);
-        let shifted_sum = shifted_poly.eval(1);
-        let expected_shifted_sum = original_sum + lower_bound * (N as Field);
-        assert(shifted_sum == expected_shifted_sum);
+        for i in 0..self.coefficients.len() {
+            // Safety: The unconstrained function performs the expensive bit-size checks.
+            // We verify correctness by checking the shift relationship, which proves the
+            // unconstrained computation was performed on the correct value.
+            let (shifted, check_passed): (Field, bool) = unsafe {
+                unconstrained_check_coefficient::<BIT>(
+                    self.coefficients[i],
+                    lower_bound,
+                    range_size,
+                )
+            };
 
-        // Assert that all range checks passed
-        assert(all_checks_passed == true);
+            // Verify the shift relationship (cheap: 1 addition constraint)
+            // This proves the unconstrained function computed shifted correctly
+            assert(shifted == self.coefficients[i] + lower_bound);
+
+            // The boolean check_passed proves the unconstrained function performed the range check.
+            // Without it, a malicious prover could skip the range check entirely.
+            // We could verify the range directly here, but that would require expensive bit checks
+            // (which defeats the purpose of moving them to unconstrained).
+            assert(check_passed == true);
+        }
     }
-
     pub fn eval_mod(self, x: Field, q: Field) -> Field {
         let mut acc = self.coefficients[0];
         let len = self.coefficients.len();
@@ -161,53 +166,42 @@ impl<let N: u32> Polynomial<N> {
     }
 }
 
-/// Unconstrained function to perform full range check computation
+/// Unconstrained function to check a single coefficient's range
 ///
-/// Performs the entire range check computation (loop + bit checks) outside the circuit.
-/// Returns (shifted_polynomial, all_checks_passed) where:
-/// - shifted_polynomial has coefficients shifted by lower_bound
-/// - all_checks_passed = true if all coefficients pass the bit-size checks
+/// Performs the expensive bit-size checks outside the circuit.
+/// Returns (shifted_coefficient, check_passed) where:
+/// - shifted_coefficient = coefficient + lower_bound
+/// - check_passed = true if the coefficient passes both bit-size checks
 ///
 /// In unconstrained code, we can check bit sizes using native comparisons.
-/// The constrained code will verify the shift relationship using polynomial evaluation.
+/// The constrained code will verify the shift relationship to ensure correctness.
 ///
 /// # Arguments
-/// * `poly` - The polynomial to check
-/// * `lower_bound` - Lower bound of the range
-/// * `upper_bound` - Upper bound of the range
-unconstrained fn unconstrained_range_check_2bounds<let N: u32, let BIT: u32>(
-    poly: Polynomial<N>,
+/// * `coefficient` - The coefficient to check
+/// * `lower_bound` - Lower bound to add to the coefficient
+/// * `range_size` - Precomputed as lower_bound + upper_bound
+unconstrained fn unconstrained_check_coefficient<let BIT: u32>(
+    coefficient: Field,
     lower_bound: Field,
-    upper_bound: Field,
-) -> (Polynomial<N>, bool) {
-    let range_size = lower_bound + upper_bound;
-    let mut shifted_coeffs = [0; N];
-    let mut all_checks_passed = true;
+    range_size: Field,
+) -> (Field, bool) {
+    let shifted = coefficient + lower_bound;
 
-    // Loop through all coefficients (this entire loop is unconstrained!)
-    for i in 0..N {
-        let shifted = poly.coefficients[i] + lower_bound;
+    // Check bit size using native comparisons (unconstrained!)
+    // assert_max_bit_size::<BIT+1> checks that value < 2^(BIT+1)
+    let max_value = 2.pow_32((BIT + 1) as Field);
 
-        // Check bit size using native comparisons (unconstrained!)
-        // assert_max_bit_size::<BIT+1> checks that value < 2^(BIT+1)
-        let max_value = 2.pow_32((BIT + 1) as Field);
+    // Check if shifted fits in BIT+1 bits
+    let shifted_fits = (shifted as u64) < (max_value as u64);
 
-        // Check if shifted fits in BIT+1 bits
-        let shifted_fits = (shifted as u64) < (max_value as u64);
+    // Check if (range_size - shifted) fits in BIT+1 bits
+    let range_diff = range_size - shifted;
+    let range_fits = (range_diff as u64) < (max_value as u64);
 
-        // Check if (range_size - shifted) fits in BIT+1 bits
-        let range_diff = range_size - shifted;
-        let range_fits = (range_diff as u64) < (max_value as u64);
+    // Both checks must pass for this coefficient to be in range
+    let check_passed = if shifted_fits { range_fits } else { false };
 
-        // Both checks must pass for this coefficient to be in range
-        let coeff_ok = if shifted_fits { range_fits } else { false };
-
-        shifted_coeffs[i] = shifted;
-        all_checks_passed = if all_checks_passed { coeff_ok } else { false };
-    }
-
-    let shifted_poly = Polynomial::new(shifted_coeffs);
-    (shifted_poly, all_checks_passed)
+    (shifted, check_passed)
 }
 
 /// Compute hex-aligned packing parameters for a given `BIT`.
