@@ -4,12 +4,12 @@ use circuits::{
 };
 
 fn main(
-    params: Params<4>,
-    sk: Polynomial<8192>,
-    y: [[[Field; 6]; 4]; 8192],
-    h: [[[Field; 6]; 3]; 4],
+    params: Params<2>,
+    sk: Polynomial<512>,
+    y: [[[Field; 6]; 2]; 512],
+    h: [[[Field; 6]; 3]; 2],
 ) -> pub Field {
-    let sk_shares: SecretKeySharesVerificationCircuit<8192, 4, 5, 2, 2, 54> =
+    let sk_shares: SecretKeySharesVerificationCircuit<512, 2, 5, 2, 2, 37> =
         SecretKeySharesVerificationCircuit::new(params, sk, y, h);
 
     sk_shares.verify()

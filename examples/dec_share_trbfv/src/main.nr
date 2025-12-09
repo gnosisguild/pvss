@@ -3,16 +3,16 @@ use circuits::{
     math::polynomial::Polynomial,
 };
 fn main(
-    params: Params<8192, 4>,
-    c_0: [Polynomial<8192>; 4],
-    c_1: [Polynomial<8192>; 4],
-    s: [Polynomial<8192>; 4],
-    e: [Polynomial<8192>; 4],
-    r_1: [Polynomial<16383>; 4],
-    r_2: [Polynomial<8191>; 4],
-    d: [Polynomial<8192>; 4],
+    params: Params<512, 2>,
+    c_0: [Polynomial<512>; 2],
+    c_1: [Polynomial<512>; 2],
+    s: [Polynomial<512>; 2],
+    e: [Polynomial<512>; 2],
+    r_1: [Polynomial<1023>; 2],
+    r_2: [Polynomial<511>; 2],
+    d: [Polynomial<512>; 2],
 ) {
-    let dec_share: DecryptionShareCorrectness<8192, 4, 56, 56, 56, 68, 56, 56> =
+    let dec_share: DecryptionShareCorrectness<512, 2, 36, 36, 36, 44, 36, 36> =
         DecryptionShareCorrectness::new(params, c_0, c_1, s, e, r_1, r_2, d);
 
     dec_share.verify_decryption_share_correctness();

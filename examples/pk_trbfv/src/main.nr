@@ -4,16 +4,16 @@ use circuits::{
 };
 
 fn main(
-    params: Params<8192, 4>,
-    a: [Polynomial<8192>; 4],
-    eek: Polynomial<8192>,
-    sk: Polynomial<8192>,
-    r1is: [Polynomial<16383>; 4],
-    r2is: [Polynomial<8191>; 4],
-    pk0is: [Polynomial<8192>; 4],
-    pk1is: [Polynomial<8192>; 4],
+    params: Params<512, 2>,
+    a: [Polynomial<512>; 2],
+    eek: Polynomial<512>,
+    sk: Polynomial<512>,
+    r1is: [Polynomial<1023>; 2],
+    r2is: [Polynomial<511>; 2],
+    pk0is: [Polynomial<512>; 2],
+    pk1is: [Polynomial<512>; 2],
 ) {
-    let pk_trbfv: BfvPublicKeyCircuit<8192, 4, 6, 2, 18, 56> =
+    let pk_trbfv: BfvPublicKeyCircuit<512, 2, 6, 2, 14, 36> =
         BfvPublicKeyCircuit::new(params, a, eek, sk, r1is, r2is, pk0is, pk1is);
 
     pk_trbfv.verify_correct_public_key();

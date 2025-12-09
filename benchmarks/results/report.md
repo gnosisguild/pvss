@@ -1,9 +1,9 @@
 # PVSS Circuit Benchmarks
 
-**Generated:** 2025-11-12 16:29:43 UTC
+**Generated:** 2025-12-09 15:24:46 UTC
 
-**Git Branch:** `benchmarks`  
-**Git Commit:** `ae1a8af6b32279a665f544101cde3059d2300833`
+**Git Branch:** `dummy-parameters`  
+**Git Commit:** `0f9d959eaddfbed16d09e3d9d721722929430b04`
 
 ---
 
@@ -13,103 +13,157 @@
 
 | Circuit | Compile | Execute | Prove | Verify | Status |
 |---------|---------|---------|-------|--------|--------|
-| dec_share_trbfv | 663.39 s | 5.70 s | 13.54 s | 0.02 s | ✅ |
-| enc_bfv | 392.92 s | 5.13 s | 11.59 s | 0.02 s | ✅ |
-| enc_trbfv | 650.82 s | 8.57 s | 19.29 s | 0.02 s | ✅ |
-| pk_bfv | 39.56 s | 2.22 s | 3.49 s | 0.02 s | ✅ |
-| pk_trbfv | 93.64 s | 4.00 s | 6.62 s | 0.01 s | ✅ |
+| dec_bfv_no_hom_add | 41.39 s | 2.38 s | 5.83 s | 0.02 s | ✅ |
+| dec_share_agg_trbfv | 0.27 s | 0.25 s | 0.13 s | 0.02 s | ✅ |
+| dec_share_trbfv | 1.38 s | 0.38 s | 0.52 s | 0.02 s | ✅ |
+| enc_bfv | 1.27 s | 0.38 s | 0.51 s | 0.02 s | ✅ |
+| enc_trbfv | 1.96 s | 0.47 s | 0.57 s | 0.02 s | ✅ |
+| pk_bfv | 0.63 s | 0.29 s | 0.22 s | 0.02 s | ✅ |
+| pk_trbfv | 0.94 s | 0.34 s | 0.33 s | 0.02 s | ✅ |
+| sk_share_2 | 5.63 s | 0.50 s | 1.56 s | 0.02 s | ✅ |
 
 ### Size & Circuit Metrics
 
 | Circuit | Opcodes | Gates | Circuit Size | Witness | VK Size | Proof Size |
 |---------|---------|-------|--------------|---------|---------|------------|
-| dec_share_trbfv | 1012169 | 3.63M | 13.63 MB | 23.13 MB | 1.72 KB | 14.25 KB |
-| enc_bfv | 927119 | 2.80M | 12.04 MB | 16.34 MB | 1.72 KB | 14.25 KB |
-| enc_trbfv | 1651809 | 4.22M | 21.35 MB | 28.06 MB | 1.72 KB | 14.25 KB |
-| pk_bfv | 406845 | 816.16K | 5.46 MB | 7.58 MB | 1.72 KB | 14.25 KB |
-| pk_trbfv | 743569 | 1.45M | 9.95 MB | 14.68 MB | 1.72 KB | 14.25 KB |
+| dec_bfv_no_hom_add | 632505 | 1.54M | 8.99 MB | 3.94 MB | 3.59 KB | 15.88 KB |
+| dec_share_agg_trbfv | 2827 | 9.63K | 74.34 KB | 6.73 KB | 3.59 KB | 15.88 KB |
+| dec_share_trbfv | 30567 | 83.33K | 509.29 KB | 522.59 KB | 3.59 KB | 15.88 KB |
+| enc_bfv | 33760 | 78.57K | 541.99 KB | 447.20 KB | 3.59 KB | 15.88 KB |
+| enc_trbfv | 56591 | 106.63K | 829.87 KB | 705.91 KB | 3.59 KB | 15.88 KB |
+| pk_bfv | 14659 | 29.02K | 310.32 KB | 204.07 KB | 3.59 KB | 15.88 KB |
+| pk_trbfv | 25141 | 44.36K | 448.77 KB | 384.27 KB | 3.59 KB | 15.88 KB |
+| sk_share_2 | 92868 | 339.02K | 1.45 MB | 463.77 KB | 3.59 KB | 15.88 KB |
 
 ## Circuit Details
+
+### dec_bfv_no_hom_add
+
+| Metric | Value |
+|--------|-------|
+| **Compilation** | 41.39 s |
+| **Execution** | 2.38 s |
+| **VK Generation** | 2.66 s |
+| **Proof Generation** | 5.83 s |
+| **Verification** | 0.02 s |
+| **ACIR Opcodes** | 632505 |
+| **Total Gates** | 1538812 |
+| **Circuit Size** | 8.99 MB |
+| **Witness Size** | 3.94 MB |
+| **VK Size** | 3.59 KB |
+| **Proof Size** | 15.88 KB |
+
+### dec_share_agg_trbfv
+
+| Metric | Value |
+|--------|-------|
+| **Compilation** | 0.27 s |
+| **Execution** | 0.25 s |
+| **VK Generation** | 0.05 s |
+| **Proof Generation** | 0.13 s |
+| **Verification** | 0.02 s |
+| **ACIR Opcodes** | 2827 |
+| **Total Gates** | 9634 |
+| **Circuit Size** | 74.34 KB |
+| **Witness Size** | 6.73 KB |
+| **VK Size** | 3.59 KB |
+| **Proof Size** | 15.88 KB |
 
 ### dec_share_trbfv
 
 | Metric | Value |
 |--------|-------|
-| **Compilation** | 663.39 s |
-| **Execution** | 5.70 s |
-| **VK Generation** | 8.87 s |
-| **Proof Generation** | 13.54 s |
+| **Compilation** | 1.38 s |
+| **Execution** | 0.38 s |
+| **VK Generation** | 0.19 s |
+| **Proof Generation** | 0.52 s |
 | **Verification** | 0.02 s |
-| **ACIR Opcodes** | 1012169 |
-| **Total Gates** | 3631029 |
-| **Circuit Size** | 13.63 MB |
-| **Witness Size** | 23.13 MB |
-| **VK Size** | 1.72 KB |
-| **Proof Size** | 14.25 KB |
+| **ACIR Opcodes** | 30567 |
+| **Total Gates** | 83328 |
+| **Circuit Size** | 509.29 KB |
+| **Witness Size** | 522.59 KB |
+| **VK Size** | 3.59 KB |
+| **Proof Size** | 15.88 KB |
 
 ### enc_bfv
 
 | Metric | Value |
 |--------|-------|
-| **Compilation** | 392.92 s |
-| **Execution** | 5.13 s |
-| **VK Generation** | 8.07 s |
-| **Proof Generation** | 11.59 s |
+| **Compilation** | 1.27 s |
+| **Execution** | 0.38 s |
+| **VK Generation** | 0.18 s |
+| **Proof Generation** | 0.51 s |
 | **Verification** | 0.02 s |
-| **ACIR Opcodes** | 927119 |
-| **Total Gates** | 2799406 |
-| **Circuit Size** | 12.04 MB |
-| **Witness Size** | 16.34 MB |
-| **VK Size** | 1.72 KB |
-| **Proof Size** | 14.25 KB |
+| **ACIR Opcodes** | 33760 |
+| **Total Gates** | 78568 |
+| **Circuit Size** | 541.99 KB |
+| **Witness Size** | 447.20 KB |
+| **VK Size** | 3.59 KB |
+| **Proof Size** | 15.88 KB |
 
 ### enc_trbfv
 
 | Metric | Value |
 |--------|-------|
-| **Compilation** | 650.82 s |
-| **Execution** | 8.57 s |
-| **VK Generation** | 13.48 s |
-| **Proof Generation** | 19.29 s |
+| **Compilation** | 1.96 s |
+| **Execution** | 0.47 s |
+| **VK Generation** | 0.23 s |
+| **Proof Generation** | 0.57 s |
 | **Verification** | 0.02 s |
-| **ACIR Opcodes** | 1651809 |
-| **Total Gates** | 4220240 |
-| **Circuit Size** | 21.35 MB |
-| **Witness Size** | 28.06 MB |
-| **VK Size** | 1.72 KB |
-| **Proof Size** | 14.25 KB |
+| **ACIR Opcodes** | 56591 |
+| **Total Gates** | 106631 |
+| **Circuit Size** | 829.87 KB |
+| **Witness Size** | 705.91 KB |
+| **VK Size** | 3.59 KB |
+| **Proof Size** | 15.88 KB |
 
 ### pk_bfv
 
 | Metric | Value |
 |--------|-------|
-| **Compilation** | 39.56 s |
-| **Execution** | 2.22 s |
-| **VK Generation** | 2.26 s |
-| **Proof Generation** | 3.49 s |
+| **Compilation** | 0.63 s |
+| **Execution** | 0.29 s |
+| **VK Generation** | 0.09 s |
+| **Proof Generation** | 0.22 s |
 | **Verification** | 0.02 s |
-| **ACIR Opcodes** | 406845 |
-| **Total Gates** | 816163 |
-| **Circuit Size** | 5.46 MB |
-| **Witness Size** | 7.58 MB |
-| **VK Size** | 1.72 KB |
-| **Proof Size** | 14.25 KB |
+| **ACIR Opcodes** | 14659 |
+| **Total Gates** | 29020 |
+| **Circuit Size** | 310.32 KB |
+| **Witness Size** | 204.07 KB |
+| **VK Size** | 3.59 KB |
+| **Proof Size** | 15.88 KB |
 
 ### pk_trbfv
 
 | Metric | Value |
 |--------|-------|
-| **Compilation** | 93.64 s |
-| **Execution** | 4.00 s |
-| **VK Generation** | 4.77 s |
-| **Proof Generation** | 6.62 s |
-| **Verification** | 0.01 s |
-| **ACIR Opcodes** | 743569 |
-| **Total Gates** | 1449473 |
-| **Circuit Size** | 9.95 MB |
-| **Witness Size** | 14.68 MB |
-| **VK Size** | 1.72 KB |
-| **Proof Size** | 14.25 KB |
+| **Compilation** | 0.94 s |
+| **Execution** | 0.34 s |
+| **VK Generation** | 0.12 s |
+| **Proof Generation** | 0.33 s |
+| **Verification** | 0.02 s |
+| **ACIR Opcodes** | 25141 |
+| **Total Gates** | 44361 |
+| **Circuit Size** | 448.77 KB |
+| **Witness Size** | 384.27 KB |
+| **VK Size** | 3.59 KB |
+| **Proof Size** | 15.88 KB |
+
+### sk_share_2
+
+| Metric | Value |
+|--------|-------|
+| **Compilation** | 5.63 s |
+| **Execution** | 0.50 s |
+| **VK Generation** | 0.60 s |
+| **Proof Generation** | 1.56 s |
+| **Verification** | 0.02 s |
+| **ACIR Opcodes** | 92868 |
+| **Total Gates** | 339024 |
+| **Circuit Size** | 1.45 MB |
+| **Witness Size** | 463.77 KB |
+| **VK Size** | 3.59 KB |
+| **Proof Size** | 15.88 KB |
 
 ## System Information
 
@@ -123,6 +177,6 @@
 
 ### Software
 
-- **Nargo Version:** nargo version = 1.0.0-beta.12 noirc version = 1.0.0-beta.12+9a5b3695b42e391fa27c48e87b9bbb07523d664d (git version hash: 9a5b3695b42e391fa27c48e87b9bbb07523d664d, is dirty: false) 
-- **Barretenberg Version:** v0.87.0 
+- **Nargo Version:** nargo version = 1.0.0-beta.16 noirc version = 1.0.0-beta.16+2d46fca7203545cbbfb31a0d0328de6c10a8db95 (git version hash: 2d46fca7203545cbbfb31a0d0328de6c10a8db95, is dirty: false) 
+- **Barretenberg Version:** 3.0.0-nightly.20251104 
 
