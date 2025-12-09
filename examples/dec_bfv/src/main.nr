@@ -4,9 +4,9 @@ use circuits::{
 };
 
 fn main(
-    params: Params<8192, 3, 2>,
-    honest_c0: [[Polynomial<8192>; 2]; 3],
-    honest_c1: [[Polynomial<8192>; 2]; 3],
+    params: Params<8192, 5, 2>,
+    honest_c0: [[Polynomial<8192>; 2]; 5],
+    honest_c1: [[Polynomial<8192>; 2]; 5],
     sum_c0: [Polynomial<8192>; 2],
     sum_c1: [Polynomial<8192>; 2],
     s: [Polynomial<8192>; 2],
@@ -20,7 +20,7 @@ fn main(
     // TODO: Your logic here...
 
     // Create Honest Ciphertext Aggregation Decryption circuit instance
-    let dec_bfv: HonestCiphertextAggregationDecryption<8192, 3, 2, 57, 2, 114, 15, 57, 59> = HonestCiphertextAggregationDecryption::new(
+    let dec_bfv: HonestCiphertextAggregationDecryption<8192, 5, 2, 57, 2, 114, 15, 57, 59> = HonestCiphertextAggregationDecryption::new(
         params,
         honest_c0,
         honest_c1,

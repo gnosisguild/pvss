@@ -9,7 +9,6 @@ use crate::math::safe::SafeSponge;
 
 /// PLEASE NOTE THIS VERSION OF GRECO IS JUST USED FOR DEVELOPMENT.
 /// REFER TO THE ORIGINAL GRECO CIRCUIT FOR THE PRODUCTION VERSION IN ENCLAVE MONOREPO.
-
 /// Cryptographic parameters for Greco circuit.
 /// Contains the core mathematical constants used in the encryption scheme.
 pub struct CryptographicParams<let L: u32> {
@@ -191,8 +190,9 @@ pub struct Greco<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let B
     ct1is: [Polynomial<N>; L],
     u: Polynomial<N>,
     e0: Polynomial<N>,
-    e1: Polynomial<N>,
     e0is: [Polynomial<N>; L],
+    e0_quotients: [Polynomial<N>; L],
+    e1: Polynomial<N>,
     k1: Polynomial<N>,
     r1is: [Polynomial<(2 * N) - 1>; L],
     r2is: [Polynomial<N - 1>; L],
@@ -214,6 +214,8 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     /// * `ct1is` - Second ciphertext component for each CRT basis
     /// * `u` - Secret polynomial from ternary distribution
     /// * `e0` - Error polynomial sampled from discrete Gaussian distribution
+    /// * `e0is` - CRT decomposition of e0 for each CRT basis
+    /// * `e0_quotients` - Quotient witnesses for CRT checking of e0
     /// * `e1` - Error polynomial sampled from discrete Gaussian distribution
     /// * `k1` - Scaled message polynomial
     /// * `r1is` - Randomness polynomials for ct0 computation
@@ -231,15 +233,32 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         ct1is: [Polynomial<N>; L],
         u: Polynomial<N>,
         e0: Polynomial<N>,
-        e1: Polynomial<N>,
         e0is: [Polynomial<N>; L],
+        e0_quotients: [Polynomial<N>; L],
+        e1: Polynomial<N>,
         k1: Polynomial<N>,
         r1is: [Polynomial<2 * N - 1>; L],
         r2is: [Polynomial<N - 1>; L],
         p1is: [Polynomial<2 * N - 1>; L],
         p2is: [Polynomial<N - 1>; L],
     ) -> Greco<N, L, BIT_PK, BIT_CT, BIT_U, BIT_E0, BIT_E1, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
-        Greco { params, pk0is, pk1is, ct0is, ct1is, u, e0, e1, e0is, k1, r1is, r2is, p1is, p2is }
+        Greco {
+            params,
+            pk0is,
+            pk1is,
+            ct0is,
+            ct1is,
+            u,
+            e0,
+            e0is,
+            e0_quotients,
+            e1,
+            k1,
+            r1is,
+            r2is,
+            p1is,
+            p2is,
+        }
     }
 
     /// Flattens all polynomials coefficients into a single array for challenge generation.
@@ -275,12 +294,41 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         inputs
     }
 
+    /// Performs coefficient-wise CRT consistency check for e0 polynomial.
+    ///
+    /// Verifies that for each CRT basis i and each coefficient j:
+    /// e0.coefficients[j] = e0is[i].coefficients[j] + e0_quotients[i].coefficients[j] * qi
+    ///
+    /// This ensures that e0 == e0is[i] (mod qi) for all coefficients, which is
+    /// much more secure than checking equality at a single evaluation point.
+    ///
+    /// # Security
+    /// Coefficient-wise checking prevents attacks where a malicious prover could
+    /// construct different polynomials that happen to evaluate to the same value
+    /// at a single challenge point.
+    fn check_e0_crt_consistency(self) {
+        let crypto_params = self.params.crypto_params();
+
+        for i in 0..L {
+            // Check each coefficient satisfies the CRT relationship
+            for j in 0..N {
+                // Verify: e0_coeff = e0i_coeff + quotient_coeff * qi
+                assert(
+                    self.e0.coefficients[j]
+                        == self.e0is[i].coefficients[j]
+                            + self.e0_quotients[i].coefficients[j] * crypto_params.qis[i],
+                );
+            }
+        }
+    }
+
     /// Verifies the correct encryption constraints for the Greco circuit.
     ///
     /// This function implements the core zero-knowledge proof by checking:
     /// 1. Binary constraint on k1 polynomial
     /// 2. Range constraints on all polynomials coefficients
-    /// 3. Correct encryption equations
+    /// 3. CRT consistency for e0 polynomial
+    /// 4. Correct encryption equations
     ///
     /// The proof uses the Schwartz-Zippel lemma: if polynomial equations hold
     /// when evaluated at random points, then the polynomials are identical with
@@ -302,10 +350,13 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         // Step 1: Perform range checks on all polynomial coefficients
         self.check_range_bounds();
 
-        // Step 2: Generate Fiat-Shamir challenges
+        // Step 2: Check CRT consistency for e0 polynomial
+        self.check_e0_crt_consistency();
+
+        // Step 3: Generate Fiat-Shamir challenges
         let gammas = self.generate_challenge();
 
-        // Step 3: Verify encryption constraints using challenges
+        // Step 4: Verify encryption constraints using challenges
         self.verify_evaluations(gammas)
     }
 
