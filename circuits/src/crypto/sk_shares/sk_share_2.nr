@@ -130,9 +130,7 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32, le
 
             for coeff_idx in 0..N {
                 for party_idx in 1..(N_PARTIES + 1) {
-                    let share = self.y[coeff_idx][mod_idx][party_idx];
-                    share.assert_max_bit_size::<BIT_SHARE>();
-                    (q_j - 1 - share).assert_max_bit_size::<BIT_SHARE>();
+                    range_check_field::<BIT_SHARE>(self.y[coeff_idx][mod_idx][party_idx], q_j);
                 }
             }
         }
@@ -203,4 +201,9 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32, le
 
         commitment.get(0)
     }
+}
+/// Range check for [0, upper_bound) on a single Field
+fn range_check_field<let BIT: u32>(value: Field, upper_bound: Field) {
+    value.assert_max_bit_size::<BIT>();
+    (upper_bound - 1 - value).assert_max_bit_size::<BIT>();
 }
