@@ -148,6 +148,24 @@ impl<let N: u32> Polynomial<N> {
             acc
         }
     }
+
+    /// Range check for [0, upper_bound)
+    /// Requires upper_bound <= 2^BIT
+    pub fn range_check_standard<let BIT: u32>(self, upper_bound: Field) {
+        for i in 0..self.coefficients.len() {
+            let coeff = self.coefficients[i];
+            // Check coeff >= 0 and coeff < 2^BIT
+            coeff.assert_max_bit_size::<BIT>();
+            // Check coeff <= upper_bound - 1 (i.e., coeff < upper_bound)
+            (upper_bound - 1 - coeff).assert_max_bit_size::<BIT>();
+        }
+    }
+    /// Range check for [0, 2^BIT)
+    pub fn range_check_power_of_two<let BIT: u32>(self) {
+        for i in 0..self.coefficients.len() {
+            self.coefficients[i].assert_max_bit_size::<BIT>();
+        }
+    }
 }
 
 /// Compute hex-aligned packing parameters for a given `BIT`.
