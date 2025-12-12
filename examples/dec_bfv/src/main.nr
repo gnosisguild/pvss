@@ -37,6 +37,4 @@ fn main(
 
     // Verify correct decryption
     dec_bfv.verify();
-
-    // TODO: Your logic here...
 }

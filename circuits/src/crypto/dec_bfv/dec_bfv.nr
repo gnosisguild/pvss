@@ -419,12 +419,10 @@ impl<let N: u32, let H: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BI
         // Verify decoding for each coefficient
         for coeff_idx in 0..N {
             // Compute (t * u_global) mod Q using BigNum
-            //TDO: check if there is a faster way without BigNum
             let u_bn_q = Enclave_TRBFV_8192::from(self.u_global.coefficients[coeff_idx]);
             let t_bn_q = Enclave_TRBFV_8192::from(t);
             let t_times_u_bn_q = (t_bn_q * u_bn_q).umod(q_bn);
             let t_times_u_q = to_field(t_times_u_bn_q);
-
             let needs_centering = (t_times_u_q as u128) > q_half;
 
             let computed_message = if needs_centering {

@@ -1,24 +1,28 @@
-use circuits::{crypto::greco::greco::{Greco, Params}, math::polynomial::Polynomial};
+use circuits::{crypto::greco::greco::Greco, math::polynomial::Polynomial};
+use constants::set_bfv_8192_100::{
+    BIT_CT, BIT_E0, BIT_E1, BIT_K, BIT_P1, BIT_P2, BIT_PK, BIT_R1, BIT_R2, BIT_U, CONSTANTS, L, N,
+};
 
 fn main(
-    params: Params<8192, 2>,
-    pk0is: [Polynomial<8192>; 2],
-    pk1is: [Polynomial<8192>; 2],
-    ct0is: [Polynomial<8192>; 2],
-    ct1is: [Polynomial<8192>; 2],
-    u: Polynomial<8192>,
-    e0: Polynomial<8192>,
-    e0is: [Polynomial<8192>; 2],
-    e0_quotients: [Polynomial<8192>; 2],
-    e1: Polynomial<8192>,
-    k1: Polynomial<8192>,
-    r1is: [Polynomial<16383>; 2],
-    r2is: [Polynomial<8191>; 2],
-    p1is: [Polynomial<16383>; 2],
-    p2is: [Polynomial<8191>; 2],
+    pk_commitment: pub Field,
+    pk0is: [Polynomial<N>; L],
+    pk1is: [Polynomial<N>; L],
+    ct0is: [Polynomial<N>; L],
+    ct1is: [Polynomial<N>; L],
+    u: Polynomial<N>,
+    e0: Polynomial<N>,
+    e1: Polynomial<N>,
+    e0is: [Polynomial<N>; L],
+    e0_quotients: [Polynomial<N>; L],
+    k1: Polynomial<N>,
+    r1is: [Polynomial<(2 * N) - 1>; L],
+    r2is: [Polynomial<N - 1>; L],
+    p1is: [Polynomial<(2 * N) - 1>; L],
+    p2is: [Polynomial<N - 1>; L],
 ) {
-    let greco: Greco<8192, 2, 57, 57, 2, 6, 6, 55, 54, 57, 14, 57> = Greco::new(
-        params,
+    let greco: Greco<8192, 2, BIT_CT, BIT_E0, BIT_E1, BIT_K, BIT_P1, BIT_P2, BIT_PK, BIT_R1, BIT_R2, BIT_U> = Greco::new(
+        CONSTANTS,
+        pk_commitment,
         pk0is,
         pk1is,
         ct0is,

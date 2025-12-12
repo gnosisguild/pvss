@@ -1,5 +1,5 @@
 [package]
-name = "sk_share_1_opt"
+name = "dec_share_agg_trbfv_no_bn"
 type = "bin"
 authors = [""]
 

@@ -1,45 +1,43 @@
-// SPDX-License-Identifier: LGPL-3.0-only
-//
-// This file is provided WITHOUT ANY WARRANTY;
-// without even the implied warranty of MERCHANTABILITY
-// or FITNESS FOR A PARTICULAR PURPOSE.
+// use circuits::{crypto::greco::greco::Greco, math::polynomial::Polynomial};
+// use constants::set_bfv_8192_100::{
+//     BIT_CT, BIT_E0, BIT_E1, BIT_K, BIT_P1, BIT_P2, BIT_PK, BIT_R1, BIT_R2, BIT_U, CONSTANTS, L, N,
+// };
 
-use circuits::{crypto::greco::greco::{Greco, Params}, math::polynomial::Polynomial};
-fn main(
-    params: Params<8192, 4>,
-    pk0is: [Polynomial<8192>; 4],
-    pk1is: [Polynomial<8192>; 4],
-    ct0is: [Polynomial<8192>; 4],
-    ct1is: [Polynomial<8192>; 4],
-    u: Polynomial<8192>,
-    e0: Polynomial<8192>,
-    e0is: [Polynomial<8192>; 4],
-    e0_quotients: [Polynomial<8192>; 4],
-    e1: Polynomial<8192>,
-    k1: Polynomial<8192>,
-    r1is: [Polynomial<16383>; 4],
-    r2is: [Polynomial<8191>; 4],
-    p1is: [Polynomial<16383>; 4],
-    p2is: [Polynomial<8191>; 4],
-) {
-    let greco: Greco<8192, 4, 52, 52, 2, 107, 6, 7, 14, 53, 14, 53> = Greco::new(
-        params,
-        pk0is,
-        pk1is,
-        ct0is,
-        ct1is,
-        u,
-        e0,
-        e0is,
-        e0_quotients,
-        e1,
-        k1,
-        r1is,
-        r2is,
-        p1is,
-        p2is,
-    );
-    let is_greco_valid = greco.verify();
-
-    assert(is_greco_valid);
-}
+// fn main(
+//     pk_commitment: pub Field,
+//     pk0is: [Polynomial<N>; L],
+//     pk1is: [Polynomial<N>; L],
+//     ct0is: [Polynomial<N>; L],
+//     ct1is: [Polynomial<N>; L],
+//     u: Polynomial<N>,
+//     e0: Polynomial<N>,
+//     e1: Polynomial<N>,
+//     e0is: [Polynomial<N>; L],
+//     e0_quotients: [Polynomial<N>; L],
+//     k1: Polynomial<N>,
+//     r1is: [Polynomial<(2 * N) - 1>; L],
+//     r2is: [Polynomial<N - 1>; L],
+//     p1is: [Polynomial<(2 * N) - 1>; L],
+//     p2is: [Polynomial<N - 1>; L],
+// ) {
+//     let greco: Greco<8192, 4, BIT_CT, BIT_E0, BIT_E1, BIT_K, BIT_P1, BIT_P2, BIT_PK, BIT_R1, BIT_R2, BIT_U> = Greco::new(
+//         CONSTANTS,
+//         pk_commitment,
+//         pk0is,
+//         pk1is,
+//         ct0is,
+//         ct1is,
+//         u,
+//         e0,
+//         e0is,
+//         e0_quotients,
+//         e1,
+//         k1,
+//         r1is,
+//         r2is,
+//         p1is,
+//         p2is,
+//     );
+//     let is_greco_valid = greco.verify();
+//     assert(is_greco_valid);
+// }
