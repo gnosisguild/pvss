@@ -82,7 +82,7 @@ impl<let N: u32, let L: u32> Params<N, L> {
 /// - d is the party's computed decryption share
 ///
 /// Since Noir works over a large field Z (254-bit), we lift the ring equation:
-/// For each modulus q_i: d_i = c_0i + c_1i * s + e_i + r_2_i * (X^N + 1) + r_1_i * q_i (mod Z)
+/// For each modulus q_i: d_i = c_0i + c_1i * s_i + e_i + r_2_i * (X^N + 1) + r_1_i * q_i (mod Z)
 ///
 /// The circuit enforces:
 /// 1. Range checks on s, e, and quotients
