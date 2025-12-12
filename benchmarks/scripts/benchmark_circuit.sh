@@ -139,16 +139,14 @@ if [ "$EXECUTE_SUCCESS" = "true" ]; then
     echo ""
     echo "[4/6] Generating verification key..."
     START=$(date +%s.%N)
-    if $BB_WRITE_VK_CMD -b "./target/${CIRCUIT_NAME}.json" -o ./target/vk > /tmp/vk_output.txt 2>&1; then
+    if $BB_WRITE_VK_CMD -b "./target/${CIRCUIT_NAME}.json" -o ./target > /tmp/vk_output.txt 2>&1; then
         END=$(date +%s.%N)
         VK_GEN_TIME=$(echo "$END - $START" | bc | awk '{printf "%.9f", $0}')
         VK_GEN_SUCCESS="true"
         echo "✓ VK generation successful (${VK_GEN_TIME}s)"
         
-        # Get VK size (bb creates a vk subdirectory with a vk file inside)
-        if [ -f "target/vk/vk" ]; then
-            VK_SIZE=$(wc -c < "target/vk/vk" | tr -d ' ')
-        elif [ -f "target/vk" ]; then
+        # Get VK size (bb creates vk file directly in target directory)
+        if [ -f "target/vk" ]; then
             VK_SIZE=$(wc -c < "target/vk" | tr -d ' ')
         fi
     else
@@ -164,16 +162,14 @@ if [ "$VK_GEN_SUCCESS" = "true" ]; then
     echo ""
     echo "[5/6] Generating proof..."
     START=$(date +%s.%N)
-    if $BB_PROVE_CMD -b "./target/${CIRCUIT_NAME}.json" -w "./target/${CIRCUIT_NAME}.gz" -o ./target/proof > /tmp/prove_output.txt 2>&1; then
+    if $BB_PROVE_CMD -b "./target/${CIRCUIT_NAME}.json" -w "./target/${CIRCUIT_NAME}.gz" -k ./target/vk -o ./target > /tmp/prove_output.txt 2>&1; then
         END=$(date +%s.%N)
         PROVE_TIME=$(echo "$END - $START" | bc | awk '{printf "%.9f", $0}')
         PROVE_SUCCESS="true"
         echo "✓ Proof generation successful (${PROVE_TIME}s)"
         
-        # Get proof size (bb creates a proof subdirectory with a proof file inside)
-        if [ -f "target/proof/proof" ]; then
-            PROOF_SIZE=$(wc -c < "target/proof/proof" | tr -d ' ')
-        elif [ -f "target/proof" ]; then
+        # Get proof size (bb creates proof file directly in target directory)
+        if [ -f "target/proof" ]; then
             PROOF_SIZE=$(wc -c < "target/proof" | tr -d ' ')
         fi
     else
@@ -189,8 +185,8 @@ if [ "$PROVE_SUCCESS" = "true" ]; then
     echo ""
     echo "[6/6] Verifying proof..."
     START=$(date +%s.%N)
-    # bb verify expects paths to vk, proof, and public inputs
-    if $BB_VERIFY_CMD -k ./target/vk/vk -p ./target/proof/proof -i ./target/proof/public_inputs > /tmp/verify_output.txt 2>&1; then
+    # bb verify expects paths to vk, proof, and public inputs (all directly in target directory)
+    if $BB_VERIFY_CMD -k ./target/vk -p ./target/proof -i ./target/public_inputs > /tmp/verify_output.txt 2>&1; then
         END=$(date +%s.%N)
         VERIFY_TIME=$(echo "$END - $START" | bc | awk '{printf "%.9f", $0}')
         VERIFY_SUCCESS="true"
@@ -283,4 +279,3 @@ echo "=================================================="
 echo "Benchmark complete!"
 echo "Results saved to: $OUTPUT_JSON"
 echo "=================================================="
-
