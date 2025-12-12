@@ -1,7 +1,0 @@
-[package]
-name = "sk_share_2"
-type = "bin"
-authors = [""]
-
-[dependencies]
-circuits = { path = "../../circuits" }

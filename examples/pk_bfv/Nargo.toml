@@ -1,7 +1,0 @@
-[package]
-name = "pk_bfv"
-type = "bin"
-authors = [""]
-
-[dependencies]
-circuits = { path = "../../circuits" }
