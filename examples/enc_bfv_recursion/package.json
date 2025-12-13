@@ -1,0 +1,20 @@
+{
+  "name": "enc_bfv_recursion",
+  "version": "1.0.0",
+  "description": "Linear recursive proof aggregation for n_party=4 (32 proofs)",
+  "type": "module",
+  "scripts": {
+    "generate-proof": "tsx generate-recursion-proofs.ts"
+  },
+  "dependencies": {
+    "@aztec/bb.js": "3.0.0-nightly.20251104",
+    "@noir-lang/noir_js": "^1.0.0-beta.6",
+    "toml": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.1",
+    "tsx": "^4.7.0",
+    "typescript": "^5.0.0"
+  }
+}
