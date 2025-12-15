@@ -1,5 +1,5 @@
 [package]
-name = "bfv_pk"
+name = "pk_bfv"
 type = "bin"
 authors = [""]
 

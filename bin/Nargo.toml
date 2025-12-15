@@ -1,5 +1,7 @@
 [workspace]
 members = [
-    "production/bfv_pk",
-    "production/enc_bfv"
+    "production/pk_trbfv",
+    "production/pk_bfv",
+    "production/enc_bfv",
+    "production/enc_trbfv",
 ]
