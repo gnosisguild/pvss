@@ -1,9 +1,9 @@
-use e3_lib::configs::production::bfv::{
+use lib::configs::production::bfv::{
     ENC_BFV_BIT_CT, ENC_BFV_BIT_E0, ENC_BFV_BIT_E1, ENC_BFV_BIT_K, ENC_BFV_BIT_P1, ENC_BFV_BIT_P2,
     ENC_BFV_BIT_PK, ENC_BFV_BIT_R1, ENC_BFV_BIT_R2, ENC_BFV_BIT_U, ENC_BFV_CONFIGS, L, N,
 };
-use e3_lib::core::greco::Greco;
-use e3_lib::math::polynomial::Polynomial;
+use lib::core::greco::Greco;
+use lib::math::polynomial::Polynomial;
 
 fn main(
     pk_commitment: pub Field,

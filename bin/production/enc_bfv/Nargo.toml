@@ -4,4 +4,4 @@ type = "bin"
 authors = [""]
 
 [dependencies]
-e3_lib = { path = "../../../e3_lib" }
+lib = { path = "../../../lib" }

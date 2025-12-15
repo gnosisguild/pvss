@@ -1,4 +1,4 @@
-//! # e3_lib - Enclave Zero-Knowledge Cryptographic Library
+//! # lib - Enclave Zero-Knowledge Cryptographic Library
 //! - **`core`**: Core functions and structs for Public Verifiable
 //!   Secret Sharing (PVSS) circuits implementations.
 //! - **`math`**: Mathematical utilities including polynomial operations, SAFE sponge
