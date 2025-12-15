@@ -335,17 +335,6 @@ pub fn compute_tag<let L: u32>(io_pattern: [u32; L], domain_separator: [u8; 64])
     tag_value
 }
 
-/// Generates a custom challenge following a given io_pattern on
-/// top of the inputs; appending a domain separator.
-pub fn safe(domain_separator: [u8; 64], inputs: Vec<Field>, io_pattern: [u32; 2]) -> Vec<Field> {
-    let mut sponge = SafeSponge::start(io_pattern, domain_separator);
-    sponge.absorb(inputs);
-    let digests = sponge.squeeze();
-    sponge.finish();
-
-    digests
-}
-
 #[test]
 fn test_safe_hashing() {
     // Verifies basic hash functionality with a simple ABSORB(3) + SQUEEZE(1) pattern.

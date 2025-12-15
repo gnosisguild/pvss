@@ -4,8 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::math::polynomial::{flatten, Polynomial};
-use crate::math::safe::safe;
+use crate::math::helpers::{flatten, safe};
+use crate::math::polynomial::Polynomial;
 
 /// Configs for the Greco circuit.
 /// Contains the core mathematical values used in Greco.
