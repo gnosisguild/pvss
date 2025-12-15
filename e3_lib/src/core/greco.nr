@@ -7,9 +7,15 @@
 use crate::math::polynomial::{flatten, Polynomial};
 use crate::math::safe::SafeSponge;
 
-/// Bound parameters for range checking.
-/// Contains all the bounds used to validate polynomial coefficients.
-pub struct Bounds<let L: u32> {
+/// Configs for the Greco circuit.
+/// Contains the core mathematical values used in Greco.
+pub struct Configs<let N: u32, let L: u32> {
+    /// CRT moduli: [q_0, q_1, ..., q_{L-1}]
+    pub qis: [Field; L],
+    /// Plaintext modulus: q mod t
+    pub q_mod_t: Field,
+    /// Scaling factors for each basis: [k0_0, k0_1, ..., k0_{L-1}]
+    pub k0is: [Field; L],
     /// Bounds for public key polynomials for each CRT basis
     pub pk_bounds: [Field; L],
     /// Bounds for error polynomials (e0)
@@ -34,50 +40,7 @@ pub struct Bounds<let L: u32> {
     pub k1_up_bound: Field,
 }
 
-impl<let L: u32> Bounds<L> {
-    pub fn new(
-        pk_bounds: [Field; L],
-        e0_bound: Field,
-        e1_bound: Field,
-        u_bound: Field,
-        r1_low_bounds: [Field; L],
-        r1_up_bounds: [Field; L],
-        r2_bounds: [Field; L],
-        p1_bounds: [Field; L],
-        p2_bounds: [Field; L],
-        k1_low_bound: Field,
-        k1_up_bound: Field,
-    ) -> Self {
-        Bounds {
-            pk_bounds,
-            e0_bound,
-            e1_bound,
-            u_bound,
-            r1_low_bounds,
-            r1_up_bounds,
-            r2_bounds,
-            p1_bounds,
-            p2_bounds,
-            k1_low_bound,
-            k1_up_bound,
-        }
-    }
-}
-
-/// Constants for the Greco circuit.
-/// Contains the core mathematical constants used in the Greco encryption scheme.
-pub struct Constants<let N: u32, let L: u32> {
-    /// CRT moduli: [q_0, q_1, ..., q_{L-1}]
-    pub qis: [Field; L],
-    /// Plaintext modulus: q mod t
-    pub q_mod_t: Field,
-    /// Scaling factors for each basis: [k0_0, k0_1, ..., k0_{L-1}]
-    pub k0is: [Field; L],
-    /// Bound parameters for range checking
-    pub bounds: Bounds<L>,
-}
-
-impl<let N: u32, let L: u32> Constants<N, L> {
+impl<let N: u32, let L: u32> Configs<N, L> {
     pub fn new(
         q_mod_t: Field,
         qis: [Field; L],
@@ -94,7 +57,10 @@ impl<let N: u32, let L: u32> Constants<N, L> {
         k1_low_bound: Field,
         k1_up_bound: Field,
     ) -> Self {
-        let bounds = Bounds::new(
+        Configs {
+            qis,
+            q_mod_t,
+            k0is,
             pk_bounds,
             e0_bound,
             e1_bound,
@@ -106,9 +72,7 @@ impl<let N: u32, let L: u32> Constants<N, L> {
             p2_bounds,
             k1_low_bound,
             k1_up_bound,
-        );
-
-        Constants { qis, q_mod_t, k0is, bounds }
+        }
     }
 }
 
@@ -154,7 +118,7 @@ impl<let N: u32, let L: u32> Constants<N, L> {
 /// * `r1is`, `r2is` - Randomness polynomials for each i-th CRT basis.
 /// * `p1is`, `p2is` - Randomness polynomials for each i-th CRT basis.
 pub struct Greco<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_K: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> {
-    constants: Constants<N, L>,
+    configs: Configs<N, L>,
     pk_commitment: Field,
     pk0is: [Polynomial<N>; L],
     pk1is: [Polynomial<N>; L],
@@ -198,7 +162,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     /// # Returns
     /// A new Greco instance ready for constraint checking
     pub fn new(
-        constants: Constants<N, L>,
+        configs: Configs<N, L>,
         pk_commitment: Field,
         pk0is: [Polynomial<N>; L],
         pk1is: [Polynomial<N>; L],
@@ -216,7 +180,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         p2is: [Polynomial<N - 1>; L],
     ) -> Greco<N, L, BIT_PK, BIT_CT, BIT_U, BIT_E0, BIT_E1, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
         Greco {
-            constants,
+            configs,
             pk_commitment,
             pk0is,
             pk1is,
@@ -303,7 +267,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
                 assert(
                     self.e0.coefficients[j]
                         == self.e0is[i].coefficients[j]
-                            + self.e0_quotients[i].coefficients[j] * self.constants.qis[i],
+                            + self.e0_quotients[i].coefficients[j] * self.configs.qis[i],
                 );
             }
         }
@@ -355,39 +319,37 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     /// # Returns
     /// True if the range bounds are satisfied, false otherwise.
     fn check_range_bounds(self) {
-        let bound_params = self.constants.bounds;
-
-        self.u.range_check_2bounds::<BIT_U>(bound_params.u_bound, bound_params.u_bound);
-        self.e0.range_check_2bounds::<BIT_E0>(bound_params.e0_bound, bound_params.e0_bound);
-        self.e1.range_check_2bounds::<BIT_E1>(bound_params.e1_bound, bound_params.e1_bound);
-        self.k1.range_check_2bounds::<BIT_K>(bound_params.k1_up_bound, bound_params.k1_low_bound);
+        self.u.range_check_2bounds::<BIT_U>(self.configs.u_bound, self.configs.u_bound);
+        self.e0.range_check_2bounds::<BIT_E0>(self.configs.e0_bound, self.configs.e0_bound);
+        self.e1.range_check_2bounds::<BIT_E1>(self.configs.e1_bound, self.configs.e1_bound);
+        self.k1.range_check_2bounds::<BIT_K>(self.configs.k1_up_bound, self.configs.k1_low_bound);
 
         for i in 0..L {
             self.pk0is[i].range_check_2bounds::<BIT_PK>(
-                bound_params.pk_bounds[i],
-                bound_params.pk_bounds[i],
+                self.configs.pk_bounds[i],
+                self.configs.pk_bounds[i],
             );
             self.pk1is[i].range_check_2bounds::<BIT_PK>(
-                bound_params.pk_bounds[i],
-                bound_params.pk_bounds[i],
+                self.configs.pk_bounds[i],
+                self.configs.pk_bounds[i],
             );
 
             self.r1is[i].range_check_2bounds::<BIT_R1>(
-                bound_params.r1_up_bounds[i],
-                bound_params.r1_low_bounds[i],
+                self.configs.r1_up_bounds[i],
+                self.configs.r1_low_bounds[i],
             );
             self.r2is[i].range_check_2bounds::<BIT_R2>(
-                bound_params.r2_bounds[i],
-                bound_params.r2_bounds[i],
+                self.configs.r2_bounds[i],
+                self.configs.r2_bounds[i],
             );
 
             self.p1is[i].range_check_2bounds::<BIT_P1>(
-                bound_params.p1_bounds[i],
-                bound_params.p1_bounds[i],
+                self.configs.p1_bounds[i],
+                self.configs.p1_bounds[i],
             );
             self.p2is[i].range_check_2bounds::<BIT_P2>(
-                bound_params.p2_bounds[i],
-                bound_params.p2_bounds[i],
+                self.configs.p2_bounds[i],
+                self.configs.p2_bounds[i],
             );
         }
     }
@@ -461,10 +423,10 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
             let pk0_u = (pk0is_at_gamma * u_at_gamma) + e0is_at_gamma;
 
             // Step 2: rhs = pk0_u + k1(gamma) * k0i
-            let mut ct0_rhs = pk0_u + (k1_at_gamma * self.constants.k0is[i]);
+            let mut ct0_rhs = pk0_u + (k1_at_gamma * self.configs.k0is[i]);
 
             // Step 3: rhs = rhs + r1i(gamma) * qi
-            ct0_rhs += r1i_at_gamma * self.constants.qis[i];
+            ct0_rhs += r1i_at_gamma * self.configs.qis[i];
 
             // Step 4: rhs = rhs + r2i(gamma) * cyclo(gamma)
             ct0_rhs += r2i_at_gamma * cyclo_at_gamma;
@@ -485,7 +447,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
             let mut ct1_rhs = pk1_u + p2is_at_gamma * cyclo_at_gamma;
 
             // Step 3: rhs = rhs + p1i(gamma) * qi
-            ct1_rhs += p1is_at_gamma * self.constants.qis[i];
+            ct1_rhs += p1is_at_gamma * self.configs.qis[i];
 
             // Left-hand side: ct1i(gamma)
             let ct1_lhs = self.ct1is[i].eval(gamma);

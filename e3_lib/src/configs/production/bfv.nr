@@ -1,6 +1,6 @@
-use crate::core::greco::{Bounds, Constants};
+use crate::core::greco::Configs;
 
-// Global configs for BFV
+// Global configs for BFV parameter set
 pub global N: u32 = 8192;
 pub global L: u32 = 2;
 pub global QIS: [Field; 2] = [72057594082099201, 72057594062438401];
@@ -37,11 +37,11 @@ pub global ENC_BFV_P2_BOUNDS: [Field; 2] = [36028797041049600, 36028797031219200
 pub global ENC_BFV_K1_LOW_BOUND: Field = 9007199254740992;
 pub global ENC_BFV_K1_UP_BOUND: Field = 9007199254740991;
 
-// enc_bfv - configs
+// enc_bfv - misc
 pub global ENC_BFV_K0IS: [Field; 2] = [70854796903366627, 47439047573780733];
 
-// enc_bfv - constants
-pub global ENC_BFV_CONSTANTS: Constants<N, L> = Constants::new(
+// enc_bfv - configs
+pub global ENC_BFV_CONFIGS: Configs<N, L> = Configs::new(
     Q_MOD_T,
     QIS,
     ENC_BFV_K0IS,
