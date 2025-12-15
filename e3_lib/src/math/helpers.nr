@@ -294,3 +294,41 @@ fn test_safe_hashing_with_safe_helper() {
     assert(digests2.len() == 1);
     assert(digests2.get(0) != 0);
 }
+
+#[test]
+fn test_pack() {
+    // Test pack function directly with small values
+    let values = [1, 2, 3, 4];
+    let packed = pack::<4, 4>(values);
+
+    // With BIT=4, nibble_bits=4, group should be floor(254/(4+4)) = 31
+    // So all 4 values should fit in one carrier
+    assert(packed.len() >= 1);
+
+    // Test with negative values
+    let values_neg = [-1, 2, -3, 4];
+    let packed_neg = pack::<4, 4>(values_neg);
+    assert(packed_neg.len() >= 1);
+}
+
+#[test]
+fn test_pack_single_value() {
+    // Test packing a single value
+    let values = [42];
+    let packed = pack::<1, 8>(values);
+    assert(packed.len() == 1);
+    assert(packed.get(0) != 0);
+}
+
+#[test]
+fn test_pack_determinism() {
+    // Test that packing is deterministic
+    let values = [10, 20, 30];
+    let packed1 = pack::<3, 8>(values);
+    let packed2 = pack::<3, 8>(values);
+
+    assert(packed1.len() == packed2.len());
+    for i in 0..packed1.len() {
+        assert_eq(packed1.get(i), packed2.get(i));
+    }
+}

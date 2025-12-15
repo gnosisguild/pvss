@@ -180,3 +180,61 @@ fn test_polynomial_out_of_bounds_coefficients() {
     // Should fail because -100 is out of bounds.
     poly.range_check_2bounds::<7>(99, 98);
 }
+
+#[test]
+fn test_polynomial_add() {
+    let coeffs1 = [1, 2, 3]; // 1x^2 + 2x + 3
+    let coeffs2 = [4, 5, 6]; // 4x^2 + 5x + 6
+    let poly1 = Polynomial::new(coeffs1);
+    let poly2 = Polynomial::new(coeffs2);
+
+    let result = poly1.add(poly2);
+
+    // Expected: (1+4)x^2 + (2+5)x + (3+6) = 5x^2 + 7x + 9
+    assert_eq(result.coefficients[0], 5);
+    assert_eq(result.coefficients[1], 7);
+    assert_eq(result.coefficients[2], 9);
+}
+
+#[test]
+fn test_polynomial_sub() {
+    let coeffs1 = [5, 7, 9]; // 5x^2 + 7x + 9
+    let coeffs2 = [1, 2, 3]; // 1x^2 + 2x + 3
+    let poly1 = Polynomial::new(coeffs1);
+    let poly2 = Polynomial::new(coeffs2);
+
+    let result = poly1.sub(poly2);
+
+    // Expected: (5-1)x^2 + (7-2)x + (9-3) = 4x^2 + 5x + 6
+    assert_eq(result.coefficients[0], 4);
+    assert_eq(result.coefficients[1], 5);
+    assert_eq(result.coefficients[2], 6);
+}
+
+#[test]
+fn test_polynomial_mul_scalar() {
+    let coeffs = [1, 2, 3]; // 1x^2 + 2x + 3
+    let poly = Polynomial::new(coeffs);
+    let scalar = 5;
+
+    let result = poly.mul_scalar(scalar);
+
+    // Expected: 5x^2 + 10x + 15
+    assert_eq(result.coefficients[0], 5);
+    assert_eq(result.coefficients[1], 10);
+    assert_eq(result.coefficients[2], 15);
+}
+
+#[test]
+fn test_polynomial_mul_scalar_zero() {
+    let coeffs = [1, 2, 3];
+    let poly = Polynomial::new(coeffs);
+    let scalar = 0;
+
+    let result = poly.mul_scalar(scalar);
+
+    // Expected: 0x^2 + 0x + 0 = 0
+    assert_eq(result.coefficients[0], 0);
+    assert_eq(result.coefficients[1], 0);
+    assert_eq(result.coefficients[2], 0);
+}
