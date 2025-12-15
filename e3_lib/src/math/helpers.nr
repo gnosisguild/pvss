@@ -1,10 +1,11 @@
+//! Helper functions for circuit construction and cryptographic operations.
 use crate::math::polynomial::Polynomial;
 use crate::math::safe::SafeSponge;
 
 /// Compute hex-aligned packing parameters for a given `BIT`.
 ///
 /// # Purpose
-/// Returns `(nibble_bits, group)` for use by packer/flatten so layout stays consistent.
+/// Returns `(nibble_bits, group)` for use by pack/flatten so layout stays consistent.
 /// - `nibble_bits`: ceil (`BIT`) to the next multiple of 4 (nibble alignment).
 ///   - Examples: `BIT = 7 -> 8`, `BIT = 8 -> 8`, `BIT = 9 -> 12`, `BIT = 10 -> 12`, `BIT = 11 -> 12`,
 ///     `BIT=16 -> 16`, `BIT = 17 -> 20`.
@@ -38,9 +39,9 @@ fn packing_layout<let BIT: u32>() -> (u32, u32) {
 ///
 /// ## What this does
 /// - For each CRT limb `j` in `0..L`, it packs the coefficients of `poly[j]`
-///   with `packer::<A, BIT>` and appends all resulting carriers to `inputs`.
+///   with `pack::<A, BIT>` and appends all resulting carriers to `inputs`.
 /// - The packing layout (nibble-aligned width and `group` size) is taken from
-///   `packing_layout::<BIT>()` and must match what `packer` uses.
+///   `packing_layout::<BIT>()` and must match what `pack` uses.
 ///
 /// ## Determinism & order
 /// - Preserves a stable order: iterate `j = 0..L`, then for each `j` append
@@ -60,7 +61,7 @@ pub fn flatten<let A: u32, let L: u32, let BIT: u32>(
 ) -> Vec<Field> {
     for j in 0..L {
         // Pack its A coefficients into `num_chunks` carriers using the same BIT layout.
-        let packed = packer::<A, BIT>(poly[j].coefficients);
+        let packed = pack::<A, BIT>(poly[j].coefficients);
 
         // Append carriers in-order to `inputs` to keep a stable transcript layout.
         for i in 0..packed.len() {
@@ -91,7 +92,7 @@ pub fn flatten<let A: u32, let L: u32, let BIT: u32>(
 ///
 /// ## Preconditions / Notes
 /// - Call with the raw coefficients whose magnitudes already satisfy the BIT bound
-///   (as enforced by the upstream range checks); `packer` performs the signed -> unsigned
+///   (as enforced by the upstream range checks); `pack` performs the signed -> unsigned
 ///   shift internally via `v + base`.
 /// - `group >= 1` is enforced by `packing_layout::<BIT>()`.
 /// - Padding with `digit = 2^nibble_bits` encodes `zero limb` consistently.
@@ -99,7 +100,7 @@ pub fn flatten<let A: u32, let L: u32, let BIT: u32>(
 /// ## Returns
 /// - A `Vec<Field>` where each element is a concatenation of up to `group` limbs,
 ///   suitable for hashing or transcript I/O.
-pub fn packer<let A: u32, let BIT: u32>(values: [Field; A]) -> Vec<Field> {
+pub fn pack<let A: u32, let BIT: u32>(values: [Field; A]) -> Vec<Field> {
     // Layout parameters: nibble-aligned width and limbs-per-carrier group size.
     let (nibble_bits, group) = packing_layout::<BIT>();
 
@@ -133,9 +134,28 @@ pub fn packer<let A: u32, let BIT: u32>(values: [Field; A]) -> Vec<Field> {
     out
 }
 
-/// Generates a custom challenge following a given io_pattern on
-/// top of the inputs; appending a domain separator.
-pub fn safe(domain_separator: [u8; 64], inputs: Vec<Field>, io_pattern: [u32; 2]) -> Vec<Field> {
+/// Computes a cryptographic hash using the SAFE (Sponge API for Field Elements) protocol.
+///
+/// This is a convenience wrapper around the SAFE sponge API that handles the full
+/// lifecycle: initialization, absorption, squeezing, and finalization. It's designed
+/// for use in Fiat-Shamir challenge generation and commitment schemes within zero-knowledge circuits.
+///
+/// # Arguments
+/// * `domain_separator` - A 64-byte domain separator used to differentiate between
+///                        different protocol instances and prevent cross-protocol attacks.
+/// * `inputs` - Vector of field elements to be absorbed into the sponge.
+/// * `io_pattern` - A 2-element array encoding the I/O pattern:
+///                 - `io_pattern[0]`: Encoded ABSORB operation (MSB=1, lower 31 bits = length)
+///                 - `io_pattern[1]`: Encoded SQUEEZE operation (MSB=0, lower 31 bits = length)
+///
+/// # Returns
+/// A vector of field elements squeezed from the sponge, with length determined by
+/// the SQUEEZE operation in the IO pattern.
+pub fn compute_safe(
+    domain_separator: [u8; 64],
+    inputs: Vec<Field>,
+    io_pattern: [u32; 2],
+) -> Vec<Field> {
     let mut sponge = SafeSponge::start(io_pattern, domain_separator);
     sponge.absorb(inputs);
     let digests = sponge.squeeze();
@@ -263,13 +283,13 @@ fn test_safe_hashing_with_safe_helper() {
 
     // Pattern: ABSORB(3), SQUEEZE(1)
     let io_pattern = [0x80000003, 0x00000001];
-    let digests1 = safe(domain_separator, elements, io_pattern);
+    let digests1 = compute_safe(domain_separator, elements, io_pattern);
 
     assert(digests1.len() == 1);
     assert(digests1.get(0) != 0);
 
     // Test determinism
-    let digests2 = safe(domain_separator, elements, io_pattern);
+    let digests2 = compute_safe(domain_separator, elements, io_pattern);
 
     assert(digests2.len() == 1);
     assert(digests2.get(0) != 0);

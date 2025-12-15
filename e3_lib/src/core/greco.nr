@@ -4,11 +4,18 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::math::helpers::{flatten, safe};
+use crate::math::helpers::{compute_safe, flatten};
 use crate::math::polynomial::Polynomial;
 
-/// Configs for the Greco circuit.
-/// Contains the core mathematical values used in Greco.
+/// Cryptographic parameters for the Greco circuit.
+///
+/// This struct contains all the mathematical constants and bounds needed to verify
+/// BFV encryption correctness. The parameters include CRT moduli, scaling factors,
+/// and bounds for all polynomial types used in the encryption scheme.
+///
+/// # Generic Parameters
+/// * `N` - The degree of polynomials (ring dimension)
+/// * `L` - The number of CRT (Chinese Remainder Theorem) bases
 pub struct Configs<let N: u32, let L: u32> {
     /// CRT moduli: [q_0, q_1, ..., q_{L-1}]
     pub qis: [Field; L],
@@ -41,6 +48,14 @@ pub struct Configs<let N: u32, let L: u32> {
 }
 
 impl<let N: u32, let L: u32> Configs<N, L> {
+    /// Creates a new `Configs` instance with the specified cryptographic parameters.
+    ///
+    /// # Arguments
+    /// All parameters correspond to the fields of the `Configs` struct. See the struct
+    /// documentation for details on each parameter.
+    ///
+    /// # Returns
+    /// A new `Configs` instance ready for use with the `Greco` circuit.
     pub fn new(
         q_mod_t: Field,
         qis: [Field; L],
@@ -143,24 +158,25 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     /// the zero-knowledge proof of correct ciphertext formation.
     ///
     /// # Arguments
-    /// * `params` - Cryptographic parameters including bounds and moduli
-    /// * `pk0is` - Public key polynomials pk0i = [ai*s + E] for each CRT basis
-    /// * `pk1is` - Public key polynomials pk1i = -[ai] for each CRT basis
-    /// * `ct0is` - First ciphertext component for each CRT basis
-    /// * `ct1is` - Second ciphertext component for each CRT basis
-    /// * `u` - Secret polynomial from ternary distribution
-    /// * `e0` - Error polynomial sampled from discrete Gaussian distribution
-    /// * `e0is` - CRT decomposition of e0 for each CRT basis
-    /// * `e0_quotients` - Quotient witnesses for CRT checking of e0
-    /// * `e1` - Error polynomial sampled from discrete Gaussian distribution
-    /// * `k1` - Scaled message polynomial
-    /// * `r1is` - Randomness polynomials for ct0 computation
-    /// * `r2is` - Randomness polynomials for ct0 computation
-    /// * `p1is` - Randomness polynomials for ct1 computation
-    /// * `p2is` - Randomness polynomials for ct1 computation
+    /// * `configs` - Cryptographic parameters including bounds, moduli, and scaling factors
+    /// * `pk_commitment` - Commitment to the public key polynomials (computed via SAFE hash)
+    /// * `pk0is` - Public key polynomials pk0i = [ai*s + E] for each CRT basis i
+    /// * `pk1is` - Public key polynomials pk1i = -[ai] for each CRT basis i
+    /// * `ct0is` - First ciphertext component for each CRT basis i
+    /// * `ct1is` - Second ciphertext component for each CRT basis i
+    /// * `u` - Secret polynomial sampled from ternary distribution (used in encryption)
+    /// * `e0` - Error polynomial sampled from discrete Gaussian distribution (used in ct0)
+    /// * `e0is` - CRT decomposition of e0 for each CRT basis i (e0 mod qi)
+    /// * `e0_quotients` - Quotient witnesses for CRT consistency checking of e0
+    /// * `e1` - Error polynomial sampled from discrete Gaussian distribution (used in ct1)
+    /// * `k1` - Scaled message polynomial (encrypted plaintext)
+    /// * `r1is` - Randomness polynomials for ct0 computation (modulus switching quotients)
+    /// * `r2is` - Randomness polynomials for ct0 computation (cyclotomic reduction quotients)
+    /// * `p1is` - Randomness polynomials for ct1 computation (modulus switching quotients)
+    /// * `p2is` - Randomness polynomials for ct1 computation (cyclotomic reduction quotients)
     ///
     /// # Returns
-    /// A new Greco instance ready for constraint checking
+    /// A new Greco instance ready for constraint checking via the `verify()` method
     pub fn new(
         configs: Configs<N, L>,
         pk_commitment: Field,
@@ -311,13 +327,16 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         self.verify_evaluations(gammas)
     }
 
-    /// Performs range checks on all polynomial coefficients
+    /// Performs range checks on all polynomial coefficients.
     ///
-    /// Checks that all polynomial coefficients are within their expected bounds.
-    /// This prevents attacks where coefficients are outside the valid range.
+    /// Checks that all polynomial coefficients are within their expected bounds
+    /// as specified in the `configs`. This prevents attacks where coefficients
+    /// are outside the valid range, which could break the security properties
+    /// of the BFV encryption scheme.
     ///
-    /// # Returns
-    /// True if the range bounds are satisfied, false otherwise.
+    /// # Panics
+    /// This function will cause the circuit to fail if any coefficient is outside
+    /// its expected bounds. The bounds are defined per polynomial type in the `configs`.
     fn check_range_bounds(self) {
         self.u.range_check_2bounds::<BIT_U>(self.configs.u_bound, self.configs.u_bound);
         self.e0.range_check_2bounds::<BIT_E0>(self.configs.e0_bound, self.configs.e0_bound);
@@ -354,13 +373,22 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         }
     }
 
-    /// Generates Fiat-Shamir challenge values using a cryptographic sponge
+    /// Generates Fiat-Shamir challenge values using the SAFE cryptographic sponge.
     ///
-    /// The sponge absorbs all witness values and squeezes out deterministic random field elements
-    /// that will be used to evaluate polynomials for the Schwartz-Zippel lemma.
+    /// This function implements the Fiat-Shamir transform for the Greco circuit:
+    /// 1. First, it computes and verifies the public key commitment by absorbing
+    ///    all public key polynomials and squeezing a single commitment value.
+    /// 2. Then, it generates challenge values by absorbing all witness values
+    ///    (ciphertexts, errors, randomness) and squeezing 2L challenge values.
+    ///
+    /// The sponge absorbs all witness values and squeezes out deterministic random
+    /// field elements that will be used to evaluate polynomials for the Schwartz-Zippel lemma.
     ///
     /// # Returns
-    /// Vector of challenge values [gamma_0, gamma_1, ..., gamma_{2L-1}]
+    /// Vector of challenge values [gamma_0, gamma_1, ..., gamma_{2L-1}] where:
+    /// - gamma_0 is used as the primary evaluation point
+    /// - gamma_1, ..., gamma_{L-1} are used for linear combination of ct0 constraints
+    /// - gamma_L, ..., gamma_{2L-1} are used for linear combination of ct1 constraints
     fn generate_challenge(self) -> Vec<Field> {
         let domain_separator = [
             0x47, 0x72, 0x65, 0x63, 0x6f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -375,7 +403,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         let input_size = inputs.len();
         let io_pattern = [0x80000000 | input_size, 0x00000000 | 1];
 
-        let pk_commitment = safe(domain_separator, inputs, io_pattern);
+        let pk_commitment = compute_safe(domain_separator, inputs, io_pattern);
         assert_eq(pk_commitment.get(0), self.pk_commitment);
 
         // IO Pattern: ABSORB(input_size), SQUEEZE(2*L)
@@ -383,16 +411,25 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         let input_size = inputs.len();
         let io_pattern = [0x80000000 | input_size, 0x00000000 | (2 * L)];
 
-        safe(domain_separator, inputs, io_pattern)
+        compute_safe(domain_separator, inputs, io_pattern)
     }
 
-    /// Verifies encryption constraints using Fiat-Shamir challenges
+    /// Verifies encryption constraints using Fiat-Shamir challenges.
     ///
-    /// For each CRT basis i, proves that LHS(gamma) = RHS(gamma)
-    /// This uses the Schwartz-Zippel lemma for polynomial identity testing.
+    /// For each CRT basis i, this function verifies that the encryption equations hold
+    /// when evaluated at the challenge points. It uses the Schwartz-Zippel lemma:
+    /// if polynomial equations hold when evaluated at random points, then the polynomials
+    /// are identical with high probability.
+    ///
+    /// The verification combines all CRT bases using a linear combination with the
+    /// challenge values to reduce the number of constraints while maintaining security.
     ///
     /// # Arguments
     /// * `gammas` - Vector of challenge values [gamma_0, gamma_1, ..., gamma_{2L-1}]
+    ///              generated by `generate_challenge()`
+    ///
+    /// # Returns
+    /// `true` if all encryption constraints are satisfied, `false` otherwise.
     fn verify_evaluations(self, gammas: Vec<Field>) -> bool {
         let gamma = gammas.get(0);
         // Cyclotomic polynomial evaluation: cyclo(x) = x^N + 1

@@ -102,23 +102,31 @@ impl<let N: u32> Polynomial<N> {
         result
     }
 
-    /// Performs range checking on polynomial coefficients using asymmetric bounds
+    /// Performs range checking on polynomial coefficients using asymmetric bounds.
     ///
     /// This function constrains all polynomial coefficients to be in the range [lower_bound, upper_bound].
-    /// Similar to range_check_1bound, it uses a shifting technique to avoid negative numbers:
-    /// 1. Shifts each coefficient by adding -lower_bound: c' = c - lower_bound
-    /// 2. Checks that shifted coefficients are in [0, upper_bound - lower_bound]
+    /// It uses a shifting technique to handle negative numbers efficiently:
+    /// 1. Shifts each coefficient by adding `lower_bound`: c' = c + lower_bound
+    /// 2. Checks that shifted coefficients are in [0, upper_bound + lower_bound] using bit-size assertions
     /// 3. This ensures original coefficients are in [lower_bound, upper_bound]
     ///
-    /// Set `BIT` to the bit-length of the total range `upper_bound - lower_bound`
-    /// (choose `BIT` so `upper_bound - lower_bound < 2^BIT`). Since all checked values lie in
-    /// `[0, upper_bound - lower_bound]`, they cannot exceed `BIT + 1` bits, which is
-    /// why we use `assert_max_bit_size::<BIT + 1>()`.
+    /// The function uses two bit-size checks per coefficient to ensure the value is within bounds:
+    /// - `shifted_coefficient.assert_max_bit_size::<BIT + 1>()` ensures c' >= 0
+    /// - `(range_size - shifted_coefficient).assert_max_bit_size::<BIT + 1>()` ensures c' <= range_size
     ///
     /// # Arguments
     /// * `upper_bound` - The upper bound for coefficient range checking
-    /// * `lower_bound` - The lower bound for coefficient range checking (must be positive Field value)
+    /// * `lower_bound` - The lower bound for coefficient range checking
     ///                   Coefficients must satisfy: lower_bound <= c <= upper_bound
+    ///
+    /// # Generic Parameters
+    /// * `BIT` - The bit-length of the total range `upper_bound - lower_bound`
+    ///           (choose `BIT` so `upper_bound - lower_bound < 2^BIT`). Since all checked
+    ///           values lie in `[0, upper_bound + lower_bound]`, they cannot exceed `BIT + 1` bits.
+    ///
+    /// # Panics
+    /// This function will cause the circuit to fail if any coefficient is outside
+    /// the specified bounds.
     pub fn range_check_2bounds<let BIT: u32>(self, upper_bound: Field, lower_bound: Field) {
         let range_size = lower_bound + upper_bound;
 
