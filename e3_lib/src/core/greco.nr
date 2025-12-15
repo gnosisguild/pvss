@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::math::polynomial::{flatten, Polynomial};
-use crate::math::safe::SafeSponge;
+use crate::math::safe::safe;
 
 /// Configs for the Greco circuit.
 /// Contains the core mathematical values used in Greco.
@@ -375,24 +375,15 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         let input_size = inputs.len();
         let io_pattern = [0x80000000 | input_size, 0x00000000 | 1];
 
-        let mut sponge = SafeSponge::start(io_pattern, domain_separator);
-        sponge.absorb(inputs);
-        let commitment = sponge.squeeze();
-        sponge.finish();
-
-        assert_eq(commitment.get(0), self.pk_commitment);
+        let pk_commitment = safe(domain_separator, inputs, io_pattern);
+        assert_eq(pk_commitment.get(0), self.pk_commitment);
 
         // IO Pattern: ABSORB(input_size), SQUEEZE(2*L)
         let inputs = self.gammas_payload();
         let input_size = inputs.len();
         let io_pattern = [0x80000000 | input_size, 0x00000000 | (2 * L)];
 
-        let mut sponge = SafeSponge::start(io_pattern, domain_separator);
-        sponge.absorb(inputs);
-        let gammas = sponge.squeeze();
-
-        sponge.finish();
-        gammas
+        safe(domain_separator, inputs, io_pattern)
     }
 
     /// Verifies encryption constraints using Fiat-Shamir challenges
