@@ -1,10 +1,38 @@
-use crate::core::greco::Configs;
+use crate::core::bfv_pk::Configs as BfvPkConfigs;
+use crate::core::greco::Configs as GrecoConfigs;
 
 // Global configs for BFV parameter set
 pub global N: u32 = 8192;
 pub global L: u32 = 2;
 pub global QIS: [Field; 2] = [72057594082099201, 72057594062438401];
 pub global Q_MOD_T: Field = 1082658244788225;
+
+/************************************
+-------------------------------------
+bfv_pk (CIRCUIT 2 - PUBLIC KEY BFV)
+-------------------------------------
+************************************/
+
+// bfv_pk - bit parameters
+pub global BFV_PK_BIT_EEK: u32 = 6;
+pub global BFV_PK_BIT_SK: u32 = 2;
+pub global BFV_PK_BIT_R1: u32 = 18;
+pub global BFV_PK_BIT_R2: u32 = 57;
+
+// bfv_pk - bounds
+pub global BFV_PK_EEK_BOUND: Field = 20;
+pub global BFV_PK_SK_BOUND: Field = 1;
+pub global BFV_PK_R1_BOUNDS: [Field; 2] = [81920, 81920];
+pub global BFV_PK_R2_BOUNDS: [Field; 2] = [36028797041049600, 36028797031219200];
+
+// bfv_pk - configs
+pub global BFV_PK_CONFIGS: BfvPkConfigs<N, L> = BfvPkConfigs::new(
+    QIS,
+    BFV_PK_EEK_BOUND,
+    BFV_PK_SK_BOUND,
+    BFV_PK_R1_BOUNDS,
+    BFV_PK_R2_BOUNDS,
+);
 
 /************************************
 -------------------------------------
@@ -41,7 +69,7 @@ pub global ENC_BFV_K1_UP_BOUND: Field = 9007199254740991;
 pub global ENC_BFV_K0IS: [Field; 2] = [70854796903366627, 47439047573780733];
 
 // enc_bfv - configs
-pub global ENC_BFV_CONFIGS: Configs<N, L> = Configs::new(
+pub global ENC_BFV_CONFIGS: GrecoConfigs<N, L> = GrecoConfigs::new(
     Q_MOD_T,
     QIS,
     ENC_BFV_K0IS,
