@@ -148,7 +148,7 @@ fn test_polynomial_eval() {
     let result = poly.eval(x);
 
     // (1 * 2^2) + (2 * 2) + 3 = 4 + 4 + 3 = 11
-    assert_eq(result, 11);
+    assert(result == 11);
 }
 
 #[test]
@@ -159,7 +159,7 @@ fn test_polynomial_eval_zero() {
     let x = 1; // evaluate at x = 1, should be 0
     let result = poly.eval(x);
 
-    assert_eq(result, 0);
+    assert(result == 0);
 }
 
 #[test]
@@ -191,9 +191,9 @@ fn test_polynomial_add() {
     let result = poly1.add(poly2);
 
     // Expected: (1+4)x^2 + (2+5)x + (3+6) = 5x^2 + 7x + 9
-    assert_eq(result.coefficients[0], 5);
-    assert_eq(result.coefficients[1], 7);
-    assert_eq(result.coefficients[2], 9);
+    assert(result.coefficients[0] == 5);
+    assert(result.coefficients[1] == 7);
+    assert(result.coefficients[2] == 9);
 }
 
 #[test]
@@ -206,9 +206,9 @@ fn test_polynomial_sub() {
     let result = poly1.sub(poly2);
 
     // Expected: (5-1)x^2 + (7-2)x + (9-3) = 4x^2 + 5x + 6
-    assert_eq(result.coefficients[0], 4);
-    assert_eq(result.coefficients[1], 5);
-    assert_eq(result.coefficients[2], 6);
+    assert(result.coefficients[0] == 4);
+    assert(result.coefficients[1] == 5);
+    assert(result.coefficients[2] == 6);
 }
 
 #[test]
@@ -220,9 +220,9 @@ fn test_polynomial_mul_scalar() {
     let result = poly.mul_scalar(scalar);
 
     // Expected: 5x^2 + 10x + 15
-    assert_eq(result.coefficients[0], 5);
-    assert_eq(result.coefficients[1], 10);
-    assert_eq(result.coefficients[2], 15);
+    assert(result.coefficients[0] == 5);
+    assert(result.coefficients[1] == 10);
+    assert(result.coefficients[2] == 15);
 }
 
 #[test]
@@ -234,7 +234,7 @@ fn test_polynomial_mul_scalar_zero() {
     let result = poly.mul_scalar(scalar);
 
     // Expected: 0x^2 + 0x + 0 = 0
-    assert_eq(result.coefficients[0], 0);
-    assert_eq(result.coefficients[1], 0);
-    assert_eq(result.coefficients[2], 0);
+    assert(result.coefficients[0] == 0);
+    assert(result.coefficients[1] == 0);
+    assert(result.coefficients[2] == 0);
 }

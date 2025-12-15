@@ -181,9 +181,9 @@ fn test_flatten() {
 
     // Verify the flattened coefficients are in the correct positions
     // Every value shifted 1 nibble incase of negative integers
-    assert_eq(result.get(0), 0x11121310101010101010101010101010101010101010101010101010101010);
-    assert_eq(result.get(1), 0x14001610101010101010101010101010101010101010101010101010101010); // -16 became 00 at  0x 14 00 16,
-    assert_eq(result.get(2), 0x09181910101010101010101010101010101010101010101010101010101010); // -7 became 09 at 0x 09 18 19(16 - 7 = 9)
+    assert(result.get(0) == 0x11121310101010101010101010101010101010101010101010101010101010);
+    assert(result.get(1) == 0x14001610101010101010101010101010101010101010101010101010101010); // -16 became 00 at  0x 14 00 16,
+    assert(result.get(2) == 0x09181910101010101010101010101010101010101010101010101010101010); // -7 became 09 at 0x 09 18 19(16 - 7 = 9)
 }
 
 #[test]
@@ -243,12 +243,12 @@ fn test_flatten_big() {
     // base - 5921327228407753 = 0xeaf69591f3b037 (negative coefficient shifted)
     // base - 3644467483862151 = 0xf30d604a3a9b79 (negative coefficient shifted)
     // base + 5430119342984413 = 0x1134aaa2e86ccdd
-    assert_eq(result.get(0), 0x1065d1a8b8b718a0eaf69591f3b0370f30d604a3a9b791134aaa2e86ccdd);
-    assert_eq(result.get(1), 0x1028105ab1b789411fa010339db66b0fc220f1326bc8e0f1e3f4cc1e02e1);
-    assert_eq(result.get(2), 0x0f23dfbe7cd76c90f4901299312ddf10a569efe35acef11c0d76f005412b);
-    assert_eq(result.get(3), 0x107624a8f605dc50f0638a368960421022ecb3cf36b7911d73ff2c27ec14);
-    assert_eq(result.get(4), 0x0f6013a24e1b9a90f4fd2c158a08481180c2dba8af4cc10242413515171c);
-    assert_eq(result.get(5), 0x11b0964eb898ce411076805680b85410729c962da53a40f4b44412d0f6ed);
+    assert(result.get(0) == 0x1065d1a8b8b718a0eaf69591f3b0370f30d604a3a9b791134aaa2e86ccdd);
+    assert(result.get(1) == 0x1028105ab1b789411fa010339db66b0fc220f1326bc8e0f1e3f4cc1e02e1);
+    assert(result.get(2) == 0x0f23dfbe7cd76c90f4901299312ddf10a569efe35acef11c0d76f005412b);
+    assert(result.get(3) == 0x107624a8f605dc50f0638a368960421022ecb3cf36b7911d73ff2c27ec14);
+    assert(result.get(4) == 0x0f6013a24e1b9a90f4fd2c158a08481180c2dba8af4cc10242413515171c);
+    assert(result.get(5) == 0x11b0964eb898ce411076805680b85410729c962da53a40f4b44412d0f6ed);
 }
 
 #[test]
@@ -266,9 +266,9 @@ fn test_flatten_small() {
     // Flatten the polynomials
     let result = flatten::<_, _, 20>(inputs, polynomials);
 
-    assert_eq(result.get(0), 0x1ade991199991f423f17a12110007b19fbf110004d100000100000100000);
-    assert_eq(result.get(1), 0x10000117ffff1d9038105ba01087071badf8100000100000100000100000);
-    assert_eq(result.get(2), 0x16c81c15161513640e11b2071f120613c41a10350b100000100000100000);
+    assert(result.get(0) == 0x1ade991199991f423f17a12110007b19fbf110004d100000100000100000);
+    assert(result.get(1) == 0x10000117ffff1d9038105ba01087071badf8100000100000100000100000);
+    assert(result.get(2) == 0x16c81c15161513640e11b2071f120613c41a10350b100000100000100000);
 }
 
 #[test]
@@ -329,6 +329,6 @@ fn test_pack_determinism() {
 
     assert(packed1.len() == packed2.len());
     for i in 0..packed1.len() {
-        assert_eq(packed1.get(i), packed2.get(i));
+        assert(packed1.get(i) == packed2.get(i));
     }
 }

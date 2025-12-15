@@ -404,7 +404,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         let io_pattern = [0x80000000 | input_size, 0x00000000 | 1];
 
         let pk_commitment = compute_safe(domain_separator, inputs, io_pattern);
-        assert_eq(pk_commitment.get(0), self.pk_commitment);
+        assert(pk_commitment.get(0) == self.pk_commitment);
 
         // IO Pattern: ABSORB(input_size), SQUEEZE(2*L)
         let inputs = self.gammas_payload();
