@@ -2,34 +2,50 @@ use crate::math::helpers::{compute_safe, flatten};
 use crate::math::modulo::U128::ModU128;
 use crate::math::polynomial::Polynomial;
 
+/// Cryptographic parameters for the BFV decryption and TRBFV share aggregation circuit.
+///
+/// This struct contains all the mathematical constants and bounds needed to verify
+/// correct BFV decryption of multiple ciphertexts and their aggregation into TRBFV shares.
+///
+/// # Generic Parameters
+/// * `L` - The number of TRBFV CRT (Chinese Remainder Theorem) bases
+/// * `L_PRIME` - The number of BFV CRT bases
 pub struct Config<let L: u32, let L_PRIME: u32> {
     /// BFV CRT moduli: [q'_0, q'_1, ..., q'_{L'-1}]
     pub bfv_qis: [Field; L_PRIME],
-    /// BFV plaintext modulus (large enough for TRBFV values)
+    /// BFV plaintext modulus (typically denoted as `t`, large enough for TRBFV values)
     pub bfv_plaintext_modulus: Field,
-    /// BFV Q^{-1} mod t for decoding
+    /// Precomputed value: `-Q^(-1) mod t` where Q is the product of all BFV CRT moduli
     pub bfv_q_inverse_mod_t: Field,
     /// TRBFV CRT moduli: [q_0, q_1, ..., q_{L-1}]
     pub trbfv_qis: [Field; L],
-    /// Bound for BFV secret key
+    /// Bound for BFV secret key polynomial coefficients
     pub s_bound: Field,
-    /// Bounds for u_i polynomials (per BFV basis)
+    /// Bounds for u_i polynomials (per BFV basis, one bound per L_PRIME)
     pub u_i_bounds: [Field; L_PRIME],
-    /// Bound for global u polynomial
+    /// Bound for global u polynomial coefficients (after CRT reconstruction)
     pub u_global_bound: Field,
-    /// Bounds for r_1 polynomials (per BFV basis)
+    /// Bounds for r_1 quotient polynomials (per BFV basis, one bound per L_PRIME)
     pub r1_bounds: [Field; L_PRIME],
-    /// Bounds for r_2 polynomials (per BFV basis)
+    /// Bounds for r_2 quotient polynomials (per BFV basis, one bound per L_PRIME)
     pub r2_bounds: [Field; L_PRIME],
-    /// Global delta value: delta = floor(Q/t) where Q is the product of all q_i
+    /// Global delta value: `delta = floor(Q/t)` where Q is the product of all BFV moduli
     /// Used in the decoding formula to scale the plaintext
     pub delta: Field,
-    /// Global half-delta value: delta_half = floor(delta / 2)
-    /// Used to check the noise bound: |u_global - delta * m| < delta/2
+    /// Global half-delta value: `delta_half = floor(delta / 2)`
+    /// Used to check the noise bound: `|u_global - delta * m| < delta/2`
     pub delta_half: Field,
 }
 
 impl<let L: u32, let L_PRIME: u32> Config<L, L_PRIME> {
+    /// Creates a new `Config` instance with the specified cryptographic parameters.
+    ///
+    /// # Arguments
+    /// All parameters correspond to the fields of the `Config` struct. See the struct
+    /// documentation for details on each parameter.
+    ///
+    /// # Returns
+    /// A new `Config` instance ready for use with the `BfvDecNoHomAdd` circuit.
     pub fn new(
         bfv_qis: [Field; L_PRIME],
         bfv_plaintext_modulus: Field,
@@ -59,26 +75,38 @@ impl<let L: u32, let L_PRIME: u32> Config<L, L_PRIME> {
     }
 }
 
-/// BFV Decryption and TRBFV Share Aggregation Circuit
+/// BFV Decryption and TRBFV Share Aggregation Circuit.
 ///
-/// This circuit verifies:
-/// 1. BFV decryption of H*L ciphertexts (H honest parties * L TRBFV bases)
-/// 2. Each ciphertext decrypts using L' BFV RNS bases
-/// 3. CRT reconstruction for each ciphertext to u_global
-/// 4. Decoding each u_global to decrypted_share
-/// 5. For each TRBFV basis l: sigma_h decrypted_shares[h][l] mod trbfv_qi[l] = expected_share[l]
+/// This circuit implements a zero-knowledge proof for the correct decryption of multiple
+/// BFV ciphertexts and their aggregation into TRBFV secret key shares. It verifies the
+/// complete pipeline from encrypted ciphertexts to aggregated TRBFV shares without using
+/// homomorphic addition.
+///
+/// The circuit verifies the following steps for H honest parties and L TRBFV bases:
+/// 1. **BFV Decryption**: For each of H*L ciphertexts, verifies correct BFV decryption
+///    using L' BFV RNS bases. Each ciphertext is decrypted component-wise:
+///    `u_i = c_0 + c_1 * s + r_2 * (X^N + 1) + r_1 * q'_i` for each BFV basis i
+/// 2. **CRT Reconstruction**: For each ciphertext, verifies that the per-basis decryption
+///    results `u_i` are correctly reconstructed into a global `u_global` using CRT
+/// 3. **Message Decoding**: For each ciphertext, verifies that `u_global` is correctly
+///    decoded to the decrypted share using the BFV decoding formula
+/// 4. **TRBFV Aggregation**: For each TRBFV basis, verifies that the sum of all H
+///    decrypted shares modulo the TRBFV modulus equals the expected aggregated share
+///
+/// This circuit is used in threshold BFV protocols where multiple parties' ciphertexts
+/// need to be decrypted and aggregated without using homomorphic operations.
 ///
 /// # Generic Parameters
-/// * `N` - Number of polynomial coefficients
-/// * `H` - Number of honest parties
+/// * `N` - Number of polynomial coefficients (ring dimension)
+/// * `H` - Number of honest parties (ciphertexts to decrypt)
 /// * `L` - Number of TRBFV CRT bases
 /// * `L_PRIME` - Number of BFV CRT bases
-/// * `BIT_CT` - Bit width for ciphertext coefficients
-/// * `BIT_S` - Bit width for BFV secret key
-/// * `BIT_U` - Bit width for u_i and u_global coefficients
-/// * `BIT_R1` - Bit width for r_1 quotients
-/// * `BIT_R2` - Bit width for r_2 quotients
-/// * `BIT_MSG` - Bit width for decoded message coefficients
+/// * `BIT_CT` - Bit-width bound per coefficient for ciphertext polynomials
+/// * `BIT_S` - Bit-width bound per coefficient for BFV secret key polynomial
+/// * `BIT_U` - Bit-width bound per coefficient for u_i and u_global polynomials
+/// * `BIT_R1` - Bit-width bound per coefficient for r_1 quotient polynomials
+/// * `BIT_R2` - Bit-width bound per coefficient for r_2 quotient polynomials
+/// * `BIT_MSG` - Bit-width bound per coefficient for decoded message polynomials
 pub struct BfvDecNoHomAdd<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_U: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_MSG: u32> {
     /// Circuit parameters
     configs: Config<L, L_PRIME>,
@@ -118,7 +146,26 @@ pub struct BfvDecNoHomAdd<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, 
 }
 
 impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_U: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_MSG: u32> BfvDecNoHomAdd<N, H, L, L_PRIME, BIT_CT, BIT_S, BIT_U, BIT_R1, BIT_R2, BIT_MSG> {
-    /// Creates a new circuit instance
+    /// Creates a new `BfvDecNoHomAdd` circuit instance.
+    ///
+    /// This constructor initializes all the polynomials and parameters needed for
+    /// the zero-knowledge proof of correct BFV decryption and TRBFV share aggregation.
+    ///
+    /// # Arguments
+    /// * `configs` - Cryptographic parameters including moduli, bounds, and scaling factors
+    /// * `honest_c0` - First ciphertext components for H parties, L TRBFV bases, L' BFV bases (public inputs)
+    /// * `honest_c1` - Second ciphertext components for H parties, L TRBFV bases, L' BFV bases (public inputs)
+    /// * `s` - BFV secret key polynomial (secret witness)
+    /// * `u_i` - Per-ciphertext per-BFV-basis decryption results (secret witnesses)
+    /// * `r_1` - Quotient polynomials for modulus lifting (secret witnesses, degree 2N-1)
+    /// * `r_2` - Quotient polynomials for cyclotomic lifting (secret witnesses, degree N-1)
+    /// * `u_global` - CRT-reconstructed global u polynomials (secret witnesses, one per H*L ciphertext)
+    /// * `crt_quotients` - CRT quotient polynomials for reconstruction (secret witnesses)
+    /// * `decrypted_shares` - Decoded message polynomials (public outputs, one per H*L ciphertext)
+    /// * `expected_aggregated_shares` - Expected aggregated TRBFV shares (secret witnesses)
+    ///
+    /// # Returns
+    /// A new `BfvDecNoHomAdd` instance ready for constraint checking via the `verify()` method
     pub fn new(
         configs: Config<L, L_PRIME>,
         honest_c0: [[[Polynomial<N>; L_PRIME]; L]; H],
@@ -147,7 +194,26 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
         }
     }
 
-    /// Main verification function
+    /// Main verification function that performs all circuit checks.
+    ///
+    /// This function implements the complete zero-knowledge proof by verifying:
+    /// 1. Range bounds on all secret witnesses (secret key, u_i, quotients, u_global)
+    /// 2. BFV decryption formula for each ciphertext and BFV basis (using Schwartz-Zippel)
+    /// 3. CRT reconstruction for each ciphertext
+    /// 4. Message decoding for each ciphertext
+    /// 5. TRBFV share aggregation across all honest parties
+    ///
+    /// The proof uses the Schwartz-Zippel lemma to verify polynomial equations by
+    /// evaluating them at a random challenge point generated via Fiat-Shamir.
+    ///
+    /// # Panics
+    /// This function will cause the circuit to fail if any verification step fails.
+    /// The circuit fails if:
+    /// - Any witness is outside its expected bounds
+    /// - BFV decryption formula doesn't hold for any ciphertext or BFV basis
+    /// - CRT reconstruction doesn't hold for any ciphertext
+    /// - Message decoding doesn't match for any ciphertext
+    /// - TRBFV share aggregation doesn't match expected values
     pub fn verify(self) {
         // Step 1: Range checks on secret witnesses
         self.check_range_bounds();
@@ -175,7 +241,22 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
         self.verify_trbfv_aggregation();
     }
 
-    /// Performs range checks on all secret witness values
+    /// Performs range checks on all secret witness values.
+    ///
+    /// This function constrains all secret witnesses to be within their expected bounds
+    /// as specified in the `configs`. This is critical for security because it prevents
+    /// attacks where malicious provers provide out-of-range values that could break the
+    /// security properties of the BFV and TRBFV schemes.
+    ///
+    /// The function checks:
+    /// - BFV secret key `s` has small coefficients (required for security)
+    /// - Per-ciphertext per-BFV-basis witnesses `u_i` are within bounds for each BFV basis
+    /// - Quotient polynomials `r_1` and `r_2` are within bounds for each BFV basis
+    /// - Global u polynomials `u_global` are within bounds (after CRT reconstruction)
+    ///
+    /// # Panics
+    /// This function will cause the circuit to fail if any coefficient is outside
+    /// its expected bounds. The bounds are defined per polynomial type in the `configs`.
     fn check_range_bounds(self) {
         // Check BFV secret key
         self.s.range_check_2bounds::<BIT_S>(self.configs.s_bound, self.configs.s_bound);
@@ -212,7 +293,25 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
         }
     }
 
-    /// Flattens all witness data for Fiat-Shamir challenge generation
+    /// Flattens all witness data into a single array for Fiat-Shamir challenge generation.
+    ///
+    /// This function serializes all polynomial coefficients (both public inputs and
+    /// secret witnesses) into a 1D array in a deterministic order. The flattened data
+    /// is used to generate the Fiat-Shamir challenge via the SAFE sponge API.
+    ///
+    /// The order of serialization is:
+    /// 1. Honest ciphertexts `c_0` and `c_1` for all parties, TRBFV bases, and BFV bases
+    /// 2. BFV secret key `s`
+    /// 3. Per-ciphertext per-BFV-basis decryption results `u_i`
+    /// 4. Quotient polynomials `r_1` and `r_2`
+    /// 5. Global u polynomials `u_global`
+    /// 6. CRT quotient polynomials
+    /// 7. Decrypted shares
+    /// 8. Expected aggregated TRBFV shares
+    ///
+    /// # Returns
+    /// A vector containing all polynomial coefficients in flattened form, ready for
+    /// hashing to generate the Fiat-Shamir challenge.
     fn payload(self) -> Vec<Field> {
         let mut inputs = Vec::new();
 
@@ -265,7 +364,20 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
         inputs
     }
 
-    /// Generates Fiat-Shamir challenge value
+    /// Generates Fiat-Shamir challenge value using the SAFE cryptographic sponge.
+    ///
+    /// This function implements the Fiat-Shamir transform for the BFV decryption circuit:
+    /// 1. Flattens all witness data (ciphertexts, secrets, quotients, shares) into a single array
+    /// 2. Absorbs the flattened data into the SAFE sponge
+    /// 3. Squeezes a single challenge value
+    ///
+    /// The challenge is used to evaluate polynomials for the Schwartz-Zippel lemma,
+    /// which allows verification of polynomial equations by checking them at a random
+    /// point rather than checking all coefficients.
+    ///
+    /// # Returns
+    /// A single challenge value `gamma` used as the evaluation point for verifying
+    /// the BFV decryption formula for all ciphertexts and BFV bases.
     fn generate_challenge(self) -> Field {
         let inputs = self.payload();
 
@@ -284,9 +396,30 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
         compute_safe(domain_separator, inputs, io_pattern).get(0)
     }
 
-    /// Verifies BFV decryption formula for one ciphertext at one BFV basis
+    /// Verifies the BFV decryption formula for one ciphertext at one BFV basis using the Schwartz-Zippel lemma.
     ///
-    /// Checks: u_i(gamma) = c_0(gamma) + c_1(gamma) * s(gamma) + r_2(gamma) * (gamma^N + 1) + r_1(gamma) * bfv_q_i
+    /// This function verifies that the decryption result `u_i` for a specific ciphertext
+    /// (party, TRBFV basis) and BFV basis satisfies:
+    /// `u_i(gamma) = c_0(gamma) + c_1(gamma) * s(gamma) + r_2(gamma) * cyclo(gamma) + r_1(gamma) * bfv_q_i`
+    ///
+    /// Where:
+    /// - `c_0`, `c_1` are ciphertext components for the specified party, TRBFV basis, and BFV basis
+    /// - `s` is the BFV secret key polynomial (same for all bases)
+    /// - `r_1`, `r_2` are quotient witnesses for lifting to the large field
+    /// - `cyclo(gamma) = gamma^N + 1` is the cyclotomic polynomial evaluated at gamma
+    /// - `bfv_q_i` is the BFV CRT modulus for basis i
+    ///
+    /// The Schwartz-Zippel lemma ensures that if this equation holds at a random point
+    /// `gamma`, then the polynomials are identical with high probability.
+    ///
+    /// # Arguments
+    /// * `party_idx` - The index of the honest party (0 <= party_idx < H)
+    /// * `trbfv_idx` - The index of the TRBFV basis (0 <= trbfv_idx < L)
+    /// * `bfv_idx` - The index of the BFV basis (0 <= bfv_idx < L_PRIME)
+    /// * `gamma` - The Fiat-Shamir challenge value used as the evaluation point
+    ///
+    /// # Panics
+    /// The circuit will fail if the BFV decryption formula doesn't hold for the specified indices.
     fn verify_decryption_formula(self, party_idx: u32, trbfv_idx: u32, bfv_idx: u32, gamma: Field) {
         // Evaluate ciphertext at gamma
         let c_0_at_gamma = self.honest_c0[party_idx][trbfv_idx][bfv_idx].eval(gamma);
@@ -313,8 +446,25 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
         assert_eq(computed_u, expected_u);
     }
 
-    /// Verifies CRT reconstruction for one ciphertext
-    /// u_i[l'] + quotient[l'] * q'_l' = u_global (for all l')
+    /// Verifies CRT reconstruction for one ciphertext: `u_i[l'] + quotient[l'] * q'_l' = u_global` for all l'.
+    ///
+    /// This function verifies that for a specific ciphertext (party, TRBFV basis), the
+    /// per-BFV-basis decryption results `u_i` are correctly reconstructed into the global
+    /// polynomial `u_global` using the Chinese Remainder Theorem.
+    ///
+    /// For each BFV basis l', the function verifies:
+    /// - `u_i[l']` (decryption result for BFV basis l') plus
+    /// - `quotient[l'] * q'_l'` (CRT quotient times BFV modulus) equals
+    /// - `u_global` (the claimed global polynomial)
+    ///
+    /// This must hold for every coefficient position and every BFV basis.
+    ///
+    /// # Arguments
+    /// * `party_idx` - The index of the honest party (0 <= party_idx < H)
+    /// * `trbfv_idx` - The index of the TRBFV basis (0 <= trbfv_idx < L)
+    ///
+    /// # Panics
+    /// The circuit will fail if the CRT reconstruction doesn't hold for any BFV basis or coefficient.
     fn verify_crt_reconstruction(self, party_idx: u32, trbfv_idx: u32) {
         for bfv_idx in 0..L_PRIME {
             let q_l = self.configs.bfv_qis[bfv_idx];
@@ -337,7 +487,26 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
         }
     }
 
-    /// Verifies BFV decoding: u_global to decrypted_share
+    /// Verifies BFV decoding: `u_global` to `decrypted_share`.
+    ///
+    /// This function verifies that the global u polynomial `u_global` is correctly decoded
+    /// to the decrypted share using the BFV decoding formula:
+    /// `message = -Q^(-1) * (t * u_global)_Q mod t`
+    ///
+    /// The decoding process involves:
+    /// 1. Computing `(t * u_global) mod Q` where Q is the product of all BFV moduli
+    /// 2. Handling centered arithmetic (values >= Q/2 are treated as negative)
+    /// 3. Computing `-Q^(-1) * (t * u_global)_Q mod t` to recover the message
+    ///
+    /// The function only verifies non-zero message coefficients to allow for sparse messages.
+    ///
+    /// # Arguments
+    /// * `party_idx` - The index of the honest party (0 <= party_idx < H)
+    /// * `trbfv_idx` - The index of the TRBFV basis (0 <= trbfv_idx < L)
+    ///
+    /// # Panics
+    /// The circuit will fail if the decoded message doesn't match the claimed decrypted share
+    /// for any non-zero coefficient.
     fn verify_decoding(self, party_idx: u32, trbfv_idx: u32) {
         let t = self.configs.bfv_plaintext_modulus;
 
@@ -379,8 +548,22 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
         }
     }
 
-    /// Verifies TRBFV share aggregation
-    /// For each TRBFV basis l: sigma_h decrypted_shares[h][l] mod trbfv_qi[l] = expected[l]
+    /// Verifies TRBFV share aggregation: `sum_h decrypted_shares[h][l] mod trbfv_qi[l] = expected[l]` for each TRBFV basis l.
+    ///
+    /// This function verifies that for each TRBFV basis, the sum of all H honest parties'
+    /// decrypted shares modulo the TRBFV modulus equals the expected aggregated share.
+    ///
+    /// For each TRBFV basis l and each coefficient position:
+    /// - Sums the decrypted shares from all H honest parties
+    /// - Reduces the sum modulo the TRBFV modulus `trbfv_qi[l]`
+    /// - Verifies the result equals the expected aggregated share coefficient
+    ///
+    /// This ensures that the aggregation of individual decrypted shares correctly produces
+    /// the expected TRBFV secret key share for each basis.
+    ///
+    /// # Panics
+    /// The circuit will fail if the aggregated shares don't match the expected values
+    /// for any TRBFV basis or coefficient.
     fn verify_trbfv_aggregation(self) {
         for trbfv_idx in 0..L {
             let trbfv_q = self.configs.trbfv_qis[trbfv_idx];
