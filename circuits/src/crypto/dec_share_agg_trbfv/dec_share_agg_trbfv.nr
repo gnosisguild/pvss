@@ -1,6 +1,5 @@
 use crate::math::modular_fns::{div_mod, mul_mod, reduce_mod};
 use crate::math::polynomial::Polynomial;
-use crate::math::safe::SafeSponge;
 
 /// Cryptographic parameters for decryption share aggregation circuit.
 pub struct CryptographicParams<let L: u32> {
@@ -54,22 +53,17 @@ impl<let N: u32, let L: u32, let T: u32> Params<N, L, T> {
     }
 }
 
-/// Decryption Share Aggregation Circuit
+/// Decryption Share Aggregation Circuit (Circuit 8: dec-result-trbfv)
 ///
 /// Verifies:
-/// 1. T+1 commitments to decryption shares match expected (from DecryptionShareCorrectness circuits)
-/// 2. Lagrange interpolation to compute u^{(l)} for each CRT basis
-/// 3. CRT reconstruction: u^{(l)} + r^{(l)} * q_l = u_global
-/// 4. Decoding verification: message = -Q^{-1} * (t * u_global)_Q mod t
+/// 1. Lagrange interpolation to compute u^{(l)} for each CRT basis
+/// 2. CRT reconstruction: u^{(l)} + r^{(l)} * q_l = u_global
+/// 3. Decoding verification: message = -Q^{-1} * (t * u_global)_Q mod t
 pub struct DecryptionShareAggregation<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> {
     /// Circuit parameters including crypto constants
     params: Params<N, L, T>,
 
-    /// Expected commitments to decryption shares (from DecryptionShareCorrectness circuits)
-    /// One commitment per party
-    expected_decryption_share_commitments: [Field; T + 1],
-
-    /// Decryption shares from t+1 parties (secret witnesses)
+    /// Decryption shares from t+1 parties (public inputs)
     decryption_shares: [[Polynomial<N>; L]; T + 1],
 
     /// Party IDs (x-coordinates) for interpolation (public inputs)
@@ -88,7 +82,6 @@ pub struct DecryptionShareAggregation<let N: u32, let L: u32, let T: u32, let BI
 impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggregation<N, L, T, BIT_NOISE> {
     pub fn new(
         params: Params<N, L, T>,
-        expected_decryption_share_commitments: [Field; T + 1],
         decryption_shares: [[Polynomial<N>; L]; T + 1],
         party_ids: [Field; T + 1],
         message: Polynomial<N>,
@@ -97,7 +90,6 @@ impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggr
     ) -> Self {
         DecryptionShareAggregation {
             params,
-            expected_decryption_share_commitments,
             decryption_shares,
             party_ids,
             message,
@@ -106,65 +98,19 @@ impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggr
         }
     }
 
-    /// Computes commitment to a party's decryption shares (must match DecryptionShareCorrectness circuit)
-    fn compute_decryption_share_commitment(d: [Polynomial<N>; L]) -> Field {
-        let mut inputs = Vec::new();
-
-        for basis_idx in 0..L {
-            for coeff_idx in 0..N {
-                inputs.push(d[basis_idx].coefficients[coeff_idx]);
-            }
-        }
-
-        // Domain separator - "PVSS_dec_sh" (must match DecryptionShareCorrectness circuit)
-        let domain_separator = [
-            0x50, 0x56, 0x53, 0x53, 0x5f, 0x64, 0x65, 0x63, 0x5f, 0x73, 0x68, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
-
-        let input_size = inputs.len();
-        let io_pattern = [0x80000000 | input_size, 0x00000001];
-
-        let mut sponge = SafeSponge::start(io_pattern, domain_separator);
-        sponge.absorb(inputs);
-        let commitment = sponge.squeeze();
-        sponge.finish();
-
-        commitment.get(0)
-    }
-
-    /// Verifies all decryption share commitments
-    fn verify_decryption_share_commitments(self) {
-        for party_idx in 0..(T + 1) {
-            let computed_commitment =
-                Self::compute_decryption_share_commitment(self.decryption_shares[party_idx]);
-            assert_eq(
-                computed_commitment,
-                self.expected_decryption_share_commitments[party_idx],
-                "Decryption share commitment mismatch",
-            );
-        }
-    }
-
     /// Main verification function
     pub fn verify(self) {
-        // Step 1: Verify all decryption share commitments
-        self.verify_decryption_share_commitments();
-
-        // Step 2: Compute Lagrange coefficients in-circuit
+        // Step 1: Compute Lagrange coefficients in-circuit
         let lagrange_coeffs = self.compute_all_lagrange_coeffs();
 
-        // Step 3: Compute u^{(l)} for each CRT basis via Lagrange interpolation
+        // Step 2: Compute u^{(l)} for each CRT basis via Lagrange interpolation
         let u_crts = self.compute_crt_components(lagrange_coeffs);
 
-        // Step 4: Verify CRT reconstruction: u^{(l)} + r^{(l)} * q_l = u_global
+        // Step 3: Verify CRT reconstruction: u^{(l)} + r^{(l)} * q_l = u_global
         self.verify_crt_reconstruction(u_crts);
 
-        // Step 5: Verify decoding
-        self.verify_decoding_alternative();
+        // Step 4: Verify decoding
+        self.verify_decoding();
     }
 
     /// Computes all Lagrange coefficients using optimized modular arithmetic
@@ -287,7 +233,7 @@ impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggr
 
     /// Alternative decoding verification using the formula:
     /// message = -Q^{-1} * (t * u_global)_Q mod t
-    fn verify_decoding_alternative(self) {
+    fn verify_decoding(self) {
         let t: Field = self.params.crypto.plaintext_modulus;
 
         // Compute Q as product of all CRT moduli

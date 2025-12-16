@@ -13,7 +13,7 @@ fn main(
     r_1: [Polynomial<1023>; 2],
     r_2: [Polynomial<511>; 2],
     d: [Polynomial<512>; 2],
-) -> pub Field {
+) {
     let circuit: DecryptionShareCorrectness<512, 2, 36, 36, 36, 44, 36, 36> = DecryptionShareCorrectness::new(
         params,
         expected_s_commitment,
@@ -27,5 +27,5 @@ fn main(
         d,
     );
 
-    circuit.verify_decryption_share_correctness()
+    circuit.verify()
 }

@@ -57,14 +57,14 @@ impl<let N: u32, let L: u32> Params<N, L> {
     }
 }
 
-/// Decryption Share Correctness Circuit
+/// Decryption Share Correctness Circuit (Circuit 7: dec-share-trbfv)
 ///
 /// Verifies:
 /// 1. Commitment to s matches expected (from BFV decryption circuit - aggregated shares)
 /// 2. Commitment to e matches expected (from BFV decryption circuit - aggregated noise shares)
 /// 3. Correct computation of d = c_0 + c_1 * s + e (lifted formula)
 ///
-/// Returns: Commitment to decryption shares d
+/// Returns: nothing
 pub struct DecryptionShareCorrectness<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_D: u32> {
     /// Circuit parameters including bounds and cryptographic constants
     params: Params<N, L>,
@@ -162,36 +162,6 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, le
         assert_eq(computed_commitment, self.expected_e_commitment, "E commitment mismatch");
     }
 
-    /// Commits to decryption shares d
-    fn commit_to_decryption_shares(d: [Polynomial<N>; L]) -> Field {
-        let mut inputs = Vec::new();
-
-        for basis_idx in 0..L {
-            for coeff_idx in 0..N {
-                inputs.push(d[basis_idx].coefficients[coeff_idx]);
-            }
-        }
-
-        // Domain separator - "PVSS_dec_sh" (decryption shares)
-        let domain_separator = [
-            0x50, 0x56, 0x53, 0x53, 0x5f, 0x64, 0x65, 0x63, 0x5f, 0x73, 0x68, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
-
-        let input_size = inputs.len();
-        let io_pattern = [0x80000000 | input_size, 0x00000001];
-
-        let mut sponge = SafeSponge::start(io_pattern, domain_separator);
-        sponge.absorb(inputs);
-        let commitment = sponge.squeeze();
-        sponge.finish();
-
-        commitment.get(0)
-    }
-
     /// Flattens all witness data into a single vector for Fiat-Shamir challenge generation
     fn payload(self) -> Vec<Field> {
         let mut inputs = Vec::new();
@@ -215,8 +185,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, le
     }
 
     /// Main verification function for decryption share correctness
-    /// Returns commitment to decryption shares d
-    pub fn verify_decryption_share_correctness(self) -> Field {
+    pub fn verify(self) {
         // Step 1: Verify s commitment matches expected
         self.verify_s_commitment();
 
@@ -233,9 +202,6 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, le
         for i in 0..L {
             self.verify_decryption_share_computation(i, gamma);
         }
-
-        // Step 6: Return commitment to decryption shares
-        Self::commit_to_decryption_shares(self.d)
     }
 
     /// Performs comprehensive range checks on all secret witness values
