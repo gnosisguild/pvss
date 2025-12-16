@@ -30,3 +30,49 @@ jobs:
 
       - name: Run Noir tests
         run: nargo test
+
+  noir-bin-insecure:
+    name: bin/insecure
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bin/insecure
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nargo
+        uses: noir-lang/noirup@v0.1.4
+        with:
+          toolchain: v1.0.0-beta.16
+
+      - name: Check Noir formatting
+        run: nargo fmt --check
+
+      - name: Build Noir project
+        run: nargo check
+
+      - name: Run Noir tests
+        run: nargo test
+
+  noir-bin-production:
+    name: bin/production
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bin/production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nargo
+        uses: noir-lang/noirup@v0.1.4
+        with:
+          toolchain: v1.0.0-beta.16
+
+      - name: Check Noir formatting
+        run: nargo fmt --check
+
+      - name: Build Noir project
+        run: nargo check
+
+      - name: Run Noir tests
+        run: nargo test
