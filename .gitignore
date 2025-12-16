@@ -1,6 +1,6 @@
 target
 out
 Prover.toml
-benchmarks/results/raw
+benchmarks/results_production/raw
+benchmarks/results_insecure/raw
 .DS_Store
-todo/

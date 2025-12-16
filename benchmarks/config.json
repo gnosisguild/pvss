@@ -1,0 +1,28 @@
+{
+  "circuits": [
+    "pk_trbfv",
+    "pk_bfv",
+    "enc_bfv",
+    "dec_bfv",
+    "enc_trbfv",
+    "dec_share_trbfv",
+    "dec_share_agg_trbfv",
+    "verify_shares_trbfv"
+  ],
+  "oracles": ["default"],
+  "mode": "insecure",
+  "bin_dir": "../bin",
+  "output_dir": "results",
+  "metrics_to_track": [
+    "compilation_time",
+    "execution_time",
+    "gate_count",
+    "vk_generation_time",
+    "proof_generation_time",
+    "verification_time",
+    "circuit_size",
+    "witness_size",
+    "vk_size",
+    "proof_size"
+  ]
+}
