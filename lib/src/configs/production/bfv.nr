@@ -1,3 +1,4 @@
+use crate::core::bfv_dec::Configs as BfvDecConfigs;
 use crate::core::bfv_pk::Configs as BfvPkConfigs;
 use crate::core::greco::Configs as GrecoConfigs;
 
@@ -6,6 +7,9 @@ pub global N: u32 = 8192;
 pub global L: u32 = 2;
 pub global QIS: [Field; L] = [72057594082099201, 72057594062438401];
 pub global Q_MOD_T: Field = 1082658244788225;
+pub global PLAINTEXT_MODULUS: Field = 18014398509481984;
+pub global Q_INVERSE_MOD_T: Field = 3634521516277761;
+pub global T_INVERSE_MOD_Q: Field = 4144717358717138174408418870545186;
 
 /************************************
 -------------------------------------
@@ -84,4 +88,42 @@ pub global ENC_BFV_CONFIGS: GrecoConfigs<N, L> = GrecoConfigs::new(
     ENC_BFV_P2_BOUNDS,
     ENC_BFV_K1_LOW_BOUND,
     ENC_BFV_K1_UP_BOUND,
+);
+
+/************************************
+-------------------------------------
+dec_bfv (CIRCUIT 5 - DECRYPTION BFV)
+-------------------------------------
+************************************/
+// dec_bfv - bit parameters
+pub global DEC_BFV_BIT_CT: u32 = 57;
+pub global DEC_BFV_BIT_S: u32 = 2;
+pub global DEC_BFV_BIT_U: u32 = 114;
+pub global DEC_BFV_BIT_R1: u32 = 15;
+pub global DEC_BFV_BIT_R2: u32 = 57;
+pub global DEC_BFV_BIT_NOISE: u32 = 59;
+
+// dec_bfv - bounds
+pub global DEC_BFV_S_BOUND: Field = 1;
+pub global DEC_BFV_U_I_BOUNDS: [Field; L] = [295183934157319372800, 295183934076778905600];
+pub global DEC_BFV_U_GLOBAL_BOUND: Field = 5192296863483867847775730833817601;
+pub global DEC_BFV_R1_BOUNDS: [Field; L] = [8192, 8192];
+pub global DEC_BFV_R2_BOUNDS: [Field; L] = [36028797041049600, 36028797031219200];
+
+// dec_bfv - misc
+pub global DEC_BFV_DELTA: Field = 288230376426438664;
+pub global DEC_BFV_DELTA_HALF: Field = 144115188213219332;
+
+// dec_bfv - configs
+pub global DEC_BFV_CONFIGS: BfvDecConfigs<L> = BfvDecConfigs::new(
+    QIS,
+    PLAINTEXT_MODULUS,
+    Q_INVERSE_MOD_T,
+    DEC_BFV_S_BOUND,
+    DEC_BFV_U_I_BOUNDS,
+    DEC_BFV_U_GLOBAL_BOUND,
+    DEC_BFV_R1_BOUNDS,
+    DEC_BFV_R2_BOUNDS,
+    DEC_BFV_DELTA,
+    DEC_BFV_DELTA_HALF,
 );

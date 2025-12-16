@@ -1,8 +1,4 @@
-// SPDX-License-Identifier: LGPL-3.0-only
-//
-// This file is provided WITHOUT ANY WARRANTY;
-// without even the implied warranty of MERCHANTABILITY
-// or FITNESS FOR A PARTICULAR PURPOSE.
+use super::modulo::U128::ModU128;
 
 /// Polynomial structure representing a polynomial of degree N-1.
 ///
@@ -102,6 +98,43 @@ impl<let N: u32> Polynomial<N> {
         result
     }
 
+    /// Evaluates the polynomial at a given point with modular reduction.
+    ///
+    /// This function computes `P(x) mod q` using Horner's method with intermediate
+    /// modular reductions to prevent overflow. The result is guaranteed to be in
+    /// the range `[0, q)`.
+    ///
+    /// The function performs lazy reduction: it only reduces the accumulator modulo
+    /// `q` when it exceeds the modulus, which is more efficient than reducing after
+    /// every operation while still preventing overflow.
+    ///
+    /// # Arguments
+    /// * `x` - The point at which to evaluate the polynomial
+    /// * `q` - The modular arithmetic context containing the modulus
+    ///
+    /// # Returns
+    /// The value `P(x) mod q` in the range `[0, q)`
+    pub fn eval_mod(self, x: Field, q: ModU128) -> Field {
+        let m = q.get_mod_field();
+        let mut acc = self.coefficients[0];
+        let len = self.coefficients.len();
+
+        for i in 1..len {
+            acc = acc * x + self.coefficients[i];
+            // Only reduce if accumulator exceeds q
+            if acc as u64 >= m as u64 {
+                acc = q.reduce_mod(acc);
+            }
+        }
+
+        // Final reduction to ensure result is in [0, q)
+        if acc as u64 >= m as u64 {
+            q.reduce_mod(acc)
+        } else {
+            acc
+        }
+    }
+
     /// Performs range checking on polynomial coefficients using asymmetric bounds.
     ///
     /// This function constrains all polynomial coefficients to be in the range [lower_bound, upper_bound].
@@ -135,6 +168,60 @@ impl<let N: u32> Polynomial<N> {
 
             shifted_coefficient.assert_max_bit_size::<BIT + 1>();
             (range_size - shifted_coefficient).assert_max_bit_size::<BIT + 1>();
+        }
+    }
+
+    /// Performs range checking on polynomial coefficients for the range [0, upper_bound).
+    ///
+    /// This function constrains all polynomial coefficients to be non-negative and
+    /// strictly less than `upper_bound`. It uses bit-size assertions to verify that
+    /// coefficients are in the valid range.
+    ///
+    /// The function performs two checks per coefficient:
+    /// 1. `coeff.assert_max_bit_size::<BIT>()` ensures `coeff >= 0` and `coeff < 2^BIT`
+    /// 2. `(upper_bound - 1 - coeff).assert_max_bit_size::<BIT>()` ensures `coeff < upper_bound`
+    ///
+    /// # Arguments
+    /// * `upper_bound` - The exclusive upper bound for coefficient range checking.
+    ///                   Coefficients must satisfy: `0 <= c < upper_bound`
+    ///
+    /// # Generic Parameters
+    /// * `BIT` - The bit-length parameter. Must satisfy `upper_bound <= 2^BIT` for
+    ///           the range check to work correctly.
+    ///
+    /// # Panics
+    /// This function will cause the circuit to fail if any coefficient is outside
+    /// the range `[0, upper_bound)`.
+    pub fn range_check_standard<let BIT: u32>(self, upper_bound: Field) {
+        for i in 0..self.coefficients.len() {
+            let coeff = self.coefficients[i];
+            // Check coeff >= 0 and coeff < 2^BIT
+            coeff.assert_max_bit_size::<BIT>();
+            // Check coeff <= upper_bound - 1 (i.e., coeff < upper_bound)
+            (upper_bound - 1 - coeff).assert_max_bit_size::<BIT>();
+        }
+    }
+
+    /// Performs range checking on polynomial coefficients for the range [0, 2^BIT).
+    ///
+    /// This is a specialized range check for coefficients that must be non-negative
+    /// and less than a power of two. It's more efficient than `range_check_standard`
+    /// when the upper bound is exactly `2^BIT` because it only needs a single
+    /// bit-size assertion per coefficient.
+    ///
+    /// The function verifies that each coefficient satisfies:
+    /// - `coeff >= 0` (implicit from bit-size check)
+    /// - `coeff < 2^BIT` (enforced by `assert_max_bit_size::<BIT>()`)
+    ///
+    /// # Generic Parameters
+    /// * `BIT` - The bit-length parameter. Coefficients must satisfy: `0 <= c < 2^BIT`
+    ///
+    /// # Panics
+    /// This function will cause the circuit to fail if any coefficient is outside
+    /// the range `[0, 2^BIT)`.
+    pub fn range_check_power_of_two<let BIT: u32>(self) {
+        for i in 0..self.coefficients.len() {
+            self.coefficients[i].assert_max_bit_size::<BIT>();
         }
     }
 }
@@ -237,4 +324,134 @@ fn test_polynomial_mul_scalar_zero() {
     assert(result.coefficients[0] == 0);
     assert(result.coefficients[1] == 0);
     assert(result.coefficients[2] == 0);
+}
+
+#[test]
+fn test_eval_mod_simple() {
+    // Test without initial reduction - simple case
+    // p(x) = x + 1 at x=5od 7
+    // Expected: (5 + 1) mod 7 = 6
+    let q = ModU128::new(7);
+
+    let poly1 = Polynomial::new([1, 1]);
+    let result1 = poly1.eval_mod(5, q);
+    assert(result1 == 6);
+
+    // Test: p(x) = 2x + 3 at x=5od 7
+    // Expected: (10 + 3) mod 7 = 13 mod 7 = 6
+    let poly2 = Polynomial::new([2, 3]);
+    let result2 = poly2.eval_mod(5, q);
+    assert(result2 == 6);
+}
+
+#[test]
+fn test_eval_mod_degree_2() {
+    // p(x) = x^2 + 2x + 3 at x=5od 7
+    // Using Horner's method: ((1)*5 + 2)*5 + 3 = (5+2)*5 + 3 = 7*5 + 3 = 35 + 3 = 38
+    // 38 mod 7 = 3 (since 38 = 5*7 + 3)
+    let q = ModU128::new(7);
+
+    let poly = Polynomial::new([1, 2, 3]);
+    let result = poly.eval_mod(5, q);
+    assert(result == 3);
+}
+
+#[test]
+fn test_eval_mod() {
+    // Test 1: Simple polynomial x^2 + 2x + 3 at x=5od 7
+    // Expected: (25 + 10 + 3) mod 7 = 38 mod 7 = 3
+    let q = ModU128::new(7);
+
+    let poly1 = Polynomial::new([1, 2, 3]);
+    let result1 = poly1.eval_mod(5, q);
+    assert(result1 == 3);
+
+    // Test 2: Higher degree polynomialod small prime
+    // p(x) = x^3 + x^2 + x + 1 at x=2od 11
+    // Expected: (8 + 4 + 2 + 1) mod 11 = 15 mod 11 = 4
+    let q = ModU128::new(11);
+
+    let poly2 = Polynomial::new([1, 1, 1, 1]);
+    let result2 = poly2.eval_mod(2, q);
+    assert(result2 == 4);
+
+    // Test 3: Polynomial with larger coefficients
+    // p(x) = 100x^2 + 50x + 25 at x=10od 73
+    // Expected: (10000 + 500 + 25) mod 73 = 10525 mod 73 = 13
+    let q = ModU128::new(73);
+
+    let poly3 = Polynomial::new([100, 50, 25]);
+    let result3 = poly3.eval_mod(10, q);
+    assert(result3 == 13);
+
+    // Test 4: Result should be less than modulus
+    let poly4 = Polynomial::new([5, 3, 7]);
+    let q = ModU128::new(17);
+    let result4 = poly4.eval_mod(4, q);
+    assert(result4 as u64 < q.get_mod_field() as u64);
+
+    // Test 5: Compare with regular eval for small values
+    let poly5 = Polynomial::new([1, 2, 1]);
+    let x = 3;
+    let q = ModU128::new(1000);
+    let result5 = poly5.eval_mod(x, q);
+    let expected5 = poly5.eval(x);
+    assert(result5 == expected5);
+
+    // Test 6: Zero polynomial
+    let poly6 = Polynomial::new([0, 0, 0]);
+    let q = ModU128::new(13);
+    let result6 = poly6.eval_mod(100, q);
+    assert(result6 == 0);
+}
+
+#[test]
+fn test_large_party_ids_scenario() {
+    // Simulating party IDs in range [1, 100]
+    let party_id_1 = 42;
+    let party_id_2 = 73;
+    let m = ModU128::new(288230376151711717); // ~58 bits
+
+    // Operations that would be used in Lagrange coefficients
+    let product = m.mul_mod(party_id_1, party_id_2);
+    let diff = m.sub(party_id_2, party_id_1);
+
+    assert(product == 3066);
+    assert(diff == 31);
+}
+
+#[test]
+fn test_eval_vs_eval_mod() {
+    // Compare eval and eval_mod for small values where no reduction should occur
+    let poly = Polynomial::new([1, 2, 3]);
+    let x = 2;
+    let q = ModU128::new(1000); // Large enough that no reduction happens
+
+    let result_normal = poly.eval(x);
+    let result_mod = poly.eval_mod(x, q);
+
+    // They should be equal: (1)*2 + 2)*2 + 3 = (2+2)*2 + 3 = 4*2 + 3 = 11
+    assert(result_normal == 11);
+    assert(result_mod == 11);
+}
+
+#[test]
+fn test_eval_mod_step_by_step() {
+    // p(x) = x + 1 at x=5od 7
+    // Step by step: acc = 1, then acc = 1*5 + 1 = 6
+    let poly = Polynomial::new([1, 1]);
+
+    // Manually compute
+    let mut acc = 1; // coefficients[0]
+    acc = acc * 5 + 1; // = 6
+    assert(acc == 6);
+
+    // Now with reduce_mod
+    let m = ModU128::new(7);
+    let reduced = m.reduce_mod(acc);
+    assert(reduced == 6);
+
+    // Now test the actual function
+    let result = poly.eval_mod(5, m);
+    assert(result == 6);
 }
