@@ -157,16 +157,7 @@ pub global DEC_SHARES_AGG_BIT_NOISE: u32 = 201;
 
 // trbfv_dec_shares_agg - bounds
 pub global DEC_SHARES_AGG_PLAINTEXT_MODULUS: Field = 100;
-pub global DEC_SHARES_AGG_DELTA: Field =
-    2056880709761530307118999640250952090321250647720126884990156;
-pub global DEC_SHARES_AGG_DELTA_HALF: Field =
-    1028440354880765153559499820125476045160625323860063442495078;
 
 // trbfv_dec_shares_agg - configs
-pub global DEC_SHARES_AGG_CONFIGS: DecSharesAggregationConfigs<L> = DecSharesAggregationConfigs::new(
-    QIS,
-    DEC_SHARES_AGG_PLAINTEXT_MODULUS,
-    Q_INVERSE_MOD_T,
-    DEC_SHARES_AGG_DELTA,
-    DEC_SHARES_AGG_DELTA_HALF,
-);
+pub global DEC_SHARES_AGG_CONFIGS: DecSharesAggregationConfigs<L> =
+    DecSharesAggregationConfigs::new(QIS, DEC_SHARES_AGG_PLAINTEXT_MODULUS, Q_INVERSE_MOD_T);
