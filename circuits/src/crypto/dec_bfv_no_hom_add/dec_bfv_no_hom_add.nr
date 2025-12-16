@@ -83,26 +83,20 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32> Params<N, H, L, L_PRI
 /// BFV Decryption and TRBFV Share Aggregation Circuit
 ///
 /// This circuit verifies:
-/// 1. BFV decryption of H*L ciphertexts (H honest parties * L TRBFV bases)
-/// 2. Each ciphertext decrypts using L' BFV RNS bases
-/// 3. CRT reconstruction for each ciphertext to u_global
-/// 4. Decoding each u_global to decrypted_share
-/// 5. For each TRBFV basis l: sigma_h decrypted_shares[h][l] mod trbfv_qi[l] = expected_share[l]
+/// 1. BFV secret key commitment matches expected
+/// 2. BFV decryption of H*L ciphertexts (H honest parties * L TRBFV bases)
+/// 3. Each ciphertext decrypts using L' BFV RNS bases
+/// 4. CRT reconstruction for each ciphertext to u_global
+/// 5. Decoding each u_global to decrypted_share
+/// 6. For each TRBFV basis l: sigma_h decrypted_shares[h][l] mod trbfv_qi[l] = expected_share[l]
 ///
-/// # Generic Parameters
-/// * `N` - Number of polynomial coefficients
-/// * `H` - Number of honest parties
-/// * `L` - Number of TRBFV CRT bases
-/// * `L_PRIME` - Number of BFV CRT bases
-/// * `BIT_CT` - Bit width for ciphertext coefficients
-/// * `BIT_S` - Bit width for BFV secret key
-/// * `BIT_U` - Bit width for u_i and u_global coefficients
-/// * `BIT_R1` - Bit width for r_1 quotients
-/// * `BIT_R2` - Bit width for r_2 quotients
-/// * `BIT_MSG` - Bit width for decoded message coefficients
+/// Returns: Commitment to expected_aggregated_shares
 pub struct HonestCiphertextAggregationDecryptionNoHomAdd<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_U: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_MSG: u32> {
     /// Circuit parameters
     params: Params<N, H, L, L_PRIME>,
+
+    /// Expected commitment to BFV secret key (from BFV public key circuit)
+    expected_sk_commitment: Field,
 
     /// H*L ciphertexts, each with L_prime BFV RNS components
     /// honest_c0[party_idx][trbfv_basis][bfv_basis]
@@ -142,6 +136,7 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
     /// Creates a new circuit instance
     pub fn new(
         params: Params<N, H, L, L_PRIME>,
+        expected_sk_commitment: Field,
         honest_c0: [[[Polynomial<N>; L_PRIME]; L]; H],
         honest_c1: [[[Polynomial<N>; L_PRIME]; L]; H],
         s: Polynomial<N>,
@@ -155,6 +150,7 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
     ) -> Self {
         HonestCiphertextAggregationDecryptionNoHomAdd {
             params,
+            expected_sk_commitment,
             honest_c0,
             honest_c1,
             s,
@@ -168,15 +164,79 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
         }
     }
 
+    /// Computes commitment to BFV secret key (must match BFV public key circuit)
+    fn compute_sk_commitment(s: Polynomial<N>) -> Field {
+        let sk_payload = flatten::<_, _, BIT_S>(Vec::new(), [s]);
+
+        // Domain separator - "PVSS_sk_comm" (must match BFV public key circuit)
+        let domain_separator = [
+            0x50, 0x56, 0x53, 0x53, 0x5f, 0x73, 0x6b, 0x5f, 0x63, 0x6f, 0x6d, 0x6d, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+
+        let input_size = sk_payload.len();
+        let io_pattern = [0x80000000 | input_size, 0x00000001];
+
+        let mut sponge = SafeSponge::start(io_pattern, domain_separator);
+        sponge.absorb(sk_payload);
+        let commitment = sponge.squeeze();
+        sponge.finish();
+
+        commitment.get(0)
+    }
+
+    /// Verifies that s hashes to expected_sk_commitment
+    fn verify_sk_commitment(self) {
+        let computed_commitment = Self::compute_sk_commitment(self.s);
+        assert_eq(computed_commitment, self.expected_sk_commitment, "SK commitment mismatch");
+    }
+
+    /// Commits to expected_aggregated_shares
+    fn commit_to_aggregated_shares(expected_aggregated_shares: [Polynomial<N>; L]) -> Field {
+        let mut inputs = Vec::new();
+
+        for trbfv_idx in 0..L {
+            for coeff_idx in 0..N {
+                inputs.push(expected_aggregated_shares[trbfv_idx].coefficients[coeff_idx]);
+            }
+        }
+
+        // Domain separator - "PVSS_agg_sh" (aggregated shares)
+        let domain_separator = [
+            0x50, 0x56, 0x53, 0x53, 0x5f, 0x61, 0x67, 0x67, 0x5f, 0x73, 0x68, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+
+        let input_size = inputs.len();
+        let io_pattern = [0x80000000 | input_size, 0x00000001];
+
+        let mut sponge = SafeSponge::start(io_pattern, domain_separator);
+        sponge.absorb(inputs);
+        let commitment = sponge.squeeze();
+        sponge.finish();
+
+        commitment.get(0)
+    }
+
     /// Main verification function
-    pub fn verify(self) {
-        // Step 1: Range checks on secret witnesses
+    /// Returns commitment to expected_aggregated_shares
+    pub fn verify(self) -> Field {
+        // Step 1: Verify BFV secret key commitment
+        self.verify_sk_commitment();
+
+        // Step 2: Range checks on secret witnesses
         self.check_range_bounds();
 
-        // Step 2: Generate Fiat-Shamir challenge
+        // Step 3: Generate Fiat-Shamir challenge
         let gamma = self.generate_challenge();
 
-        // Step 3: For each ciphertext, verify BFV decryption
+        // Step 4: For each ciphertext, verify BFV decryption
         for party_idx in 0..H {
             for trbfv_idx in 0..L {
                 // Verify decryption formula for each BFV basis
@@ -192,8 +252,11 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
             }
         }
 
-        // Step 4: Verify TRBFV share aggregation
+        // Step 5: Verify TRBFV share aggregation
         self.verify_trbfv_aggregation();
+
+        // Step 6: Return commitment to aggregated shares
+        Self::commit_to_aggregated_shares(self.expected_aggregated_shares)
     }
 
     /// Performs range checks on all secret witness values
@@ -229,7 +292,7 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
                 // u_global bounds
                 self.u_global[party_idx][trbfv_idx].range_check_2bounds::<BIT_U>(
                     bounds.u_global_bound,
-                    bounds.u_global_bound,
+                    0,
                 );
             }
         }
@@ -239,6 +302,9 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
     fn payload(self) -> Vec<Field> {
         let mut inputs = Vec::new();
 
+        // Include sk commitment instead of full sk (saves constraints)
+        inputs.push(self.expected_sk_commitment);
+
         // Flatten honest ciphertexts
         for party_idx in 0..H {
             for trbfv_idx in 0..L {
@@ -246,9 +312,6 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
                 inputs = flatten::<_, _, BIT_CT>(inputs, self.honest_c1[party_idx][trbfv_idx]);
             }
         }
-
-        // Flatten secret key
-        inputs = flatten::<_, _, BIT_S>(inputs, [self.s]);
 
         // Flatten u_i
         for party_idx in 0..H {
@@ -292,7 +355,7 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
     fn generate_challenge(self) -> Field {
         let inputs = self.payload();
 
-        // Domain separator - "BfvTrbfvAgg" in hex
+        // Domain separator - "BfvTrbfvAgg"
         let domain_separator = [
             0x42, 0x66, 0x76, 0x54, 0x72, 0x62, 0x66, 0x76, 0x41, 0x67, 0x67, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -312,26 +375,17 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
     }
 
     /// Verifies BFV decryption formula for one ciphertext at one BFV basis
-    ///
-    /// Checks: u_i(gamma) = c_0(gamma) + c_1(gamma) * s(gamma) + r_2(gamma) * (gamma^N + 1) + r_1(gamma) * bfv_q_i
     fn verify_decryption_formula(self, party_idx: u32, trbfv_idx: u32, bfv_idx: u32, gamma: Field) {
         let crypto = self.params.crypto;
 
-        // Evaluate ciphertext at gamma
         let c_0_at_gamma = self.honest_c0[party_idx][trbfv_idx][bfv_idx].eval(gamma);
         let c_1_at_gamma = self.honest_c1[party_idx][trbfv_idx][bfv_idx].eval(gamma);
-
-        // Evaluate secret key at gamma (same s for all)
         let s_at_gamma = self.s.eval(gamma);
-
-        // Evaluate quotients at gamma
         let r_1_at_gamma = self.r_1[party_idx][trbfv_idx][bfv_idx].eval(gamma);
         let r_2_at_gamma = self.r_2[party_idx][trbfv_idx][bfv_idx].eval(gamma);
 
-        // Cyclotomic polynomial X^N + 1 at gamma
         let cyclo_at_gamma = gamma.pow_32(N as Field) + 1;
 
-        // Expected: u_i = c_0 + c_1 * s + r_2 * (X^N + 1) + r_1 * q'_i
         let expected_u = c_0_at_gamma
             + c_1_at_gamma * s_at_gamma
             + r_2_at_gamma * cyclo_at_gamma
@@ -343,21 +397,15 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
     }
 
     /// Verifies CRT reconstruction for one ciphertext
-    /// u_i[l'] + quotient[l'] * q'_l' = u_global (for all l')
     fn verify_crt_reconstruction(self, party_idx: u32, trbfv_idx: u32) {
         let crypto = self.params.crypto;
 
         for bfv_idx in 0..L_PRIME {
             let q_l = crypto.bfv_qis[bfv_idx];
-
-            // quotient * q'_l
             let quotient_times_q =
                 self.crt_quotients[party_idx][trbfv_idx][bfv_idx].mul_scalar(q_l);
-
-            // u_i + quotient * q'_l
             let reconstructed = self.u_i[party_idx][trbfv_idx][bfv_idx].add(quotient_times_q);
 
-            // Verify equality with u_global
             for coeff_idx in 0..N {
                 assert(
                     reconstructed.coefficients[coeff_idx]
@@ -372,7 +420,6 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
     fn verify_decoding(self, party_idx: u32, trbfv_idx: u32) {
         let t = self.params.crypto.bfv_plaintext_modulus;
 
-        // Compute Q = product of all BFV moduli
         let mut q_modulus = 1;
         for l in 0..L_PRIME {
             q_modulus *= self.params.crypto.bfv_qis[l];
@@ -401,7 +448,6 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
                 }
             };
 
-            // Verify decoding
             if self.decrypted_shares[party_idx][trbfv_idx].coefficients[coeff_idx] != 0 {
                 assert(
                     computed_message
@@ -412,7 +458,6 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
     }
 
     /// Verifies TRBFV share aggregation
-    /// For each TRBFV basis l: sigma_h decrypted_shares[h][l] mod trbfv_qi[l] = expected[l]
     fn verify_trbfv_aggregation(self) {
         let crypto = self.params.crypto;
 
@@ -420,16 +465,13 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
             let trbfv_q = crypto.trbfv_qis[trbfv_idx];
 
             for coeff_idx in 0..N {
-                // Sum shares from all honest parties
                 let mut sum = 0 as Field;
                 for party_idx in 0..H {
                     sum = sum + self.decrypted_shares[party_idx][trbfv_idx].coefficients[coeff_idx];
                 }
 
-                // Reduce mod TRBFV modulus
                 let sum_reduced = reduce_mod(sum, trbfv_q);
 
-                // Verify against expected
                 assert(
                     sum_reduced
                         == self.expected_aggregated_shares[trbfv_idx].coefficients[coeff_idx],

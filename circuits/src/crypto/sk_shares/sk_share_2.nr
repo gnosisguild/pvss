@@ -1,5 +1,5 @@
 use crate::math::modular_fns::reduce_mod;
-use crate::math::polynomial::Polynomial;
+use crate::math::polynomial::{flatten, Polynomial};
 use crate::math::safe::SafeSponge;
 
 /// Cryptographic parameters for SK shares verification circuit.
@@ -48,26 +48,20 @@ impl<let L: u32> Params<L> {
 
 /// PVSS Verification Circuit for TRBFV Secret Key Shamir Shares
 ///
-/// Verifies that Shamir secret shares satisfy the Reed-Solomon parity check.
-///
 /// Verification:
-/// 1. sk consistency: y[i][j][0] == sk[i] for all i, j
-/// 2. Range check: sk coefficients are trinary (-1, 0, 1)
-/// 3. Range check: shares are in [0, q_j)
-/// 4. Parity check: H[j] * y[i][j]^T == 0 mod q_j for all i, j
+/// 1. sk commitment: verify sk hashes to expected_sk_commitment
+/// 2. sk consistency: y[i][j][0] == sk[i] for all i, j
+/// 3. Range check: sk coefficients are trinary (-1, 0, 1)
+/// 4. Range check: shares are in [0, q_j)
+/// 5. Parity check: H[j] * y[i][j]^T == 0 mod q_j for all i, j
 ///
 /// Output:
-/// - Commitment to shares y[i][j][1..N_PARTIES+1] (excluding sk values)
-///
-/// # Generic Parameters
-/// * `N` - Number of TRBFV secret key coefficients
-/// * `L` - Number of CRT moduli
-/// * `N_PARTIES` - Number of parties (shares per coefficient)
-/// * `T` - Threshold (degree of sharing polynomial)
-/// * `BIT_SK` - Bit width for secret key bounds
-/// * `BIT_SHARE` - Bit width for share bounds
+/// - L * N_PARTIES commitments: [[Field; L]; N_PARTIES]
+///   commitments[party_idx][mod_idx] = commitment to shares for that party and modulus
 pub struct SecretKeySharesVerificationCircuit<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32, let BIT_SHARE: u32> {
     params: Params<L>,
+    /// Expected commitment to sk (from BFV public key circuit)
+    expected_sk_commitment: Field,
     /// Secret key polynomial (trinary coefficients)
     sk: Polynomial<N>,
     /// Shares: y[coeff_idx][mod_idx][0..N_PARTIES+1]
@@ -82,27 +76,61 @@ pub struct SecretKeySharesVerificationCircuit<let N: u32, let L: u32, let N_PART
 impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32, let BIT_SHARE: u32> SecretKeySharesVerificationCircuit<N, L, N_PARTIES, T, BIT_SK, BIT_SHARE> {
     pub fn new(
         params: Params<L>,
+        expected_sk_commitment: Field,
         sk: Polynomial<N>,
         y: [[[Field; N_PARTIES + 1]; L]; N],
         h: [[[Field; N_PARTIES + 1]; N_PARTIES - T]; L],
     ) -> Self {
-        SecretKeySharesVerificationCircuit { params, sk, y, h }
+        SecretKeySharesVerificationCircuit { params, expected_sk_commitment, sk, y, h }
     }
 
     /// Main verification function
-    /// Returns commitment to shares (excluding sk values)
-    pub fn verify(self) -> Field {
-        // Step 1: Verify sk consistency
+    /// Returns L * N_PARTIES commitments: [[Field; L]; N_PARTIES]
+    pub fn verify(self) -> [[Field; L]; N_PARTIES] {
+        // Step 1: Verify sk commitment matches expected
+        self.verify_sk_commitment();
+
+        // Step 2: Verify sk consistency
         self.verify_sk_consistency();
 
-        // Step 2: Range checks
+        // Step 3: Range checks
         self.check_range_bounds();
 
-        // Step 3: Verify parity check
+        // Step 4: Verify parity check
         self.verify_parity_check();
 
-        // Step 4: Commit to shares (excluding sk values)
-        Self::commit_to_shares(self.y)
+        // Step 5: Commit to shares for each party and modulus
+        self.commit_to_party_shares()
+    }
+
+    /// Computes commitment to sk (must match BFV circuit's commit_to_sk)
+    fn compute_sk_commitment(sk: Polynomial<N>) -> Field {
+        let sk_payload = flatten::<_, _, BIT_SK>(Vec::new(), [sk]);
+
+        // Domain separator - "PVSS_sk_comm" (must match BFV circuit)
+        let domain_separator = [
+            0x50, 0x56, 0x53, 0x53, 0x5f, 0x73, 0x6b, 0x5f, 0x63, 0x6f, 0x6d, 0x6d, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+
+        let input_size = sk_payload.len();
+        let io_pattern = [0x80000000 | input_size, 0x00000001];
+
+        let mut sponge = SafeSponge::start(io_pattern, domain_separator);
+        sponge.absorb(sk_payload);
+        let commitment = sponge.squeeze();
+        sponge.finish();
+
+        commitment.get(0)
+    }
+
+    /// Verifies that sk hashes to expected_sk_commitment
+    fn verify_sk_commitment(self) {
+        let computed_commitment = Self::compute_sk_commitment(self.sk);
+        assert_eq(computed_commitment, self.expected_sk_commitment, "SK commitment mismatch");
     }
 
     /// Verifies y[i][j][0] == sk[i] for all i, j
@@ -137,8 +165,6 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32, le
     }
 
     /// Verifies H[j] * y[i][j]^T == 0 mod q_j for all i, j
-    /// H is (N_PARTIES - T) * (N_PARTIES + 1)
-    /// y[i][j] is a vector of length (N_PARTIES + 1)
     fn verify_parity_check(self) {
         let crypto_params = self.params.crypto_params();
 
@@ -146,7 +172,6 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32, le
             for mod_idx in 0..L {
                 let q_j = crypto_params.qis[mod_idx];
 
-                // For each row of H, compute dot product with y and verify == 0
                 for row in 0..(N_PARTIES - T) {
                     let mut sum: Field = 0;
 
@@ -154,7 +179,6 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32, le
                         sum = sum + self.h[mod_idx][row][col] * self.y[coeff_idx][mod_idx][col];
                     }
 
-                    // Reduce mod q_j and verify == 0
                     let result = reduce_mod(sum, q_j);
                     assert(result == 0, "Parity check failed");
                 }
@@ -162,46 +186,63 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32, le
         }
     }
 
-    /// Flattens shares (excluding sk values) into Vec<Field>
-    fn payload(y: [[[Field; N_PARTIES + 1]; L]; N]) -> Vec<Field> {
+    /// Flattens shares for a specific party and modulus into Vec<Field>
+    /// Returns N field elements: y[0][mod_idx][party_idx+1], ..., y[N-1][mod_idx][party_idx+1]
+    fn party_modulus_payload(self, party_idx: u32, mod_idx: u32) -> Vec<Field> {
         let mut inputs = Vec::new();
 
         for coeff_idx in 0..N {
-            for mod_idx in 0..L {
-                // Only include shares, not sk (skip index 0)
-                for party_idx in 1..(N_PARTIES + 1) {
-                    inputs.push(y[coeff_idx][mod_idx][party_idx]);
-                }
-            }
+            inputs.push(self.y[coeff_idx][mod_idx][party_idx + 1]);
         }
 
         inputs
     }
 
-    /// Commits to shares using SafeSponge
-    fn commit_to_shares(y: [[[Field; N_PARTIES + 1]; L]; N]) -> Field {
-        let inputs = Self::payload(y);
+    /// Commits to shares for a single party and modulus
+    fn commit_to_single_party_modulus(self, party_idx: u32, mod_idx: u32) -> Field {
+        let inputs = self.party_modulus_payload(party_idx, mod_idx);
 
-        // Domain separator - "PVSS_verify"
+        // Domain separator - "PVSS_sh_pm" (shares party-modulus)
         let domain_separator = [
-            0x50, 0x56, 0x53, 0x53, 0x5f, 0x76, 0x65, 0x72, 0x69, 0x66, 0x79, 0x00, 0x00, 0x00,
+            0x50, 0x56, 0x53, 0x53, 0x5f, 0x73, 0x68, 0x5f, 0x70, 0x6d, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
 
-        let input_size = inputs.len();
+        // Include party_idx and mod_idx in the hash
+        let mut inputs_with_indices = inputs;
+        inputs_with_indices.push(party_idx as Field);
+        inputs_with_indices.push(mod_idx as Field);
+
+        let input_size = inputs_with_indices.len();
         let io_pattern = [0x80000000 | input_size, 0x00000001];
 
         let mut sponge = SafeSponge::start(io_pattern, domain_separator);
-        sponge.absorb(inputs);
+        sponge.absorb(inputs_with_indices);
         let commitment = sponge.squeeze();
         sponge.finish();
 
         commitment.get(0)
     }
+
+    /// Commits to shares for each party and modulus
+    /// Returns [[Field; L]; N_PARTIES] where commitments[party_idx][mod_idx]
+    fn commit_to_party_shares(self) -> [[Field; L]; N_PARTIES] {
+        let mut commitments: [[Field; L]; N_PARTIES] = [[0; L]; N_PARTIES];
+
+        for party_idx in 0..N_PARTIES {
+            for mod_idx in 0..L {
+                commitments[party_idx][mod_idx] =
+                    self.commit_to_single_party_modulus(party_idx, mod_idx);
+            }
+        }
+
+        commitments
+    }
 }
+
 /// Range check for [0, upper_bound) on a single Field
 fn range_check_field<let BIT: u32>(value: Field, upper_bound: Field) {
     value.assert_max_bit_size::<BIT>();

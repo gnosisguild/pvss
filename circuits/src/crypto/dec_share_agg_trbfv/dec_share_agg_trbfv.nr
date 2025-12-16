@@ -1,16 +1,10 @@
 use crate::math::modular_fns::{div_mod, mul_mod, reduce_mod};
 use crate::math::polynomial::Polynomial;
-use dep::bignum::BigNum;
-use dep::bignum::BigNum::__invmod;
-use dep::bignum::BigNum::umod;
-use dep::bignum::bignum::to_field;
-use dep::bignum::Enclave_TRBFV_8192;
+use crate::math::safe::SafeSponge;
 
 /// Cryptographic parameters for decryption share aggregation circuit.
 pub struct CryptographicParams<let L: u32> {
-    /// CRT moduli for each basis: [q_0, q_1, ..., q_{L-1}]
     pub qis: [Field; L],
-    /// Plaintext modulus
     pub plaintext_modulus: Field,
     pub q_inverse_mod_t: Field,
 }
@@ -22,14 +16,11 @@ impl<let L: u32> CryptographicParams<L> {
 }
 
 pub struct BoundParams {
-    /// Global delta value: delta = floor(q/t) where q = product of all q_i
     pub delta: Field,
-    /// Global half-delta value for noise bound checking: delta_half = floor(delta / 2)
     pub delta_half: Field,
 }
 
 impl BoundParams {
-    /// Creates new bound parameters
     pub fn new(delta: Field, delta_half: Field) -> Self {
         BoundParams { delta, delta_half }
     }
@@ -37,9 +28,7 @@ impl BoundParams {
 
 /// Complete parameters for decryption share aggregation circuit.
 pub struct Params<let N: u32, let L: u32, let T: u32> {
-    /// Cryptographic parameters (moduli)
     pub crypto: CryptographicParams<L>,
-    /// Bound parameters for range checking
     pub bounds: BoundParams,
 }
 
@@ -67,55 +56,39 @@ impl<let N: u32, let L: u32, let T: u32> Params<N, L, T> {
 
 /// Decryption Share Aggregation Circuit
 ///
-/// This circuit aggregates t+1 decryption shares using Lagrange interpolation
-/// to recover the final decrypted message. The process involves:
-///
-/// 1. Each of t+1 parties provides a polynomial d_i(x) of degree N-1 with their party ID x_i
-/// 2. Compute Lagrange coefficients L_i(0) for each party and each CRT basis
-/// 3. For each coefficient position (0 to N-1), apply Lagrange interpolation independently
-///    to get u^{(l)} for each CRT basis l
-/// 4. Verify CRT reconstruction: u^{(l)} + r^{(l)} * q_l = u_global for all bases l
-/// 5. Compute global noise: noise = u_global - delta * m
-/// 6. Verify noise bound: |noise| < delta/2
-///
-/// The decoding step in BFV decryption recovers the message m from u by computing:
-///    m = round(u / delta) mod t
-///
-/// Instead of performing the decoding operation directly, we verify it was done correctly
-/// by checking that the noise (u - delta*m) is bounded. If ||noise|| < delta/2, then
-/// the decoded message m is guaranteed to be correct and unique in the plaintext space [0, t).
-///
-/// # Generic Parameters
-/// * `N` - The message degree (number of coefficients in the message and decryption share polynomials)
-/// * `L` - The number of CRT (Chinese Remainder Theorem) bases
-/// * `T` - The threshold value (we need T+1 parties to reconstruct)
-/// * `BIT_NOISE` - Bit-width bound for noise coefficients
+/// Verifies:
+/// 1. T+1 commitments to decryption shares match expected (from DecryptionShareCorrectness circuits)
+/// 2. Lagrange interpolation to compute u^{(l)} for each CRT basis
+/// 3. CRT reconstruction: u^{(l)} + r^{(l)} * q_l = u_global
+/// 4. Decoding verification: message = -Q^{-1} * (t * u_global)_Q mod t
 pub struct DecryptionShareAggregation<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> {
     /// Circuit parameters including crypto constants
     params: Params<N, L, T>,
 
-    /// Decryption shares from t+1 parties (public inputs)
+    /// Expected commitments to decryption shares (from DecryptionShareCorrectness circuits)
+    /// One commitment per party
+    expected_decryption_share_commitments: [Field; T + 1],
+
+    /// Decryption shares from t+1 parties (secret witnesses)
     decryption_shares: [[Polynomial<N>; L]; T + 1],
 
     /// Party IDs (x-coordinates) for interpolation (public inputs)
     party_ids: [Field; T + 1],
 
-    /// Message polynomial m(x) (public input)
+    /// Message polynomial m(x) (public output)
     message: Polynomial<N>,
 
-    /// Global u polynomial (public input)
-    /// This is the CRT reconstruction of all u^{(l)} values
+    /// Global u polynomial (secret witness)
     u_global: Polynomial<N>,
 
-    /// CRT quotient polynomials (public inputs)
-    /// For each basis l, r^{(l)} satisfies: u^{(l)} + r^{(l)} * q_l = u_global
+    /// CRT quotient polynomials (secret witnesses)
     crt_quotients: [Polynomial<N>; L],
 }
 
 impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggregation<N, L, T, BIT_NOISE> {
-    /// Creates a new decryption share aggregation circuit instance
     pub fn new(
         params: Params<N, L, T>,
+        expected_decryption_share_commitments: [Field; T + 1],
         decryption_shares: [[Polynomial<N>; L]; T + 1],
         party_ids: [Field; T + 1],
         message: Polynomial<N>,
@@ -124,6 +97,7 @@ impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggr
     ) -> Self {
         DecryptionShareAggregation {
             params,
+            expected_decryption_share_commitments,
             decryption_shares,
             party_ids,
             message,
@@ -132,28 +106,68 @@ impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggr
         }
     }
 
+    /// Computes commitment to a party's decryption shares (must match DecryptionShareCorrectness circuit)
+    fn compute_decryption_share_commitment(d: [Polynomial<N>; L]) -> Field {
+        let mut inputs = Vec::new();
+
+        for basis_idx in 0..L {
+            for coeff_idx in 0..N {
+                inputs.push(d[basis_idx].coefficients[coeff_idx]);
+            }
+        }
+
+        // Domain separator - "PVSS_dec_sh" (must match DecryptionShareCorrectness circuit)
+        let domain_separator = [
+            0x50, 0x56, 0x53, 0x53, 0x5f, 0x64, 0x65, 0x63, 0x5f, 0x73, 0x68, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+
+        let input_size = inputs.len();
+        let io_pattern = [0x80000000 | input_size, 0x00000001];
+
+        let mut sponge = SafeSponge::start(io_pattern, domain_separator);
+        sponge.absorb(inputs);
+        let commitment = sponge.squeeze();
+        sponge.finish();
+
+        commitment.get(0)
+    }
+
+    /// Verifies all decryption share commitments
+    fn verify_decryption_share_commitments(self) {
+        for party_idx in 0..(T + 1) {
+            let computed_commitment =
+                Self::compute_decryption_share_commitment(self.decryption_shares[party_idx]);
+            assert_eq(
+                computed_commitment,
+                self.expected_decryption_share_commitments[party_idx],
+                "Decryption share commitment mismatch",
+            );
+        }
+    }
+
     /// Main verification function
     pub fn verify(self) {
-        // Step 1: Compute Lagrange coefficients in-circuit
+        // Step 1: Verify all decryption share commitments
+        self.verify_decryption_share_commitments();
+
+        // Step 2: Compute Lagrange coefficients in-circuit
         let lagrange_coeffs = self.compute_all_lagrange_coeffs();
 
-        // Step 2: Compute u^{(l)} for each CRT basis via Lagrange interpolation
+        // Step 3: Compute u^{(l)} for each CRT basis via Lagrange interpolation
         let u_crts = self.compute_crt_components(lagrange_coeffs);
 
-        // Step 3: Verify CRT reconstruction: u^{(l)} + r^{(l)} * q_l = u_global
+        // Step 4: Verify CRT reconstruction: u^{(l)} + r^{(l)} * q_l = u_global
         self.verify_crt_reconstruction(u_crts);
 
-        // Step 4: Verify global noise bound
+        // Step 5: Verify decoding
         self.verify_decoding_alternative();
     }
 
     /// Computes all Lagrange coefficients using optimized modular arithmetic
-    ///
-    /// For each party i with ID x_i in [1, 100] and each CRT basis l with modulus q_l, computes:
-    /// L_i(0) = PRODUCT(j!=i) (-x_j) / (x_i - x_j) mod q_l
-    ///
-    /// Uses efficient Field arithmetic with modular reduction instead of BigNum.
-    /// Since party IDs <= 100 and moduli <= 2^56, all intermediate values fit in Field.
     fn compute_all_lagrange_coeffs(self) -> [[Field; T + 1]; L] {
         let mut lagrange_coeffs = [[0 as Field; T + 1]; L];
         let crypto_params = self.params.crypto_params();
@@ -249,9 +263,6 @@ impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggr
     }
 
     /// Verifies CRT reconstruction: u^{(l)} + r^{(l)} * q_l = u_global for all bases l
-    ///
-    /// This proves that u_global is the correct CRT reconstruction of the per-basis
-    /// interpolation results u^{(l)}.
     fn verify_crt_reconstruction(self, u_crts: [Polynomial<N>; L]) {
         let crypto_params = self.params.crypto_params();
 
@@ -265,7 +276,6 @@ impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggr
             let reconstructed = u_crts[basis_idx].add(r_times_q);
 
             // Verify: u^{(l)} + r^{(l)} * q_l = u_global
-            // Must hold for every coefficient
             for coeff_idx in 0..N {
                 assert(
                     reconstructed.coefficients[coeff_idx] == self.u_global.coefficients[coeff_idx],
@@ -274,77 +284,26 @@ impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggr
             }
         }
     }
-    // fn verify_global_noise_bound(self) {
-    //     let bound_params = self.params.bound_params();
-    //     let delta_m = self.message.mul_scalar(bound_params.delta);
-    //     let q_bn = Enclave_100::modulus();
-    //     let q_half_bn = q_bn.udiv(Enclave_100::from(2));
-    //     let mut noise_centered_fields = [0 as Field; N];
-    //     for coeff_idx in 0..N {
-    //         let u_global_bn = Enclave_100::from(self.u_global.coefficients[coeff_idx]);
-    //         let delta_m_bn = Enclave_100::from(delta_m.coefficients[coeff_idx]);
-    //         let noise_bn = u_global_bn - delta_m_bn;
-    //         // Center and take absolute value in BigNum
-    //         let noise_centered_bn = if noise_bn > q_half_bn {
-    //             q_bn - noise_bn
-    //         } else {
-    //             noise_bn
-    //         };
-    //         // Convert absolute value to Field
-    //         let limbs = noise_centered_bn.get_limbs();
-    //         noise_centered_fields[coeff_idx] =
-    //             (limbs[0] as Field) + (limbs[1] as Field) * (2 as Field).pow_32(120);
-    //     }
-    //     // Range check
-    //     let noise_poly = Polynomial::new(noise_centered_fields);
-    //     noise_poly.range_check_2bounds::<BIT_NOISE>(
-    //         bound_params.delta_half,
-    //         bound_params.delta_half,
-    //     );
-    // }
-    /// Alternative decoding verification using the formula:
-    /// message = -Q^{-1} * (t * u_global)_Q mod t
-    ///
-    /// Where:
-    /// - t = plaintext_modulus
-    /// - u_global = decryption result (in Z_Q)
-    /// - Q = global modulus (product of all q_i)
-    /// - Q^{-1} = modular inverse of Q modulo t (precomputed)
-    /// - (t * u_global)_Q = (t * u_global) mod Q
-    ///
-    /// This directly checks the BFV decoding formula instead of checking noise bounds.
 
     /// Alternative decoding verification using the formula:
     /// message = -Q^{-1} * (t * u_global)_Q mod t
-    ///
-    /// Uses BigNum arithmetic modulo t (plaintext_modulus) for all operations.
-    /// Q is 72 bits for dummy parameter set , so no need for bignum
     fn verify_decoding_alternative(self) {
         let t: Field = self.params.crypto.plaintext_modulus;
+
         // Compute Q as product of all CRT moduli
         let mut q_modulus = 1;
         for l in 0..L {
             q_modulus *= self.params.crypto.qis[l];
         }
 
-        // For centered arithmetic
-        //  let q_bn = Enclave_TRBFV_8192::from(q_modulus);
-
-        // let q_half_bn = q_bn.udiv(Enclave_TRBFV_8192::from(2));
         let q_half = q_modulus as u128 / 2;
 
         for coeff_idx in 0..N {
-            // Compute (t * u_global) mod Q using modular arithemtic fns
-
             let t_times_u_mod_q = mul_mod(t, self.u_global.coefficients[coeff_idx], q_modulus);
-            //check if better to keep it u128
-            // Check if centering is needed
+
             let needs_centering = t_times_u_mod_q as u128 > q_half;
 
             let computed_message = if needs_centering {
-                // When (t*u) mod Q >= Q/2: treat as negative in centered form
-                // Centered value is conceptually negative: (t_times_u_mod_q - Q)
-                // -Q^{-1} * (negative) = positive result
                 let centered_positive = q_modulus - t_times_u_mod_q;
                 let centered_positive_mod_t = reduce_mod(centered_positive, t);
 
@@ -354,8 +313,6 @@ impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggr
                     t,
                 )
             } else {
-                // When (t*u) mod Q < Q/2: stays positive in centered form
-                // -Q^{-1} * (positive) = negative result = t - result
                 let t_times_u_mod_t = reduce_mod(t_times_u_mod_q, t);
 
                 let product = mul_mod(self.params.crypto.q_inverse_mod_t, t_times_u_mod_t, t);
@@ -371,7 +328,5 @@ impl<let N: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionShareAggr
                 assert(computed_message == self.message.coefficients[coeff_idx]);
             }
         }
-
-        std::println("=== All verified ===");
     }
 }
