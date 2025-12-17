@@ -1,13 +1,7 @@
 use crate::math::helpers::{compute_safe, flatten};
 use crate::math::polynomial::Polynomial;
 
-/// Cryptographic parameters for the TRBFV decryption share circuit.
-///
-/// This struct contains all the mathematical constants and bounds needed to verify
-/// correct decryption share computation in threshold BFV.
-///
-/// # Generic Parameters
-/// * `L` - The number of CRT (Chinese Remainder Theorem) bases
+/// Cryptographic parameters for TRBFV decryption share circuit.
 pub struct Configs<let L: u32> {
     /// CRT moduli: [q_0, q_1, ..., q_{L-1}]
     pub qis: [Field; L],
@@ -20,14 +14,6 @@ pub struct Configs<let L: u32> {
 }
 
 impl<let L: u32> Configs<L> {
-    /// Creates a new `Configs` instance with the specified cryptographic parameters.
-    ///
-    /// # Arguments
-    /// All parameters correspond to the fields of the `Configs` struct. See the struct
-    /// documentation for details on each parameter.
-    ///
-    /// # Returns
-    /// A new `Configs` instance ready for use with the `DecryptionShare` circuit.
     pub fn new(
         qis: [Field; L],
         decryption_share_bound: Field,
@@ -40,35 +26,19 @@ impl<let L: u32> Configs<L> {
 
 /// TRBFV Decryption Share Correctness Circuit.
 ///
-/// This circuit implements a zero-knowledge proof for the correct computation of a
-/// decryption share in threshold BFV (TRBFV). Each party computes their decryption
-/// share using their aggregated secret key shares and verifies the computation is correct.
-///
-/// The circuit verifies the lifted decryption share formula:
-/// For each CRT basis i: `d_i = c_0i + c_1i * s + e_i + r_2_i * (X^N + 1) + r_1_i * q_i`
-///
-/// Where:
-/// - `c_0i`, `c_1i` are ciphertext components for CRT basis i
-/// - `s` is the aggregated sum of valid secret key shares (secret witness)
-/// - `e_i` is the aggregated sum of smudging noise shares (secret witness)
-/// - `r_1_i`, `r_2_i` are quotient witnesses for lifting to the large field Z
-/// - `d_i` is the party's computed decryption share (public output)
-///
-/// The circuit uses the Schwartz-Zippel lemma to verify polynomial equations by
-/// evaluating them at a random challenge point generated via Fiat-Shamir.
-///
-/// # Generic Parameters
-/// * `N` - The number of coefficients in ring polynomials (polynomials have degree N-1)
-/// * `L` - The number of CRT (Chinese Remainder Theorem) bases
-/// * `BIT_CT` - Bit-width bound per coefficient for ciphertext polynomials
-/// * `BIT_S` - Bit-width bound per coefficient for aggregated secret shares `s`
-/// * `BIT_E` - Bit-width bound per coefficient for aggregated noise shares `e`
-/// * `BIT_R1` - Bit-width bound per coefficient for quotient polynomials `r_1`
-/// * `BIT_R2` - Bit-width bound per coefficient for quotient polynomials `r_2`
-/// * `BIT_D` - Bit-width bound per coefficient for decryption share polynomials `d`
+/// Verifies:
+/// 1. Commitment to s matches expected (from BFV decryption circuit)
+/// 2. Commitment to e matches expected (from BFV decryption circuit)
+/// 3. Correct computation: d = c_0 + c_1 * s + e + r_2 * (X^N + 1) + r_1 * q_i
 pub struct DecryptionShare<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_D: u32> {
     /// Circuit parameters including bounds and cryptographic constants
     configs: Configs<L>,
+
+    /// Expected commitment to aggregated shares s (from BFV decryption circuit)
+    expected_s_commitment: Field,
+
+    /// Expected commitment to aggregated noise e (from BFV decryption circuit)
+    expected_e_commitment: Field,
 
     /// Ciphertext components (public inputs)
     /// c_0 components for each CRT basis (degree N-1 polynomials with N coefficients)
@@ -76,9 +46,7 @@ pub struct DecryptionShare<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u
     /// c_1 components for each CRT basis (degree N-1 polynomials with N coefficients)
     c_1: [Polynomial<N>; L],
 
-    /// Aggregated sum of shares s (secret witness, direct input)
-    /// s[basis] - sum of valid shares for each CRT basis (degree N-1 with N coefficients)
-    /// This has small coefficients since it's sum of small shares
+    /// Aggregated sum of shares s (secret witness)
     s: [Polynomial<N>; L],
 
     /// Aggregated sum of noise e (secret witness, direct input)
@@ -86,38 +54,18 @@ pub struct DecryptionShare<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u
     e: [Polynomial<N>; L],
 
     /// Quotient polynomials for lifting to Z (secret witnesses)
-    /// r_1[basis] - quotients from modulus q_i (degree 2N-2 with 2N-1 coefficients, can be negative)
     r_1: [Polynomial<2 * N - 1>; L],
-    /// r_2[basis] - quotients from cyclotomic polynomial X^N + 1 (degree N-2 with N-1 coefficients)
     r_2: [Polynomial<N - 1>; L],
 
     /// Party's computed decryption share (public output)
-    /// d[basis] - decryption share computed by this party for each CRT basis (degree N-1 with N coefficients)
-    /// This is what the party claims to have computed using the lifted formula
-    /// These shares are public so they can be aggregated by other parties
     d: [Polynomial<N>; L],
 }
 
 impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_D: u32> DecryptionShare<N, L, BIT_CT, BIT_S, BIT_E, BIT_R1, BIT_R2, BIT_D> {
-    /// Creates a new `DecryptionShare` circuit instance.
-    ///
-    /// This constructor initializes all the polynomials and parameters needed for
-    /// the zero-knowledge proof of correct decryption share computation.
-    ///
-    /// # Arguments
-    /// * `configs` - Cryptographic parameters including bounds and moduli
-    /// * `c_0` - First ciphertext components for each CRT basis (public inputs)
-    /// * `c_1` - Second ciphertext components for each CRT basis (public inputs)
-    /// * `s` - Aggregated sum of valid secret key shares for each CRT basis (secret witness)
-    /// * `e` - Aggregated sum of smudging noise shares for each CRT basis (secret witness)
-    /// * `r_1` - Quotient polynomials for modulus q_i lifting (secret witnesses, degree 2N-1)
-    /// * `r_2` - Quotient polynomials for cyclotomic polynomial lifting (secret witnesses, degree N-1)
-    /// * `d` - Party's computed decryption share for each CRT basis (public output)
-    ///
-    /// # Returns
-    /// A new `DecryptionShare` instance ready for constraint checking via the `verify()` method
     pub fn new(
         configs: Configs<L>,
+        expected_s_commitment: Field,
+        expected_e_commitment: Field,
         c_0: [Polynomial<N>; L],
         c_1: [Polynomial<N>; L],
         s: [Polynomial<N>; L],
@@ -126,7 +74,55 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, le
         r_2: [Polynomial<N - 1>; L],
         d: [Polynomial<N>; L],
     ) -> Self {
-        DecryptionShare { configs, c_0, c_1, s, e, r_1, r_2, d }
+        DecryptionShare {
+            configs,
+            expected_s_commitment,
+            expected_e_commitment,
+            c_0,
+            c_1,
+            s,
+            e,
+            r_1,
+            r_2,
+            d,
+        }
+    }
+
+    /// Computes commitment to aggregated values (must match BFV decryption circuit)
+    fn compute_aggregated_commitment(values: [Polynomial<N>; L]) -> Field {
+        let mut inputs = Vec::new();
+
+        for basis_idx in 0..L {
+            for coeff_idx in 0..N {
+                inputs.push(values[basis_idx].coefficients[coeff_idx]);
+            }
+        }
+
+        // Domain separator - "PVSS_agg_sh" (must match BFV decryption circuit)
+        let domain_separator = [
+            0x50, 0x56, 0x53, 0x53, 0x5f, 0x61, 0x67, 0x67, 0x5f, 0x73, 0x68, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+
+        let input_size = inputs.len();
+        let io_pattern = [0x80000000 | input_size, 0x00000001];
+
+        compute_safe(domain_separator, inputs, io_pattern).get(0)
+    }
+
+    /// Verifies that s hashes to expected_s_commitment
+    fn verify_s_commitment(self) {
+        let computed_commitment = Self::compute_aggregated_commitment(self.s);
+        assert_eq(computed_commitment, self.expected_s_commitment, "S commitment mismatch");
+    }
+
+    /// Verifies that e hashes to expected_e_commitment
+    fn verify_e_commitment(self) {
+        let computed_commitment = Self::compute_aggregated_commitment(self.e);
+        assert_eq(computed_commitment, self.expected_e_commitment, "E commitment mismatch");
     }
 
     /// Flattens all witness data into a single array for Fiat-Shamir challenge generation.
@@ -150,46 +146,39 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, le
     fn payload(self) -> Vec<Field> {
         let mut inputs = Vec::new();
 
+        // Use commitments instead of full polynomials (saves constraints)
+        inputs.push(self.expected_s_commitment);
+        inputs.push(self.expected_e_commitment);
+
         // Flatten ciphertext components (public inputs)
         inputs = flatten::<_, _, BIT_CT>(inputs, self.c_0);
         inputs = flatten::<_, _, BIT_CT>(inputs, self.c_1);
-
-        // Flatten aggregated sums (secret witnesses)
-        inputs = flatten::<_, _, BIT_S>(inputs, self.s);
-        inputs = flatten::<_, _, BIT_E>(inputs, self.e);
 
         // Flatten quotient polynomials (secret witnesses)
         inputs = flatten::<_, _, BIT_R1>(inputs, self.r_1);
         inputs = flatten::<_, _, BIT_R2>(inputs, self.r_2);
 
-        // Flatten decryption shares (public outputs - to be shared with other parties)
+        // Flatten decryption shares (public outputs)
         inputs = flatten::<_, _, BIT_D>(inputs, self.d);
 
         inputs
     }
 
-    /// Main verification function that performs all circuit checks.
-    ///
-    /// This function implements the complete zero-knowledge proof by verifying:
-    /// 1. Range bounds on all secret witnesses (aggregated shares, noise, quotients)
-    /// 2. Decryption share computation formula for each CRT basis (using Schwartz-Zippel)
-    ///
-    /// The proof uses the Schwartz-Zippel lemma: if polynomial equations hold when
-    /// evaluated at a random point, then the polynomials are identical with high probability.
-    ///
-    /// # Panics
-    /// This function will cause the circuit to fail if any verification step fails.
-    /// The circuit fails if:
-    /// - Any witness is outside its expected bounds
-    /// - Decryption share computation formula doesn't hold for any CRT basis
+    /// Main verification function
     pub fn verify(self) {
-        // Step 1: Perform range checks on all secret witness values
+        // Step 1: Verify s commitment matches expected
+        self.verify_s_commitment();
+
+        // Step 2: Verify e commitment matches expected
+        self.verify_e_commitment();
+
+        // Step 3: Perform range checks on all secret witness values
         self.check_range_bounds();
 
-        // Step 2: Generate Fiat-Shamir challenge from the transcript
+        // Step 4: Generate Fiat-Shamir challenge from the transcript
         let gamma = self.generate_challenge();
 
-        // Step 3: Verify decryption share computation for each CRT basis using the same gamma
+        // Step 5: Verify decryption share computation for each CRT basis
         for i in 0..L {
             self.verify_decryption_share_computation(i, gamma);
         }

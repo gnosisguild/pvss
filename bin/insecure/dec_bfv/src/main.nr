@@ -9,6 +9,7 @@ use lib::math::polynomial::Polynomial;
 pub global H: u32 = 5;
 
 fn main(
+    expected_sk_commitment: pub Field,
     honest_c0: [[[Polynomial<N>; L_PRIME]; L_TRBFV]; H],
     honest_c1: [[[Polynomial<N>; L_PRIME]; L_TRBFV]; H],
     s: Polynomial<N>,
@@ -19,9 +20,10 @@ fn main(
     crt_quotients: [[[Polynomial<N>; L_PRIME]; L_TRBFV]; H],
     decrypted_shares: [[Polynomial<N>; L_TRBFV]; H],
     expected_aggregated_shares: [Polynomial<N>; L_TRBFV],
-) {
+) -> pub Field {
     let dec_bfv: BfvDecNoHomAdd<N, H, L_TRBFV, L_PRIME, DEC_BFV_BIT_CT, DEC_BFV_BIT_S, DEC_BFV_BIT_U, DEC_BFV_BIT_R1, DEC_BFV_BIT_R2, DEC_BFV_BIT_MSG> = BfvDecNoHomAdd::new(
         DEC_BFV_CONFIGS,
+        expected_sk_commitment,
         honest_c0,
         honest_c1,
         s,
@@ -33,5 +35,5 @@ fn main(
         decrypted_shares,
         expected_aggregated_shares,
     );
-    dec_bfv.verify();
+    dec_bfv.verify()
 }

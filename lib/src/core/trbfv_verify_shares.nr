@@ -1,14 +1,8 @@
+use crate::math::helpers::{compute_safe, flatten};
 use crate::math::modulo::U128::ModU128;
 use crate::math::polynomial::Polynomial;
-use crate::math::safe::SafeSponge;
 
-/// Cryptographic parameters for the TRBFV secret share verification circuit.
-///
-/// This struct contains all the mathematical constants and bounds needed to verify
-/// correct Shamir secret sharing of the TRBFV secret key.
-///
-/// # Generic Parameters
-/// * `L` - The number of CRT (Chinese Remainder Theorem) bases
+/// Cryptographic parameters for TRBFV secret share verification circuit.
 pub struct Configs<let L: u32> {
     /// CRT moduli: [q_0, q_1, ..., q_{L-1}]
     pub qis: [Field; L],
@@ -17,14 +11,6 @@ pub struct Configs<let L: u32> {
 }
 
 impl<let L: u32> Configs<L> {
-    /// Creates a new `Configs` instance with the specified cryptographic parameters.
-    ///
-    /// # Arguments
-    /// All parameters correspond to the fields of the `Configs` struct. See the struct
-    /// documentation for details on each parameter.
-    ///
-    /// # Returns
-    /// A new `Configs` instance ready for use with the `VerifyShares` circuit.
     pub fn new(qis: [Field; L], sk_bound: Field) -> Self {
         Configs { qis, sk_bound }
     }
@@ -32,30 +18,16 @@ impl<let L: u32> Configs<L> {
 
 /// TRBFV Secret Share Verification Circuit.
 ///
-/// This circuit implements a zero-knowledge proof for the correct Shamir secret sharing
-/// of the TRBFV secret key. It verifies that secret key shares are correctly generated
-/// and satisfy the Reed-Solomon parity check constraints.
-///
-/// The circuit verifies:
-/// 1. **Secret Key Consistency**: For each coefficient i and CRT basis j,
-///    `y[i][j][0] == sk[i]`, ensuring shares at party ID 0 equal the secret key
-/// 2. **Range Checks**: Secret key coefficients are trinary (-1, 0, 1) and shares
-///    are in the valid range [0, q_j) for each CRT modulus
-/// 3. **Parity Check**: For each coefficient i and CRT basis j, the Reed-Solomon
-///    parity check matrix H[j] satisfies `H[j] * y[i][j]^T == 0 mod q_j`
-///
-/// The parity check ensures that shares form a valid Reed-Solomon codeword, which
-/// guarantees that any T+1 shares can correctly reconstruct the secret key.
-///
-/// # Generic Parameters
-/// * `N` - Number of TRBFV secret key coefficients (ring dimension)
-/// * `L` - Number of CRT moduli
-/// * `N_PARTIES` - Number of parties (shares per coefficient)
-/// * `T` - Threshold (degree of sharing polynomial, need T+1 shares to reconstruct)
-/// * `BIT_SK` - Bit-width bound per coefficient for secret key polynomial
-/// * `BIT_SHARE` - Bit-width bound per coefficient for share values
+/// Verifies:
+/// 1. sk commitment: verify sk hashes to expected_sk_commitment
+/// 2. sk consistency: y[i][j][0] == sk[i] for all i, j
+/// 3. Range check: sk coefficients are trinary (-1, 0, 1)
+/// 4. Range check: shares are in [0, q_j)
+/// 5. Parity check: H[j] * y[i][j]^T == 0 mod q_j for all i, j
 pub struct VerifyShares<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32, let BIT_SHARE: u32> {
     configs: Configs<L>,
+    /// Expected commitment to sk (from BFV public key circuit)
+    expected_sk_commitment: Field,
     /// Secret key polynomial (trinary coefficients)
     sk: Polynomial<N>,
     /// Shares: y[coeff_idx][mod_idx][0..N_PARTIES+1]
@@ -68,63 +40,57 @@ pub struct VerifyShares<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, 
 }
 
 impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32, let BIT_SHARE: u32> VerifyShares<N, L, N_PARTIES, T, BIT_SK, BIT_SHARE> {
-    /// Creates a new `VerifyShares` circuit instance.
-    ///
-    /// This constructor initializes all the polynomials and parameters needed for
-    /// the zero-knowledge proof of correct secret key sharing.
-    ///
-    /// # Arguments
-    /// * `configs` - Cryptographic parameters including moduli and bounds
-    /// * `sk` - Secret key polynomial with trinary coefficients (secret witness)
-    /// * `y` - Share values: `y[coeff_idx][mod_idx][party_idx]` where
-    ///         `y[i][j][0] = sk[i]` and `y[i][j][k]` for k >= 1 are shares for party k
-    /// * `h` - Parity check matrices: `H[mod_idx][row][col]` of size
-    ///         `(N_PARTIES - T) * (N_PARTIES + 1)` for each CRT basis
-    ///
-    /// # Returns
-    /// A new `VerifyShares` instance ready for constraint checking via the `verify()` method
     pub fn new(
         configs: Configs<L>,
+        expected_sk_commitment: Field,
         sk: Polynomial<N>,
         y: [[[Field; N_PARTIES + 1]; L]; N],
         h: [[[Field; N_PARTIES + 1]; N_PARTIES - T]; L],
     ) -> Self {
-        VerifyShares { configs, sk, y, h }
+        VerifyShares { configs, expected_sk_commitment, sk, y, h }
     }
 
-    /// Main verification function that performs all circuit checks.
-    ///
-    /// This function implements the complete zero-knowledge proof by verifying:
-    /// 1. Secret key consistency across all CRT bases
-    /// 2. Range bounds on secret key and share values
-    /// 3. Reed-Solomon parity check constraints for all coefficients and CRT bases
-    ///
-    /// After successful verification, returns a commitment to the shares (excluding
-    /// the secret key values) that can be used for public verification.
-    ///
-    /// # Returns
-    /// A commitment hash to all share values (excluding secret key values), computed
-    /// using the SAFE sponge API. This commitment can be used to verify that shares
-    /// were correctly generated without revealing the secret key.
-    ///
-    /// # Panics
-    /// This function will cause the circuit to fail if any verification step fails.
-    /// The circuit fails if:
-    /// - Secret key consistency doesn't hold for any coefficient or CRT basis
-    /// - Any value is outside its expected bounds
-    /// - Parity check doesn't hold for any coefficient or CRT basis
-    pub fn verify(self) -> Field {
-        // Step 1: Verify sk consistency
+    /// Main verification function
+    pub fn verify(self) -> [[Field; L]; N_PARTIES] {
+        // Step 1: Verify sk commitment matches expected
+        self.verify_sk_commitment();
+
+        // Step 2: Verify sk consistency
         self.verify_sk_consistency();
 
-        // Step 2: Range checks
+        // Step 3: Range checks
         self.check_range_bounds();
 
-        // Step 3: Verify parity check
+        // Step 4: Verify parity check
         self.verify_parity_check();
 
-        // Step 4: Commit to shares (excluding sk values)
-        Self::commit_to_shares(self.y)
+        // Step 5: Commit to shares for each party and modulus
+        self.commit_to_party_shares()
+    }
+
+    /// Computes commitment to sk (must match BFV circuit's commit_to_sk)
+    fn compute_sk_commitment(sk: Polynomial<N>) -> Field {
+        let sk_payload = flatten::<_, _, BIT_SK>(Vec::new(), [sk]);
+
+        // Domain separator - "PVSS_sk_comm" (must match BFV circuit)
+        let domain_separator = [
+            0x50, 0x56, 0x53, 0x53, 0x5f, 0x73, 0x6b, 0x5f, 0x63, 0x6f, 0x6d, 0x6d, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+
+        let input_size = sk_payload.len();
+        let io_pattern = [0x80000000 | input_size, 0x00000001];
+
+        compute_safe(domain_separator, sk_payload, io_pattern).get(0)
+    }
+
+    /// Verifies that sk hashes to expected_sk_commitment
+    fn verify_sk_commitment(self) {
+        let computed_commitment = Self::compute_sk_commitment(self.sk);
+        assert_eq(computed_commitment, self.expected_sk_commitment, "SK commitment mismatch");
     }
 
     /// Verifies secret key consistency: `y[i][j][0] == sk[i]` for all i, j.
@@ -212,64 +178,52 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32, le
         }
     }
 
-    /// Flattens shares (excluding secret key values) into a single array.
-    ///
-    /// This function serializes all share values into a 1D array, excluding the
-    /// secret key values at index 0. The flattened data is used to generate a
-    /// commitment to the shares without revealing the secret key.
-    ///
-    /// # Arguments
-    /// * `y` - Share values array: `y[coeff_idx][mod_idx][party_idx]`
-    ///
-    /// # Returns
-    /// A vector containing all share values (excluding secret key values) in flattened form
-    fn payload(y: [[[Field; N_PARTIES + 1]; L]; N]) -> Vec<Field> {
+    /// Flattens shares for a specific party and modulus into Vec<Field>
+    /// Returns N field elements: y[0][mod_idx][party_idx+1], ..., y[N-1][mod_idx][party_idx+1]
+    fn party_modulus_payload(self, party_idx: u32, mod_idx: u32) -> Vec<Field> {
         let mut inputs = Vec::new();
 
         for coeff_idx in 0..N {
-            for mod_idx in 0..L {
-                // Only include shares, not sk (skip index 0)
-                for party_idx in 1..(N_PARTIES + 1) {
-                    inputs.push(y[coeff_idx][mod_idx][party_idx]);
-                }
-            }
+            inputs.push(self.y[coeff_idx][mod_idx][party_idx + 1]);
         }
 
         inputs
     }
 
-    /// Commits to shares using the SAFE cryptographic sponge.
-    ///
-    /// This function generates a cryptographic commitment to all share values
-    /// (excluding secret key values) using the SAFE sponge API. The commitment
-    /// can be used for public verification that shares were correctly generated
-    /// without revealing the secret key.
-    ///
-    /// # Arguments
-    /// * `y` - Share values array: `y[coeff_idx][mod_idx][party_idx]`
-    ///
-    /// # Returns
-    /// A single field element representing the commitment hash to all shares
-    fn commit_to_shares(y: [[[Field; N_PARTIES + 1]; L]; N]) -> Field {
-        let inputs = Self::payload(y);
-
-        // Domain separator - "PVSS_verify"
+    /// Commits to shares
+    fn commit_to_single_party_modulus(self, party_idx: u32, mod_idx: u32) -> Field {
+        let inputs = self.party_modulus_payload(party_idx, mod_idx);
+        // Domain separator - "PVSS_sh_pm" (shares party-modulus)
         let domain_separator = [
-            0x50, 0x56, 0x53, 0x53, 0x5f, 0x76, 0x65, 0x72, 0x69, 0x66, 0x79, 0x00, 0x00, 0x00,
+            0x50, 0x56, 0x53, 0x53, 0x5f, 0x73, 0x68, 0x5f, 0x70, 0x6d, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
 
-        let input_size = inputs.len();
+        // Include party_idx and mod_idx in the hash
+        let mut inputs_with_indices = inputs;
+        inputs_with_indices.push(party_idx as Field);
+        inputs_with_indices.push(mod_idx as Field);
+        let input_size = inputs_with_indices.len();
         let io_pattern = [0x80000000 | input_size, 0x00000001];
 
-        let mut sponge = SafeSponge::start(io_pattern, domain_separator);
-        sponge.absorb(inputs);
-        let commitment = sponge.squeeze();
-        sponge.finish();
+        compute_safe(domain_separator, inputs_with_indices, io_pattern).get(0)
+    }
 
-        commitment.get(0)
+    /// Commits to shares for each party and modulus
+    /// Returns [[Field; L]; N_PARTIES] where commitments[party_idx][mod_idx]
+    fn commit_to_party_shares(self) -> [[Field; L]; N_PARTIES] {
+        let mut commitments: [[Field; L]; N_PARTIES] = [[0; L]; N_PARTIES];
+
+        for party_idx in 0..N_PARTIES {
+            for mod_idx in 0..L {
+                commitments[party_idx][mod_idx] =
+                    self.commit_to_single_party_modulus(party_idx, mod_idx);
+            }
+        }
+
+        commitments
     }
 }

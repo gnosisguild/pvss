@@ -8,6 +8,7 @@ use lib::math::polynomial::Polynomial;
 /// Honest parties.
 pub global H: u32 = 5;
 
+// TODO: needs update
 fn main(
     honest_c0: [[Polynomial<N>; L]; H],
     honest_c1: [[Polynomial<N>; L]; H],

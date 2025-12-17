@@ -4,13 +4,7 @@ use dep::bignum::BigNum;
 use dep::bignum::bignum::to_field;
 use dep::bignum::Enclave_TRBFV_8192;
 
-/// Cryptographic parameters for the TRBFV decryption share aggregation circuit.
-///
-/// This struct contains all the mathematical constants needed to verify correct
-/// aggregation of decryption shares and message decoding in threshold BFV.
-///
-/// # Generic Parameters
-/// * `L` - The number of CRT (Chinese Remainder Theorem) bases
+/// Cryptographic parameters for decryption share aggregation circuit.
 pub struct Configs<let L: u32> {
     /// CRT moduli: [q_0, q_1, ..., q_{L-1}]
     pub qis: [Field; L],
@@ -21,45 +15,17 @@ pub struct Configs<let L: u32> {
 }
 
 impl<let L: u32> Configs<L> {
-    /// Creates a new `Configs` instance with the specified cryptographic parameters.
-    ///
-    /// # Arguments
-    /// All parameters correspond to the fields of the `Configs` struct. See the struct
-    /// documentation for details on each parameter.
-    ///
-    /// # Returns
-    /// A new `Configs` instance ready for use with the `DecryptionSharesAggregation` circuit.
     pub fn new(qis: [Field; L], plaintext_modulus: Field, q_inverse_mod_t: Field) -> Self {
         Configs { qis, plaintext_modulus, q_inverse_mod_t }
     }
 }
 
-/// TRBFV Decryption Share Aggregation Circuit.
+/// Decryption Share Aggregation Circuit (Circuit 8: dec-result-trbfv)
 ///
-/// This circuit implements a zero-knowledge proof for the correct aggregation of T+1
-/// decryption shares using Lagrange interpolation to recover the final decrypted message
-/// in threshold BFV (TRBFV).
-///
-/// The circuit verifies the complete decryption process:
-/// 1. **Lagrange Interpolation**: Computes Lagrange coefficients L_i(0) for each party
-///    and each CRT basis, then interpolates decryption shares to recover u^{(l)} for each basis l
-/// 2. **CRT Reconstruction**: Verifies that u_global is the correct CRT reconstruction of
-///    all per-basis interpolation results: `u^{(l)} + r^{(l)} * q_l = u_global` for all bases l
-/// 3. **Message Decoding**: Verifies that the decoded message m is correct by checking
-///    the decoding operation was performed correctly
-///
-/// The decoding step in BFV decryption recovers the message m from u by computing:
-/// `m = round(u / delta) mod t`
-///
-/// Instead of performing the decoding operation directly, we verify it was done correctly
-/// by checking that the decoding computation matches the claimed message. This ensures
-/// that if the noise is bounded (|noise| < delta/2), the decoded message is correct.
-///
-/// # Generic Parameters
-/// * `N_PARTIES` - The number of coefficients in the message and decryption share polynomials
-/// * `L` - The number of CRT (Chinese Remainder Theorem) bases
-/// * `T` - The threshold value (we need T+1 parties to reconstruct the secret)
-/// * `BIT_NOISE` - Bit-width bound for noise coefficients (currently unused but reserved for future use)
+/// Verifies:
+/// 1. Lagrange interpolation to compute u^{(l)} for each CRT basis
+/// 2. CRT reconstruction: u^{(l)} + r^{(l)} * q_l = u_global
+/// 3. Decoding verification: message = -Q^{-1} * (t * u_global)_Q mod t
 pub struct DecryptionSharesAggregation<let N_PARTIES: u32, let L: u32, let T: u32, let BIT_NOISE: u32> {
     /// Circuit parameters including crypto constants
     configs: Configs<L>,
@@ -70,34 +36,17 @@ pub struct DecryptionSharesAggregation<let N_PARTIES: u32, let L: u32, let T: u3
     /// Party IDs (x-coordinates) for interpolation (public inputs)
     party_ids: [Field; T + 1],
 
-    /// Message polynomial m(x) (public input)
+    /// Message polynomial m(x) (public output)
     message: Polynomial<N_PARTIES>,
 
-    /// Global u polynomial (public input)
-    /// This is the CRT reconstruction of all u^{(l)} values
+    /// Global u polynomial (secret witness)
     u_global: Polynomial<N_PARTIES>,
 
-    /// CRT quotient polynomials (public inputs)
-    /// For each basis l, r^{(l)} satisfies: u^{(l)} + r^{(l)} * q_l = u_global
+    /// CRT quotient polynomials (secret witnesses)
     crt_quotients: [Polynomial<N_PARTIES>; L],
 }
 
 impl<let N_PARTIES: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionSharesAggregation<N_PARTIES, L, T, BIT_NOISE> {
-    /// Creates a new `DecryptionSharesAggregation` circuit instance.
-    ///
-    /// This constructor initializes all the polynomials and parameters needed for
-    /// the zero-knowledge proof of correct decryption share aggregation and message decoding.
-    ///
-    /// # Arguments
-    /// * `configs` - Cryptographic parameters including moduli, plaintext modulus, and scaling factors
-    /// * `decryption_shares` - Decryption shares from T+1 parties (public inputs, one per CRT basis)
-    /// * `party_ids` - Party IDs (x-coordinates) for Lagrange interpolation (public inputs)
-    /// * `message` - Decoded message polynomial m(x) (public input)
-    /// * `u_global` - Global u polynomial from CRT reconstruction (public input)
-    /// * `crt_quotients` - CRT quotient polynomials r^{(l)} for each CRT basis (public inputs)
-    ///
-    /// # Returns
-    /// A new `DecryptionSharesAggregation` instance ready for constraint checking via the `verify()` method
     pub fn new(
         configs: Configs<L>,
         decryption_shares: [[Polynomial<N_PARTIES>; L]; T + 1],
@@ -116,18 +65,7 @@ impl<let N_PARTIES: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionS
         }
     }
 
-    /// Main verification function that performs all circuit checks.
-    ///
-    /// This function implements the complete zero-knowledge proof by verifying:
-    /// 1. Lagrange interpolation of decryption shares for each CRT basis
-    /// 2. CRT reconstruction of per-basis interpolation results
-    /// 3. Correct message decoding from the global u polynomial
-    ///
-    /// # Panics
-    /// This function will cause the circuit to fail if any verification step fails.
-    /// The circuit fails if:
-    /// - CRT reconstruction doesn't hold for any basis
-    /// - Message decoding doesn't match the claimed message for any coefficient
+    /// Main verification function
     pub fn verify(self) {
         // Step 1: Compute Lagrange coefficients in-circuit
         let lagrange_coeffs = self.compute_all_lagrange_coeffs();
@@ -138,10 +76,14 @@ impl<let N_PARTIES: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionS
         // Step 3: Verify CRT reconstruction: u^{(l)} + r^{(l)} * q_l = u_global
         self.verify_crt_reconstruction(u_crts);
 
-        // Step 4: Verify global noise bound
-        self.verify_decoding_alternative();
+        // Step 4: Verify decoding
+        self.verify_decoding();
     }
 
+    /// Alternative verification function using efficient modular arithmetic without BigNum.
+    ///
+    /// Uses `ModU128` for decoding verification instead of BigNum. More efficient when
+    /// Q (the product of all CRT moduli) fits within u128 (e.g., 72 bits for insecure parameter sets).
     pub fn verify_no_bn(self) {
         // Step 1: Compute Lagrange coefficients in-circuit
         let lagrange_coeffs = self.compute_all_lagrange_coeffs();
@@ -152,25 +94,11 @@ impl<let N_PARTIES: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionS
         // Step 3: Verify CRT reconstruction: u^{(l)} + r^{(l)} * q_l = u_global
         self.verify_crt_reconstruction(u_crts);
 
-        // Step 4: Verify global noise bound
-        self.verify_decoding_alternative_no_bn();
+        // Step 4: Verify decoding
+        self.verify_decoding_no_bn();
     }
 
-    /// Computes all Lagrange coefficients using optimized modular arithmetic.
-    ///
-    /// For each party i with ID x_i and each CRT basis l with modulus q_l, computes:
-    /// `L_i(0) = PRODUCT(j!=i) (-x_j) / (x_i - x_j) mod q_l`
-    ///
-    /// These coefficients are used to interpolate the decryption shares at point 0,
-    /// which recovers the aggregated secret key evaluation needed for decryption.
-    ///
-    /// The implementation uses efficient Field arithmetic with modular reduction.
-    /// Since party IDs are typically in [1, 100] and moduli are <= 2^56, all
-    /// intermediate values fit within the Field type.
-    ///
-    /// # Returns
-    /// A 2D array `lagrange_coeffs[basis_idx][party_idx]` containing the Lagrange
-    /// coefficient L_i(0) for each party i and each CRT basis.
+    /// Computes all Lagrange coefficients using optimized modular arithmetic
     fn compute_all_lagrange_coeffs(self) -> [[Field; T + 1]; L] {
         let mut lagrange_coeffs = [[0 as Field; T + 1]; L];
 
@@ -233,23 +161,7 @@ impl<let N_PARTIES: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionS
         lagrange_coeffs
     }
 
-    /// Computes u^{(l)} for each CRT basis via Lagrange interpolation.
-    ///
-    /// For each coefficient position and each CRT basis, computes:
-    /// `u^{(l)}[k] = SUM(i=0..T) [d_i^{(l)}[k] * L_i(0)] mod q_l`
-    ///
-    /// Where:
-    /// - `d_i^{(l)}[k]` is the k-th coefficient of party i's decryption share for basis l
-    /// - `L_i(0)` is the Lagrange coefficient for party i evaluated at 0
-    ///
-    /// This recovers the aggregated secret key evaluation u^{(l)} needed for decryption
-    /// in each CRT basis independently.
-    ///
-    /// # Arguments
-    /// * `lagrange_coeffs` - Precomputed Lagrange coefficients for all parties and CRT bases
-    ///
-    /// # Returns
-    /// An array of polynomials `u_crts[l]` representing the interpolated result for each CRT basis l
+    /// Computes u^{(l)} for each CRT basis via Lagrange interpolation
     fn compute_crt_components(
         self,
         lagrange_coeffs: [[Field; T + 1]; L],
@@ -284,25 +196,7 @@ impl<let N_PARTIES: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionS
         u_crts
     }
 
-    /// Verifies CRT reconstruction: `u^{(l)} + r^{(l)} * q_l = u_global` for all bases l.
-    ///
-    /// This function proves that `u_global` is the correct CRT reconstruction of the
-    /// per-basis interpolation results `u^{(l)}`. The CRT reconstruction ensures that
-    /// the global polynomial `u_global` can be recovered from the per-basis results
-    /// using the Chinese Remainder Theorem.
-    ///
-    /// For each CRT basis l, the function verifies that:
-    /// - `u^{(l)}` (computed via Lagrange interpolation) plus
-    /// - `r^{(l)} * q_l` (CRT quotient times modulus) equals
-    /// - `u_global` (the claimed global polynomial)
-    ///
-    /// This must hold for every coefficient position.
-    ///
-    /// # Arguments
-    /// * `u_crts` - Per-basis interpolation results computed via `compute_crt_components()`
-    ///
-    /// # Panics
-    /// The circuit will fail if the CRT reconstruction doesn't hold for any basis or coefficient.
+    /// Verifies CRT reconstruction: u^{(l)} + r^{(l)} * q_l = u_global for all bases l
     fn verify_crt_reconstruction(self, u_crts: [Polynomial<N_PARTIES>; L]) {
         for basis_idx in 0..L {
             let q_l = self.configs.qis[basis_idx];
@@ -324,22 +218,8 @@ impl<let N_PARTIES: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionS
         }
     }
 
-    /// Verifies that the decoded message m is correct by checking the decoding computation.
-    ///
-    /// This function verifies the BFV decoding operation: `m = round(u / delta) mod t`
-    /// by checking that the decoding computation matches the claimed message polynomial.
-    ///
-    /// The decoding process involves:
-    /// 1. Computing `(t * u_global) mod Q` where Q is the product of all CRT moduli
-    /// 2. Handling centered arithmetic (values >= Q/2 are treated as negative)
-    /// 3. Computing `-Q^(-1) * (t * u_global) mod t` to recover the message
-    ///
-    /// The function only verifies non-zero message coefficients to allow for sparse messages.
-    ///
-    /// # Panics
-    /// The circuit will fail if the decoded message doesn't match the claimed message
-    /// for any non-zero coefficient.
-    fn verify_decoding_alternative(self) {
+    /// Verifies decoding using BigNum for large Q values
+    fn verify_decoding(self) {
         // Compute Q as product of all CRT moduli
         let mut q_modulus = 1 as Field;
         for l in 0..L {
@@ -389,34 +269,9 @@ impl<let N_PARTIES: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionS
         }
     }
 
-    /// Alternative decoding verification using the formula: `message = -Q^(-1) * (t * u_global)_Q mod t`.
-    ///
-    /// This function verifies that the decoded message m is correct by checking the decoding
-    /// computation matches the claimed message polynomial. It uses modular arithmetic with
-    /// `ModU128` instead of BigNum, which is more efficient when Q (the product of all CRT moduli)
-    /// fits within u128 (e.g., 72 bits for insecure parameter sets).
-    ///
-    /// The decoding process involves:
-    /// 1. Computing `(t * u_global) mod Q` where Q is the product of all CRT moduli
-    /// 2. Handling centered arithmetic (values >= Q/2 are treated as negative)
-    /// 3. Computing `-Q^(-1) * (t * u_global)_Q mod t` to recover the message
-    ///
-    /// When `(t * u_global) mod Q >= Q/2`:
-    /// - The value is treated as negative in centered form
-    /// - Compute `centered_positive = Q - (t * u_global) mod Q`
-    /// - Result: `Q^(-1) * centered_positive mod t` (positive result)
-    ///
-    /// When `(t * u_global) mod Q < Q/2`:
-    /// - The value stays positive in centered form
-    /// - Compute `product = Q^(-1) * (t * u_global) mod t`
-    /// - Result: `t - product` if product != 0, else 0 (negative result in centered form)
-    ///
-    /// The function only verifies non-zero message coefficients to allow for sparse messages.
-    ///
-    /// # Panics
-    /// The circuit will fail if the decoded message doesn't match the claimed message
-    /// for any non-zero coefficient.
-    fn verify_decoding_alternative_no_bn(self) {
+    /// Alternative decoding verification using the formula:
+    /// message = -Q^{-1} * (t * u_global)_Q mod t
+    fn verify_decoding_no_bn(self) {
         let t: Field = self.configs.plaintext_modulus;
         // Compute Q as product of all CRT moduli
         let mut q_modulus = 1;
@@ -432,7 +287,7 @@ impl<let N_PARTIES: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionS
             let q_mod = ModU128::new(q_modulus);
             let t_mod = ModU128::new(t);
 
-            // Compute (t * u_global) mod Q using modular arithemtic fns
+            // Compute (t * u_global) mod Q using modular arithmetic functions
             let t_times_u_mod_q = q_mod.mul_mod(t, self.u_global.coefficients[coeff_idx]);
             let needs_centering = (t_times_u_mod_q as u128) > q_half;
 

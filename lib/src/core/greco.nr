@@ -7,15 +7,7 @@
 use crate::math::helpers::{compute_safe, flatten};
 use crate::math::polynomial::Polynomial;
 
-/// Cryptographic parameters for the Greco circuit.
-///
-/// This struct contains all the mathematical constants and bounds needed to verify
-/// BFV encryption correctness. The parameters include CRT moduli, scaling factors,
-/// and bounds for all polynomial types used in the encryption scheme.
-///
-/// # Generic Parameters
-/// * `N` - The degree of polynomials (ring dimension)
-/// * `L` - The number of CRT (Chinese Remainder Theorem) bases
+/// Cryptographic parameters for Greco circuit.
 pub struct Configs<let N: u32, let L: u32> {
     /// CRT moduli: [q_0, q_1, ..., q_{L-1}]
     pub qis: [Field; L],
@@ -48,14 +40,6 @@ pub struct Configs<let N: u32, let L: u32> {
 }
 
 impl<let N: u32, let L: u32> Configs<N, L> {
-    /// Creates a new `Configs` instance with the specified cryptographic parameters.
-    ///
-    /// # Arguments
-    /// All parameters correspond to the fields of the `Configs` struct. See the struct
-    /// documentation for details on each parameter.
-    ///
-    /// # Returns
-    /// A new `Configs` instance ready for use with the `Greco` circuit.
     pub fn new(
         q_mod_t_mod_p: Field,
         qis: [Field; L],
@@ -91,47 +75,15 @@ impl<let N: u32, let L: u32> Configs<N, L> {
     }
 }
 
-/// Greco
-/// Correct Encryption Circuit under BFV public key
+/// Greco: Correct Encryption Circuit under BFV public key
 ///
-/// This circuit implements a zero-knowledge proof for the correct formation of a ciphertext
-/// resulting from BFV (Brakerski-Fan-Vercauteren) public key encryption. The circuit verifies
-/// that the ciphertext components (ct0, ct1) are correctly computed from the public key
-/// components (pk0, pk1) and the encryption randomness.
+/// Verifies:
+/// 1. Range checks on all polynomial coefficients
+/// 2. Correct encryption: ct0i = pk0i * u + e0 + k1 * k0i + r1i * qi + r2i * cyclo
+///    and ct1i = pk1i * u + e1 + p1i * qi + p2i * cyclo
 ///
-/// The circuit enforces the following core constraints:
-/// 1. Range checks on all polynomial coefficients to ensure they are within expected bounds
-/// 2. Correct encryption equations:
-///    a. ct0i(gamma) = pk0i(gamma) * u(gamma) + e0(gamma) + k1(gamma) * k0i + r1i(gamma) * qi + r2i(gamma) * cyclo(gamma)
-///    b. ct1i(gamma) = pk1i(gamma) * u(gamma) + e1(gamma) + p1i(gamma) * qi + p2i(gamma) * cyclo(gamma)
-///
-/// DISCLAIMER
-/// The circuit is a porting of the Halo2 circuit from Greco paper author @ PSE.
-/// Halo2 implementation is available at https://github.com/privacy-scaling-explorations/greco
-///
-/// # Generic Parameters
-/// * `N` - The degree of polynomials (ring dimension)
-/// * `L` - The number of CRT (Chinese Remainder Theorem) bases
-/// * `BIT_PK` - Bit-width bound per coefficient for public keys `pk0is`/`pk1is`
-/// * `BIT_CT` - Bit-width bound per coefficient for cipher texts `ct0is`/`ct1is`
-/// * `BIT_U` - Bit-width bound per coefficient for the ternary secret `u`
-/// * `BIT_E0` - Bit-width bound per coefficient for error polynomial `e0`
-/// * `BIT_E1` - Bit-width bound per coefficient for error polynomials `e1`
-/// * `BIT_K` - Bit-width bound per coefficient for the scaled message polynomial `k1`
-/// * `BIT_R1` - Bit-width bound per coefficient for randomness polynomials `r1is`
-/// * `BIT_R2` - Bit-width bound per coefficient for randomness polynomials `r2is`
-/// * `BIT_P1` - Bit-width bound per coefficient for randomness polynomials `p1is`
-/// * `BIT_P2` - Bit-width bound per coefficient for randomness polynomials `p2is`
-///
-/// # Circuit Inputs
-/// * `pk_commitment` - Public key commitment
-/// * `pk0is`, `pk1is` - Public key polynomials
-/// * `ct0is`, `ct1is` - Ciphertext polynomials
-/// * `u` - Secret polynomial sampled from ternary distribution
-/// * `e0`, `e1` - Error polynomials sampled from discrete Gaussian distribution
-/// * `k1` - Scaled message polynomial
-/// * `r1is`, `r2is` - Randomness polynomials for each i-th CRT basis.
-/// * `p1is`, `p2is` - Randomness polynomials for each i-th CRT basis.
+/// DISCLAIMER: Ported from Halo2 circuit by Greco paper authors @ PSE.
+/// Halo2 implementation: https://github.com/privacy-scaling-explorations/greco
 pub struct Greco<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_K: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> {
     configs: Configs<N, L>,
     pk_commitment: Field,
@@ -152,31 +104,6 @@ pub struct Greco<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let B
 }
 
 impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_K: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> Greco<N, L, BIT_PK, BIT_CT, BIT_U, BIT_E0, BIT_E1, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
-    /// Creates a new Greco instance.
-    ///
-    /// This constructor initializes all the polynomials and parameters needed for
-    /// the zero-knowledge proof of correct ciphertext formation.
-    ///
-    /// # Arguments
-    /// * `configs` - Cryptographic parameters including bounds, moduli, and scaling factors
-    /// * `pk_commitment` - Commitment to the public key polynomials (computed via SAFE hash)
-    /// * `pk0is` - Public key polynomials pk0i = [ai*s + E] for each CRT basis i
-    /// * `pk1is` - Public key polynomials pk1i = -[ai] for each CRT basis i
-    /// * `ct0is` - First ciphertext component for each CRT basis i
-    /// * `ct1is` - Second ciphertext component for each CRT basis i
-    /// * `u` - Secret polynomial sampled from ternary distribution (used in encryption)
-    /// * `e0` - Error polynomial sampled from discrete Gaussian distribution (used in ct0)
-    /// * `e0is` - CRT decomposition of e0 for each CRT basis i (e0 mod qi)
-    /// * `e0_quotients` - Quotient witnesses for CRT consistency checking of e0
-    /// * `e1` - Error polynomial sampled from discrete Gaussian distribution (used in ct1)
-    /// * `k1` - Scaled message polynomial (encrypted plaintext)
-    /// * `r1is` - Randomness polynomials for ct0 computation (modulus switching quotients)
-    /// * `r2is` - Randomness polynomials for ct0 computation (cyclotomic reduction quotients)
-    /// * `p1is` - Randomness polynomials for ct1 computation (modulus switching quotients)
-    /// * `p2is` - Randomness polynomials for ct1 computation (cyclotomic reduction quotients)
-    ///
-    /// # Returns
-    /// A new Greco instance ready for constraint checking via the `verify()` method
     pub fn new(
         configs: Configs<N, L>,
         pk_commitment: Field,
