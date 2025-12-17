@@ -20,7 +20,7 @@ jobs:
       - name: Install Nargo
         uses: noir-lang/noirup@v0.1.4
         with:
-          toolchain: v1.0.0-beta.16
+          toolchain: v1.0.0-beta.15
 
       - name: Check Noir formatting
         run: nargo fmt --check
@@ -43,7 +43,7 @@ jobs:
       - name: Install Nargo
         uses: noir-lang/noirup@v0.1.4
         with:
-          toolchain: v1.0.0-beta.16
+          toolchain: v1.0.0-beta.15
 
       - name: Check Noir formatting
         run: nargo fmt --check
@@ -66,7 +66,7 @@ jobs:
       - name: Install Nargo
         uses: noir-lang/noirup@v0.1.4
         with:
-          toolchain: v1.0.0-beta.16
+          toolchain: v1.0.0-beta.15
 
       - name: Check Noir formatting
         run: nargo fmt --check
