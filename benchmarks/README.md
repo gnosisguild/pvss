@@ -17,6 +17,12 @@ cd benchmarks
 ./run_benchmarks.sh
 ```
 
+By default, this runs benchmarks for the `insecure` mode. To run for `production`:
+
+```bash
+./run_benchmarks.sh --mode production
+```
+
 This runs all circuits in `config.json` through:
 
 1. `nargo compile` - Compile the circuit
@@ -36,28 +42,50 @@ Edit `config.json`:
 {
   "circuits": ["pk_trbfv", "enc_trbfv"],
   "oracles": ["default"],
-  "examples_dir": "../examples",
+  "mode": "insecure",
+  "bin_dir": "../bin",
   "output_dir": "results"
 }
 ```
 
-- **circuits**: All the circuits must be inside the `examples` folder at root repository level.
+- **circuits**: List of circuit names to benchmark (must exist in `bin/insecure` or `bin/production`)
 - **oracles**: Oracle types to test (only "default" is used)
-- **examples_dir**: Path to circuit examples
-- **output_dir**: Where to save results
+- **mode**: Default mode to use ("insecure" or "production"). Can be overridden with `--mode` flag
+- **bin_dir**: Path to the bin directory containing insecure/production subdirectories
+- **output_dir**: Base directory name for results (will be suffixed with mode, e.g., `results` becomes `results_insecure` or `results_production`)
 
 ## Usage
 
 ### Run All Benchmarks
 
 ```bash
+# Run insecure mode (default)
 ./run_benchmarks.sh
+
+# Run production mode
+./run_benchmarks.sh --mode production
+
+# Run insecure mode explicitly
+./run_benchmarks.sh --mode insecure
+
+# Skip compilation (use existing compiled circuits)
+./run_benchmarks.sh --skip-compile
+
+# Combine flags
+./run_benchmarks.sh --mode production --skip-compile
 ```
 
 ### Custom Config
 
 ```bash
 ./run_benchmarks.sh --config <your-config>.json
+```
+
+### Override Mode from Config
+
+```bash
+# Use production mode even if config.json specifies insecure
+./run_benchmarks.sh --mode production
 ```
 
 ### Clean Artifacts After
@@ -69,7 +97,14 @@ Edit `config.json`:
 ### Single Circuit
 
 ```bash
-./scripts/benchmark_circuit.sh ../examples/test123 default results/raw/test.json
+# Benchmark a single circuit (insecure mode)
+./scripts/benchmark_circuit.sh ../bin/insecure/pk_trbfv default results/raw/test.json insecure
+
+# Benchmark a single circuit (production mode)
+./scripts/benchmark_circuit.sh ../bin/production/pk_trbfv default results/raw/test.json production
+
+# Skip compilation for a single circuit
+./scripts/benchmark_circuit.sh ../bin/insecure/pk_trbfv default results/raw/test.json insecure --skip-compile
 ```
 
 ## What Gets Measured

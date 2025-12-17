@@ -1,7 +1,0 @@
-[package]
-name = "dec_share_trbfv"
-type = "bin"
-authors = [""]
-
-[dependencies]
-circuits = { path = "../../circuits" }

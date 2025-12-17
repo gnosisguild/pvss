@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # run_benchmarks.sh - Main orchestration script for benchmarking circuits
-# Usage: ./run_benchmarks.sh [--config <config_file>] [--clean]
+# Usage: ./run_benchmarks.sh [--config <config_file>] [--mode insecure|production] [--skip-compile] [--clean]
 
 set -e
 
@@ -9,6 +9,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BENCHMARKS_DIR="$(dirname "$SCRIPT_DIR")"
 CONFIG_FILE="${BENCHMARKS_DIR}/config.json"
 CLEAN_ARTIFACTS=false
+MODE_OVERRIDE=""
+SKIP_COMPILE=false
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -17,13 +19,25 @@ while [[ $# -gt 0 ]]; do
             CONFIG_FILE="$2"
             shift 2
             ;;
+        --mode)
+            MODE_OVERRIDE="$2"
+            if [ "$MODE_OVERRIDE" != "insecure" ] && [ "$MODE_OVERRIDE" != "production" ]; then
+                echo "Error: Mode must be 'insecure' or 'production'"
+                exit 1
+            fi
+            shift 2
+            ;;
+        --skip-compile|--no-compile)
+            SKIP_COMPILE=true
+            shift
+            ;;
         --clean)
             CLEAN_ARTIFACTS=true
             shift
             ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 [--config <config_file>] [--clean]"
+            echo "Usage: $0 [--config <config_file>] [--mode insecure|production] [--skip-compile] [--clean]"
             exit 1
             ;;
     esac
@@ -42,10 +56,26 @@ echo ""
 # Read configuration
 CIRCUITS=$(jq -r '.circuits[]' "$CONFIG_FILE")
 ORACLES=$(jq -r '.oracles[]' "$CONFIG_FILE")
-OUTPUT_DIR=$(jq -r '.output_dir' "$CONFIG_FILE")
-EXAMPLES_DIR=$(jq -r '.examples_dir' "$CONFIG_FILE")
+OUTPUT_DIR_BASE=$(jq -r '.output_dir // "results"' "$CONFIG_FILE")
+BIN_DIR=$(jq -r '.bin_dir // "../bin"' "$CONFIG_FILE")
+MODE=$(jq -r '.mode // "insecure"' "$CONFIG_FILE")
 
-# Create output directories
+# Override mode if provided via command line
+if [ -n "$MODE_OVERRIDE" ]; then
+    MODE="$MODE_OVERRIDE"
+fi
+
+# Validate mode
+if [ "$MODE" != "insecure" ] && [ "$MODE" != "production" ]; then
+    echo "Error: Invalid mode '$MODE'. Must be 'insecure' or 'production'"
+    exit 1
+fi
+
+# Set the base directory for circuits
+CIRCUITS_BASE_DIR="${BENCHMARKS_DIR}/${BIN_DIR}/${MODE}"
+
+# Create mode-specific output directory
+OUTPUT_DIR="${OUTPUT_DIR_BASE}_${MODE}"
 mkdir -p "${BENCHMARKS_DIR}/${OUTPUT_DIR}/raw"
 
 # Store git info
@@ -53,10 +83,16 @@ GIT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
 GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
 
 echo "Configuration:"
+echo "  Mode: $MODE"
+if [ "$SKIP_COMPILE" = true ]; then
+    echo "  Skip Compilation: Yes (using existing artifacts)"
+fi
 echo "  Git Branch: $GIT_BRANCH"
 echo "  Git Commit: $GIT_COMMIT"
 echo "  Circuits: $(echo $CIRCUITS | wc -w | tr -d ' ')"
 echo "  Oracles: $(echo $ORACLES)"
+echo "  Base Directory: $CIRCUITS_BASE_DIR"
+echo "  Output Directory: ${OUTPUT_DIR}"
 echo ""
 
 TOTAL_BENCHMARKS=$(($(echo $CIRCUITS | wc -w | tr -d ' ') * $(echo $ORACLES | wc -w | tr -d ' ')))
@@ -64,7 +100,7 @@ CURRENT=0
 
 # Run benchmarks
 for CIRCUIT in $CIRCUITS; do
-    CIRCUIT_PATH="${BENCHMARKS_DIR}/${EXAMPLES_DIR}/${CIRCUIT}"
+    CIRCUIT_PATH="${CIRCUITS_BASE_DIR}/${CIRCUIT}"
     
     if [ ! -d "$CIRCUIT_PATH" ]; then
         echo "⚠️  Warning: Circuit directory not found: $CIRCUIT_PATH"
@@ -78,11 +114,15 @@ for CIRCUIT in $CIRCUITS; do
         OUTPUT_FILE="${BENCHMARKS_DIR}/${OUTPUT_DIR}/raw/${CIRCUIT}_${ORACLE}.json"
         
         echo "────────────────────────────────────────────────"
-        echo "Benchmark [$CURRENT/$TOTAL_BENCHMARKS]: ${CIRCUIT} with ${ORACLE} oracle"
+        echo "Benchmark [$CURRENT/$TOTAL_BENCHMARKS]: ${CIRCUIT} (${MODE}) with ${ORACLE} oracle"
         echo "────────────────────────────────────────────────"
         
         # Run benchmark
-        "${SCRIPT_DIR}/benchmark_circuit.sh" "$CIRCUIT_PATH" "$ORACLE" "$OUTPUT_FILE"
+        BENCHMARK_ARGS=("$CIRCUIT_PATH" "$ORACLE" "$OUTPUT_FILE" "$MODE")
+        if [ "$SKIP_COMPILE" = true ]; then
+            BENCHMARK_ARGS+=("--skip-compile")
+        fi
+        "${SCRIPT_DIR}/benchmark_circuit.sh" "${BENCHMARK_ARGS[@]}"
         
         echo ""
     done
@@ -108,12 +148,12 @@ echo ""
 if [ "$CLEAN_ARTIFACTS" = true ]; then
     echo "Cleaning circuit artifacts..."
     for CIRCUIT in $CIRCUITS; do
-        CIRCUIT_PATH="${BENCHMARKS_DIR}/${EXAMPLES_DIR}/${CIRCUIT}"
+        CIRCUIT_PATH="${CIRCUITS_BASE_DIR}/${CIRCUIT}"
         if [ -d "$CIRCUIT_PATH/target" ]; then
             rm -rf "$CIRCUIT_PATH/target"
-            echo "  ✓ Cleaned: $CIRCUIT"
+            echo "  ✓ Cleaned: $CIRCUIT (${MODE})"
         else
-            echo "  ⊘ No target dir: $CIRCUIT"
+            echo "  ⊘ No target dir: $CIRCUIT (${MODE})"
         fi
     done
     echo ""
