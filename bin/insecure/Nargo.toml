@@ -7,5 +7,6 @@ members = [
     "dec_bfv",
     "enc_trbfv",
     "dec_share_trbfv",
-    "dec_share_agg_trbfv"   
+    "dec_share_agg_trbfv",
+    "pk_agg_trbfv"
 ]

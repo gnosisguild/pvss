@@ -1,7 +1,8 @@
 use crate::core::bfv_pk::Configs as BfvPkConfigs;
 use crate::core::greco::Configs as GrecoConfigs;
 use crate::core::trbfv_dec_share::Configs as DecShareConfigs;
-use crate::core::trbfv_dec_shares_agg::Configs as DecSharesAggregationConfigs;
+use crate::core::trbfv_dec_shares_agg::Configs as DecShareAggTrBfvConfigs;
+use crate::core::trbfv_pk_agg::Configs as PkAggTrBfvConfigs;
 use crate::core::trbfv_verify_shares::Configs as VerifySharesConfigs;
 
 // Global configs for BFV parameter set
@@ -159,5 +160,14 @@ pub global DEC_SHARES_AGG_BIT_NOISE: u32 = 201;
 pub global DEC_SHARES_AGG_PLAINTEXT_MODULUS: Field = 100;
 
 // trbfv_dec_shares_agg - configs
-pub global DEC_SHARES_AGG_CONFIGS: DecSharesAggregationConfigs<L> =
-    DecSharesAggregationConfigs::new(QIS, DEC_SHARES_AGG_PLAINTEXT_MODULUS, Q_INVERSE_MOD_T);
+pub global DEC_SHARES_AGG_CONFIGS: DecShareAggTrBfvConfigs<L> =
+    DecShareAggTrBfvConfigs::new(QIS, DEC_SHARES_AGG_PLAINTEXT_MODULUS, Q_INVERSE_MOD_T);
+
+/************************************
+-------------------------------------
+pk_agg_trbfv (CIRCUIT 9 - PUBLIC KEY AGGREGATION TRBFV)
+-------------------------------------
+************************************/
+
+// pk_agg_trbfv - configs
+pub global PK_AGG_TRBFV_CONFIGS: PkAggTrBfvConfigs<L> = PkAggTrBfvConfigs::new(QIS);

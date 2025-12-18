@@ -1,13 +1,14 @@
 use crate::core::bfv_pk::Configs as BfvPkConfigs;
 use crate::core::greco::Configs as GrecoConfigs;
 use crate::core::trbfv_dec_share::Configs as DecShareConfigs;
-use crate::core::trbfv_dec_shares_agg::Configs as DecSharesAggregationConfigs;
+use crate::core::trbfv_dec_shares_agg::Configs as DecShareAggTrBfvConfigs;
+use crate::core::trbfv_pk_agg::Configs as PkAggTrBfvConfigs;
 use crate::core::trbfv_verify_shares::Configs as VerifySharesConfigs;
 
 // Global configs for BFV parameter set
 pub global N: u32 = 512;
 pub global L: u32 = 2;
-pub global PLAINTEXT_MODULUS: u32 = 10;
+pub global PLAINTEXT_MODULUS: Field = 10;
 pub global QIS: [Field; L] = [68719403009, 68719230977];
 pub global Q_MOD_T_MOD_P: Field = 3;
 pub global Q_MOD_T: Field = 3;
@@ -143,12 +144,18 @@ trbfv_dec_shares_agg (CIRCUIT 8 - THRESHOLD BFV DECRYPTION SHARES AGGREGATION)
 -------------------------------------
 ************************************/
 
-// trbfv_dec_shares_agg - bit parameters
+// dec_share_agg_trbfv - bit parameters
 pub global DEC_SHARES_AGG_BIT_NOISE: u32 = 69;
 
-// trbfv_dec_shares_agg - bounds
-pub global DEC_SHARES_AGG_PLAINTEXT_MODULUS: Field = 10;
+// dec_share_agg_trbfv - configs
+pub global DEC_SHARES_AGG_CONFIGS: DecShareAggTrBfvConfigs<L> =
+    DecShareAggTrBfvConfigs::new(QIS, PLAINTEXT_MODULUS, Q_INVERSE_MOD_T);
 
-// trbfv_dec_shares_agg - configs
-pub global DEC_SHARES_AGG_CONFIGS: DecSharesAggregationConfigs<L> =
-    DecSharesAggregationConfigs::new(QIS, DEC_SHARES_AGG_PLAINTEXT_MODULUS, Q_INVERSE_MOD_T);
+/************************************
+-------------------------------------
+pk_agg_trbfv (CIRCUIT 9 - PUBLIC KEY AGGREGATION TRBFV)
+-------------------------------------
+************************************/
+
+// pk_agg_trbfv - configs
+pub global PK_AGG_TRBFV_CONFIGS: PkAggTrBfvConfigs<L> = PkAggTrBfvConfigs::new(QIS);
