@@ -8,7 +8,7 @@ pub struct Config<let L: u32, let L_PRIME: u32> {
     pub bfv_qis: [Field; L_PRIME],
     /// BFV plaintext modulus (typically denoted as `t`, large enough for TRBFV values)
     pub bfv_plaintext_modulus: Field,
-    /// Precomputed value: `-Q^(-1) mod t` where Q is the product of all BFV CRT moduli
+    /// Precomputed value: `Q^(-1) mod t` where Q is the product of all BFV CRT moduli
     pub bfv_q_inverse_mod_t: Field,
     /// TRBFV CRT moduli: [q_0, q_1, ..., q_{L-1}]
     pub trbfv_qis: [Field; L],

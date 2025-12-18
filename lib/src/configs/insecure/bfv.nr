@@ -96,7 +96,7 @@ pub global ENC_BFV_CONFIGS: BfvEncConfigs<L> = BfvEncConfigs::new(
 dec_bfv (CIRCUIT 5 - DECRYPTION BFV NO HOM ADD)
 -------------------------------------
 ************************************/
-// dec_bfv - bit parameters
+// dec_bfv_no_hom_add - bit parameters
 pub global DEC_BFV_BIT_CT: u32 = 51;
 pub global DEC_BFV_BIT_S: u32 = 2;
 pub global DEC_BFV_BIT_U: u32 = 61;
@@ -104,22 +104,22 @@ pub global DEC_BFV_BIT_R1: u32 = 11;
 pub global DEC_BFV_BIT_R2: u32 = 51;
 pub global DEC_BFV_BIT_MSG: u32 = 16;
 
-// dec_bfv - bounds
+// dec_bfv_no_hom_add - bounds
+pub global DEC_BFV_PLAINTEXT_MODULUS: Field = 68719403009;
+pub global DEC_BFV_Q_INVERSE_MOD_T: Field = 39210117854;
 pub global DEC_BFV_S_BOUND: Field = 1;
-pub global DEC_BFV_U_I_BOUNDS: [Field; L] = [577586652176646144];
+pub global DEC_BFV_U_I_BOUNDS: [Field; L_PRIME] = [577586652176646144];
 pub global DEC_BFV_U_GLOBAL_BOUND: Field = 2251799813554177;
-pub global DEC_BFV_R1_BOUNDS: [Field; L] = [512];
-pub global DEC_BFV_R2_BOUNDS: [Field; L] = [1125899906777088];
+pub global DEC_BFV_R1_BOUNDS: [Field; L_PRIME] = [512];
+pub global DEC_BFV_R2_BOUNDS: [Field; L_PRIME] = [1125899906777088];
+pub global DEC_BFV_DELTA: Field = 32768;
+pub global DEC_BFV_DELTA_HALF: Field = 16384;
 
-// dec_bfv - misc
-pub global DEC_BFV_DELTA: Field = 288230376426438664;
-pub global DEC_BFV_DELTA_HALF: Field = 144115188213219332;
-
-// dec_bfv - configs
+// dec_bfv_no_hom_add - configs
 pub global DEC_BFV_CONFIGS: BfvDecNoHomAddConfig<L_TRBFV, L_PRIME> = BfvDecNoHomAddConfig::new(
     QIS,
-    BFV_PLAINTEXT_MODULUS,
-    BFV_Q_INVERSE_MOD_T,
+    DEC_BFV_PLAINTEXT_MODULUS,
+    DEC_BFV_Q_INVERSE_MOD_T,
     TRBFV_QIS,
     DEC_BFV_S_BOUND,
     DEC_BFV_U_I_BOUNDS,

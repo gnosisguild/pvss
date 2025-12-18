@@ -4,8 +4,12 @@ use crate::core::bfv_pk::Configs as BfvPkConfigs;
 
 // Global configs for BFV parameter set
 pub global N: u32 = 8192;
+pub global L_TRBFV: u32 = 4;
+pub global L_PRIME: u32 = 2;
 pub global L: u32 = 2;
 pub global QIS: [Field; L] = [72057594082099201, 72057594062438401];
+pub global TRBFV_QIS: [Field; L_TRBFV] =
+    [2251799822204929, 4503599627763713, 4503599631433729, 4503599634579457];
 pub global Q_MOD_T: Field = 1082658244788225;
 pub global PLAINTEXT_MODULUS: Field = 18014398509481984;
 pub global Q_INVERSE_MOD_T: Field = 3634521516277761;
@@ -100,24 +104,25 @@ pub global DEC_BFV_BIT_S: u32 = 2;
 pub global DEC_BFV_BIT_U: u32 = 114;
 pub global DEC_BFV_BIT_R1: u32 = 15;
 pub global DEC_BFV_BIT_R2: u32 = 57;
-pub global DEC_BFV_BIT_NOISE: u32 = 59;
+pub global DEC_BFV_BIT_MSG: u32 = 59;
 
 // dec_bfv - bounds
+pub global DEC_BFV_PLAINTEXT_MODULUS: Field = 18014398509481984;
+pub global DEC_BFV_Q_INVERSE_MOD_T: Field = 3634521516277761;
 pub global DEC_BFV_S_BOUND: Field = 1;
-pub global DEC_BFV_U_I_BOUNDS: [Field; L] = [295183934157319372800, 295183934076778905600];
+pub global DEC_BFV_U_I_BOUNDS: [Field; L_PRIME] = [295183934157319372800, 295183934076778905600];
 pub global DEC_BFV_U_GLOBAL_BOUND: Field = 5192296863483867847775730833817601;
-pub global DEC_BFV_R1_BOUNDS: [Field; L] = [8192, 8192];
-pub global DEC_BFV_R2_BOUNDS: [Field; L] = [36028797041049600, 36028797031219200];
-
-// dec_bfv - misc
+pub global DEC_BFV_R1_BOUNDS: [Field; L_PRIME] = [8192, 8192];
+pub global DEC_BFV_R2_BOUNDS: [Field; L_PRIME] = [36028797041049600, 36028797031219200];
 pub global DEC_BFV_DELTA: Field = 288230376426438664;
 pub global DEC_BFV_DELTA_HALF: Field = 144115188213219332;
 
 // dec_bfv - configs
-pub global DEC_BFV_CONFIGS: BfvDecConfigs<L> = BfvDecConfigs::new(
+pub global DEC_BFV_CONFIGS: BfvDecConfigs<L_TRBFV, L_PRIME> = BfvDecConfigs::new(
     QIS,
-    PLAINTEXT_MODULUS,
-    Q_INVERSE_MOD_T,
+    TRBFV_QIS,
+    DEC_BFV_PLAINTEXT_MODULUS,
+    DEC_BFV_Q_INVERSE_MOD_T,
     DEC_BFV_S_BOUND,
     DEC_BFV_U_I_BOUNDS,
     DEC_BFV_U_GLOBAL_BOUND,
