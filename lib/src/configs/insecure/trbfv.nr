@@ -65,7 +65,13 @@ enc_trbfv (CIRCUIT 6 - ENCRYPTION THRESHOLD BFV - GRECO)
 -------------------------------------
 ************************************/
 
-// enc_trbfv - bit parameters
+/************************************
+-------------------------------------
+greco (CIRCUIT 6 - ENCRYPTION TRBFV - GRECO)
+-------------------------------------
+************************************/
+
+// greco - bit parameters
 pub global ENC_TRBFV_BIT_PK: u32 = 36;
 pub global ENC_TRBFV_BIT_CT: u32 = 36;
 pub global ENC_TRBFV_BIT_U: u32 = 2;
@@ -77,25 +83,24 @@ pub global ENC_TRBFV_BIT_R2: u32 = 36;
 pub global ENC_TRBFV_BIT_P1: u32 = 10;
 pub global ENC_TRBFV_BIT_P2: u32 = 36;
 
-// enc_trbfv - bounds
+// greco - bounds
+pub global ENC_TRBFV_Q_MOD_T: Field = 3;
+pub global ENC_TRBFV_K0IS: [Field; L] = [61847462708, 20615769293];
 pub global ENC_TRBFV_PK_BOUNDS: [Field; L] = [34359701504, 34359615488];
 pub global ENC_TRBFV_E0_BOUND: Field = 20;
 pub global ENC_TRBFV_E1_BOUND: Field = 20;
 pub global ENC_TRBFV_U_BOUND: Field = 1;
+pub global ENC_TRBFV_K1_LOW_BOUND: Field = 5;
+pub global ENC_TRBFV_K1_UP_BOUND: Field = 4;
 pub global ENC_TRBFV_R1_LOW_BOUNDS: [Field; L] = [261, 258];
 pub global ENC_TRBFV_R1_UP_BOUNDS: [Field; L] = [260, 258];
 pub global ENC_TRBFV_R2_BOUNDS: [Field; L] = [34359701504, 34359615488];
 pub global ENC_TRBFV_P1_BOUNDS: [Field; L] = [256, 256];
 pub global ENC_TRBFV_P2_BOUNDS: [Field; L] = [34359701504, 34359615488];
-pub global ENC_TRBFV_K1_LOW_BOUND: Field = 5;
-pub global ENC_TRBFV_K1_UP_BOUND: Field = 4;
 
-// enc_trbfv - misc
-pub global ENC_TRBFV_K0IS: [Field; L] = [61847462708, 20615769293];
-
-// enc_trbfv - configs
+// greco - configs
 pub global ENC_TRBFV_CONFIGS: GrecoConfigs<N, L> = GrecoConfigs::new(
-    Q_MOD_T_MOD_P,
+    ENC_TRBFV_Q_MOD_T,
     QIS,
     ENC_TRBFV_K0IS,
     ENC_TRBFV_PK_BOUNDS,
