@@ -196,7 +196,7 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
         for trbfv_idx in 0..L {
             for bfv_idx in 0..L_PRIME {
                 let q_prime = self.configs.bfv_qis[bfv_idx];
-                let mod_q_prime = ModU128::new(q_prime);
+                let q_prime_mod = ModU128::new(q_prime);
                 let mut c0_coeffs = [0 as Field; N];
                 let mut c1_coeffs = [0 as Field; N];
 
@@ -207,7 +207,7 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
                         sum0 = sum0
                             + self.honest_c0[party_idx][trbfv_idx][bfv_idx].coefficients[coeff_idx];
                     }
-                    c0_coeffs[coeff_idx] = mod_q_prime.reduce_mod(sum0);
+                    c0_coeffs[coeff_idx] = q_prime_mod.reduce_mod(sum0);
 
                     // Sum c_1 coefficients
                     let mut sum1 = 0 as Field;
@@ -215,7 +215,7 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
                         sum1 = sum1
                             + self.honest_c1[party_idx][trbfv_idx][bfv_idx].coefficients[coeff_idx];
                     }
-                    c1_coeffs[coeff_idx] = mod_q_prime.reduce_mod(sum1);
+                    c1_coeffs[coeff_idx] = q_prime_mod.reduce_mod(sum1);
                 }
 
                 sum_c0[trbfv_idx][bfv_idx] = Polynomial::new(c0_coeffs);
@@ -383,6 +383,7 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
     fn verify_crt_reconstruction(self, trbfv_idx: u32) {
         for bfv_idx in 0..L_PRIME {
             let q_prime = self.configs.bfv_qis[bfv_idx];
+
             let quotient_times_q = self.crt_quotients[trbfv_idx][bfv_idx].mul_scalar(q_prime);
             let reconstructed = self.u_i[trbfv_idx][bfv_idx].add(quotient_times_q);
 

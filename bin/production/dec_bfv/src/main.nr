@@ -6,7 +6,7 @@ use lib::core::bfv_dec::BfvDec;
 use lib::math::polynomial::Polynomial;
 
 /// Number of honest parties.
-pub global H: u32 = 3;
+pub global H: u32 = 5;
 
 fn main(
     expected_sk_commitment: Field,

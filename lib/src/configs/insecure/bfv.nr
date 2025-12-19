@@ -2,14 +2,14 @@ use crate::core::bfv_dec_no_hom_add::Config as BfvDecNoHomAddConfig;
 use crate::core::bfv_enc::Configs as BfvEncConfigs;
 use crate::core::bfv_pk::Configs as BfvPkConfigs;
 
-// Global configs for BFV Encryption circuit
+// Global configs for BFV Decryption circuit
 pub global N: u32 = 512;
-pub global L: u32 = 1;
-pub global QIS: [Field; L] = [2251799813554177];
-pub global L_PRIME: u32 = 1;
 pub global L_TRBFV: u32 = 2;
-pub global Q_MOD_T: Field = 1082658244788225;
+pub global L_PRIME: u32 = 1;
+pub global QIS: [Field; L_PRIME] = [2251799813554177];
 pub global TRBFV_QIS: [Field; L_TRBFV] = [68719403009, 68719230977];
+pub global L: u32 = 1;
+pub global Q_MOD_T: Field = 1082658244788225;
 pub global BFV_Q_INVERSE_MOD_T: Field = 39210117854;
 pub global BFV_PLAINTEXT_MODULUS: Field = 68719403009;
 
