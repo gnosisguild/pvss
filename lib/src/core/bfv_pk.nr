@@ -222,10 +222,10 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_R1: u32,
             + r2_at_gamma[i] * cyclo_at_gamma
             + r1_at_gamma[i] * self.configs.qis[i];
 
-        assert_eq(pk0_at_gamma[i], expected_pk0);
+        assert(pk0_at_gamma[i] == expected_pk0, "Public key equation 1 failed");
 
         // Equation 2: pk1_i = a_i
         // The second component of BFV public key is just the CRS polynomial
-        assert_eq(pk1_at_gamma[i], a_at_gamma[i]);
+        assert(pk1_at_gamma[i] == a_at_gamma[i], "Public key equation 2 failed");
     }
 }

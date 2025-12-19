@@ -90,7 +90,7 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32, le
     /// Verifies that sk hashes to expected_sk_commitment
     fn verify_sk_commitment(self) {
         let computed_commitment = Self::compute_sk_commitment(self.sk);
-        assert_eq(computed_commitment, self.expected_sk_commitment, "SK commitment mismatch");
+        assert(computed_commitment == self.expected_sk_commitment, "SK commitment mismatch");
     }
 
     /// Verifies secret key consistency: `y[i][j][0] == sk[i]` for all i, j.
@@ -108,7 +108,7 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32, le
             let sk_coeff = self.sk.coefficients[coeff_idx];
 
             for mod_idx in 0..L {
-                assert_eq(self.y[coeff_idx][mod_idx][0], sk_coeff);
+                assert(self.y[coeff_idx][mod_idx][0] == sk_coeff);
             }
         }
     }

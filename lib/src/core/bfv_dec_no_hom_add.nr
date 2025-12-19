@@ -286,7 +286,7 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
     /// Verifies that the BFV secret key `s` hashes to the expected commitment
     fn verify_sk_commitment(self) {
         let computed_commitment = Self::compute_sk_commitment(self.s);
-        assert_eq(computed_commitment, self.expected_sk_commitment, "SK commitment mismatch");
+        assert(computed_commitment == self.expected_sk_commitment, "SK commitment mismatch");
     }
 
     /// Computes a commitment to the expected aggregated TRBFV shares
@@ -357,7 +357,7 @@ impl<let N: u32, let H: u32, let L: u32, let L_PRIME: u32, let BIT_CT: u32, let 
 
         let computed_u = self.u_i[party_idx][trbfv_idx][bfv_idx].eval(gamma);
 
-        assert_eq(computed_u, expected_u);
+        assert(computed_u == expected_u, "Decryption formula failed");
     }
 
     /// Verifies CRT reconstruction for one ciphertext: u_i[l'] + quotient[l'] * q'_l' = u_global for all l'

@@ -116,13 +116,13 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, le
     /// Verifies that s hashes to expected_s_commitment
     fn verify_s_commitment(self) {
         let computed_commitment = Self::compute_aggregated_commitment(self.s);
-        assert_eq(computed_commitment, self.expected_s_commitment, "S commitment mismatch");
+        assert(computed_commitment == self.expected_s_commitment, "S commitment mismatch");
     }
 
     /// Verifies that e hashes to expected_e_commitment
     fn verify_e_commitment(self) {
         let computed_commitment = Self::compute_aggregated_commitment(self.e);
-        assert_eq(computed_commitment, self.expected_e_commitment, "E commitment mismatch");
+        assert(computed_commitment == self.expected_e_commitment, "E commitment mismatch");
     }
 
     /// Flattens all witness data into a single array for Fiat-Shamir challenge generation.
@@ -310,6 +310,9 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, le
         let computed_decryption_share = self.d[basis_idx].eval(gamma);
 
         // Enforce equality: computed decryption share must match expected value
-        assert_eq(computed_decryption_share, expected_decryption_share);
+        assert(
+            computed_decryption_share == expected_decryption_share,
+            "Decryption share computation failed",
+        );
     }
 }

@@ -187,9 +187,8 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     /// Verifies that the message polynomial hashes to the expected commitment
     fn verify_message_commitment(self) {
         let computed_commitment = Self::compute_message_commitment(self.message);
-        assert_eq(
-            computed_commitment,
-            self.expected_message_commitment,
+        assert(
+            computed_commitment == self.expected_message_commitment,
             "Message commitment mismatch",
         );
     }
