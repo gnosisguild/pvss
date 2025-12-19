@@ -1,5 +1,4 @@
 use crate::math::helpers::{compute_safe, flatten};
-use crate::math::modulo::U128::ModU128;
 use crate::math::polynomial::Polynomial;
 
 /// Cryptographic parameters for BFV encryption circuit.
@@ -20,6 +19,10 @@ pub struct Configs<let L: u32> {
     pub e1_bound: Field,
     /// Bound for secret polynomial u (ternary distribution)
     pub u_bound: Field,
+    /// Bound for k1 polynomial
+    pub k1_low_bound: Field,
+    /// Upper bound for k1 polynomial
+    pub k1_up_bound: Field,
     /// Lower bounds for r1 polynomials (modulus switching quotients)
     pub r1_low_bounds: [Field; L],
     /// Upper bounds for r1 polynomials (modulus switching quotients)
@@ -44,6 +47,8 @@ impl<let L: u32> Configs<L> {
         e0_bound: Field,
         e1_bound: Field,
         u_bound: Field,
+        k1_low_bound: Field,
+        k1_up_bound: Field,
         r1_low_bounds: [Field; L],
         r1_up_bounds: [Field; L],
         r2_bounds: [Field; L],
@@ -60,6 +65,8 @@ impl<let L: u32> Configs<L> {
             e0_bound,
             e1_bound,
             u_bound,
+            k1_low_bound,
+            k1_up_bound,
             r1_low_bounds,
             r1_up_bounds,
             r2_bounds,
@@ -76,7 +83,7 @@ impl<let L: u32> Configs<L> {
 /// 1. Message commitment matches expected (from SK shares circuit)
 /// 2. Correct BFV encryption: ct0[l] = pk0[l] * u + e0[l] + k1 * k0[l] + r1[l] * q[l] + r2[l] * (X^N + 1)
 ///    and ct1[l] = pk1[l] * u + e1 + p2[l] * (X^N + 1) + p1[l] * q[l]
-pub struct EncryptionBfv<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_MSG: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> {
+pub struct EncryptionBfv<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_MSG: u32, let BIT_K: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> {
     /// Circuit parameters
     configs: Configs<L>,
     /// Expected commitment to message (from SK shares verification circuit)
@@ -99,8 +106,10 @@ pub struct EncryptionBfv<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u3
     e0_quotients: [Polynomial<N>; L],
     /// Error polynomial e1 (secret witness)
     e1: Polynomial<N>,
-    /// Raw message polynomial (will be scaled to k1 inside circuit) (secret witness)
+    /// Raw message polynomial (secret witness)
     message: Polynomial<N>,
+    /// Scaled message polynomial k1 = [q*m]_t (secret witness, pre-computed during witness generation)
+    k1: Polynomial<N>,
     /// Modulus switching quotient polynomials r1 (secret witnesses, degree 2N-1)
     r1is: [Polynomial<(2 * N) - 1>; L],
     /// Cyclotomic reduction quotient polynomials r2 (secret witnesses, degree N-1)
@@ -111,7 +120,7 @@ pub struct EncryptionBfv<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u3
     p2is: [Polynomial<N - 1>; L],
 }
 
-impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_MSG: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> EncryptionBfv<N, L, BIT_PK, BIT_CT, BIT_U, BIT_E0, BIT_E1, BIT_MSG, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
+impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_MSG: u32, let BIT_K: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> EncryptionBfv<N, L, BIT_PK, BIT_CT, BIT_U, BIT_E0, BIT_E1, BIT_MSG, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
     pub fn new(
         configs: Configs<L>,
         expected_message_commitment: Field,
@@ -125,6 +134,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         e0_quotients: [Polynomial<N>; L],
         e1: Polynomial<N>,
         message: Polynomial<N>,
+        k1: Polynomial<N>,
         r1is: [Polynomial<2 * N - 1>; L],
         r2is: [Polynomial<N - 1>; L],
         p1is: [Polynomial<2 * N - 1>; L],
@@ -143,6 +153,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
             e0_quotients,
             e1,
             message,
+            k1,
             r1is,
             r2is,
             p1is,
@@ -183,18 +194,6 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         );
     }
 
-    /// Computes the scaled message k1 from the raw message polynomial
-    fn compute_scaled_message(self) -> Polynomial<N> {
-        let mut k1_coeffs: [Field; N] = [0; N];
-
-        for i in 0..N {
-            let mod_t = ModU128::new(self.configs.t);
-            k1_coeffs[i] = mod_t.mul_mod(self.configs.q_mod_t, self.message.coefficients[i]);
-        }
-
-        Polynomial { coefficients: k1_coeffs }
-    }
-
     /// Flattens all polynomial coefficients into a single array for Fiat-Shamir challenge generation
     fn payload(self) -> Vec<Field> {
         let mut inputs = Vec::new();
@@ -207,6 +206,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         inputs = flatten::<_, _, BIT_E0>(inputs, [self.e0]);
         inputs = flatten::<_, _, BIT_E1>(inputs, [self.e1]);
         inputs = flatten::<_, _, BIT_U>(inputs, [self.u]);
+        inputs = flatten::<_, _, BIT_K>(inputs, [self.k1]);
 
         // Use message commitment instead of full message
         inputs.push(self.expected_message_commitment);
@@ -243,14 +243,11 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         // Step 3: Check CRT consistency for e0
         self.check_e0_crt_consistency();
 
-        // Step 4: Compute scaled message k1
-        let k1 = self.compute_scaled_message();
-
-        // Step 5: Generate Fiat-Shamir challenges
+        // Step 4: Generate Fiat-Shamir challenges
         let gammas = self.generate_challenge();
 
-        // Step 6: Verify encryption constraints
-        self.verify_evaluations(gammas, k1)
+        // Step 5: Verify encryption constraints
+        self.verify_evaluations(gammas)
     }
 
     /// Performs range checks on all secret witness polynomial coefficients
@@ -312,13 +309,12 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     }
 
     /// Verifies BFV encryption constraints using Fiat-Shamir challenges and the Schwartz-Zippel lemma
-    fn verify_evaluations(self, gammas: Vec<Field>, k1: Polynomial<N>) -> bool {
+    fn verify_evaluations(self, gammas: Vec<Field>) -> bool {
         let gamma = gammas.get(0);
-
         let cyclo_at_gamma = gamma.pow_32(N as Field) + 1;
         let u_at_gamma = self.u.eval(gamma);
         let e1_at_gamma = self.e1.eval(gamma);
-        let k1_at_gamma = k1.eval(gamma);
+        let k1_at_gamma = self.k1.eval(gamma);
 
         let mut sum = (0, 0);
         for i in 0..L {
@@ -327,25 +323,24 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
             let r2i_at_gamma = self.r2is[i].eval(gamma);
             let e0is_at_gamma = self.e0is[i].eval(gamma);
 
-            let pk0_u = (pk0is_at_gamma * u_at_gamma) + e0is_at_gamma;
-            let mut ct0_rhs = pk0_u + (k1_at_gamma * self.configs.k0is[i]);
+            // Verify ct0 equation: ct0[i] = pk0[i]*u + e0[i] + k1*k0[i] + r1[i]*q[i] + r2[i]*cyclo
+            let mut ct0_rhs = (pk0is_at_gamma * u_at_gamma) + e0is_at_gamma;
+            ct0_rhs += k1_at_gamma * self.configs.k0is[i];
             ct0_rhs += r1i_at_gamma * self.configs.qis[i];
             ct0_rhs += r2i_at_gamma * cyclo_at_gamma;
-
             let ct0_lhs = self.ct0is[i].eval(gamma);
 
+            // Verify ct1 equation: ct1[i] = pk1[i]*u + e1 + p2[i]*cyclo + p1[i]*q[i]
             let pk1is_at_gamma = self.pk1is[i].eval(gamma);
             let p1is_at_gamma = self.p1is[i].eval(gamma);
             let p2is_at_gamma = self.p2is[i].eval(gamma);
-
-            let pk1_u = (pk1is_at_gamma * u_at_gamma) + e1_at_gamma;
-            let mut ct1_rhs = pk1_u + p2is_at_gamma * cyclo_at_gamma;
+            let mut ct1_rhs = (pk1is_at_gamma * u_at_gamma) + e1_at_gamma;
+            ct1_rhs += p2is_at_gamma * cyclo_at_gamma;
             ct1_rhs += p1is_at_gamma * self.configs.qis[i];
-
             let ct1_lhs = self.ct1is[i].eval(gamma);
 
+            // Accumulate weighted sums for batch verification
             let gamma_i = if i == 0 { 1 } else { gammas.get(i) };
-
             sum = (
                 sum.0 + ct0_lhs * gamma_i + ct1_lhs * gammas.get(i + L),
                 sum.1 + ct0_rhs * gamma_i + ct1_rhs * gammas.get(i + L),

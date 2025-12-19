@@ -2,12 +2,12 @@ use crate::core::bfv_dec_no_hom_add::Config as BfvDecNoHomAddConfig;
 use crate::core::bfv_enc::Configs as BfvEncConfigs;
 use crate::core::bfv_pk::Configs as BfvPkConfigs;
 
-// Global configs for BFV parameter set
+// Global configs for BFV Encryption circuit
 pub global N: u32 = 512;
 pub global L: u32 = 1;
+pub global QIS: [Field; L] = [2251799813554177];
 pub global L_PRIME: u32 = 1;
 pub global L_TRBFV: u32 = 2;
-pub global QIS: [Field; L] = [2251799813554177];
 pub global Q_MOD_T: Field = 1082658244788225;
 pub global TRBFV_QIS: [Field; L_TRBFV] = [68719403009, 68719230977];
 pub global BFV_Q_INVERSE_MOD_T: Field = 39210117854;
@@ -53,6 +53,7 @@ pub global ENC_BFV_BIT_U: u32 = 2;
 pub global ENC_BFV_BIT_E0: u32 = 4;
 pub global ENC_BFV_BIT_E1: u32 = 4;
 pub global ENC_BFV_BIT_MSG: u32 = 37;
+pub global ENC_BFV_BIT_K: u32 = 36;
 pub global ENC_BFV_BIT_R1: u32 = 36;
 pub global ENC_BFV_BIT_R2: u32 = 51;
 pub global ENC_BFV_BIT_P1: u32 = 10;
@@ -66,6 +67,8 @@ pub global ENC_BFV_PK_BOUNDS: [Field; L] = [1125899906777088];
 pub global ENC_BFV_E0_BOUND: Field = 6;
 pub global ENC_BFV_E1_BOUND: Field = 6;
 pub global ENC_BFV_U_BOUND: Field = 1;
+pub global ENC_BFV_K1_LOW_BOUND: Field = 34359701504;
+pub global ENC_BFV_K1_UP_BOUND: Field = 34359701504;
 pub global ENC_BFV_R1_LOW_BOUNDS: [Field; L] = [19605059183];
 pub global ENC_BFV_R1_UP_BOUNDS: [Field; L] = [19605059183];
 pub global ENC_BFV_R2_BOUNDS: [Field; L] = [1125899906777088];
@@ -83,6 +86,8 @@ pub global ENC_BFV_CONFIGS: BfvEncConfigs<L> = BfvEncConfigs::new(
     ENC_BFV_E0_BOUND,
     ENC_BFV_E1_BOUND,
     ENC_BFV_U_BOUND,
+    ENC_BFV_K1_LOW_BOUND,
+    ENC_BFV_K1_UP_BOUND,
     ENC_BFV_R1_LOW_BOUNDS,
     ENC_BFV_R1_UP_BOUNDS,
     ENC_BFV_R2_BOUNDS,
