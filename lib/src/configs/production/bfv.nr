@@ -55,7 +55,6 @@ pub global ENC_BFV_BIT_U: u32 = 2;
 pub global ENC_BFV_BIT_E0: u32 = 6;
 pub global ENC_BFV_BIT_E1: u32 = 6;
 pub global ENC_BFV_BIT_MSG: u32 = 55;
-pub global ENC_BFV_BIT_K: u32 = 55;
 pub global ENC_BFV_BIT_R1: u32 = 54;
 pub global ENC_BFV_BIT_R2: u32 = 57;
 pub global ENC_BFV_BIT_P1: u32 = 14;
@@ -69,8 +68,6 @@ pub global ENC_BFV_PK_BOUNDS: [Field; L] = [36028797041049600, 36028797031219200
 pub global ENC_BFV_E0_BOUND: Field = 20;
 pub global ENC_BFV_E1_BOUND: Field = 20;
 pub global ENC_BFV_U_BOUND: Field = 1;
-pub global ENC_BFV_K1_LOW_BOUND: Field = 9007199254740992;
-pub global ENC_BFV_K1_UP_BOUND: Field = 9007199254740991;
 pub global ENC_BFV_R1_LOW_BOUNDS: [Field; L] = [8856849607495681, 5929880944709633];
 pub global ENC_BFV_R1_UP_BOUNDS: [Field; L] = [8856849607495680, 5929880944709632];
 pub global ENC_BFV_R2_BOUNDS: [Field; L] = [36028797041049600, 36028797031219200];
@@ -88,8 +85,6 @@ pub global ENC_BFV_CONFIGS: BfvEncConfigs<L> = BfvEncConfigs::new(
     ENC_BFV_E0_BOUND,
     ENC_BFV_E1_BOUND,
     ENC_BFV_U_BOUND,
-    // ENC_BFV_K1_LOW_BOUND,
-    // ENC_BFV_K1_UP_BOUND,
     ENC_BFV_R1_LOW_BOUNDS,
     ENC_BFV_R1_UP_BOUNDS,
     ENC_BFV_R2_BOUNDS,
