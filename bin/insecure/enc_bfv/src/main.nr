@@ -1,7 +1,6 @@
 use lib::configs::insecure::bfv::{
-    ENC_BFV_BIT_CT, ENC_BFV_BIT_E0, ENC_BFV_BIT_E1, ENC_BFV_BIT_K, ENC_BFV_BIT_MSG, ENC_BFV_BIT_P1,
-    ENC_BFV_BIT_P2, ENC_BFV_BIT_PK, ENC_BFV_BIT_R1, ENC_BFV_BIT_R2, ENC_BFV_BIT_U, ENC_BFV_CONFIGS,
-    L, N,
+    ENC_BFV_BIT_CT, ENC_BFV_BIT_E0, ENC_BFV_BIT_E1, ENC_BFV_BIT_MSG, ENC_BFV_BIT_P1, ENC_BFV_BIT_P2,
+    ENC_BFV_BIT_PK, ENC_BFV_BIT_R1, ENC_BFV_BIT_R2, ENC_BFV_BIT_U, ENC_BFV_CONFIGS, L, N,
 };
 use lib::core::bfv_enc::EncryptionBfv;
 use lib::math::polynomial::Polynomial;
@@ -18,13 +17,12 @@ fn main(
     e0_quotients: [Polynomial<N>; L],
     e1: Polynomial<N>,
     message: Polynomial<N>,
-    k1: Polynomial<N>,
     r1is: [Polynomial<(2 * N) - 1>; L],
     r2is: [Polynomial<N - 1>; L],
     p1is: [Polynomial<(2 * N) - 1>; L],
     p2is: [Polynomial<N - 1>; L],
 ) -> pub bool {
-    let enc_bfv: EncryptionBfv<N, L, ENC_BFV_BIT_PK, ENC_BFV_BIT_CT, ENC_BFV_BIT_U, ENC_BFV_BIT_E0, ENC_BFV_BIT_E1, ENC_BFV_BIT_MSG, ENC_BFV_BIT_K, ENC_BFV_BIT_R1, ENC_BFV_BIT_R2, ENC_BFV_BIT_P1, ENC_BFV_BIT_P2> = EncryptionBfv::new(
+    let enc_bfv: EncryptionBfv<N, L, ENC_BFV_BIT_PK, ENC_BFV_BIT_CT, ENC_BFV_BIT_U, ENC_BFV_BIT_E0, ENC_BFV_BIT_E1, ENC_BFV_BIT_MSG, ENC_BFV_BIT_R1, ENC_BFV_BIT_R2, ENC_BFV_BIT_P1, ENC_BFV_BIT_P2> = EncryptionBfv::new(
         ENC_BFV_CONFIGS,
         expected_message_commitment,
         pk0is,
@@ -37,7 +35,6 @@ fn main(
         e0_quotients,
         e1,
         message,
-        k1,
         r1is,
         r2is,
         p1is,
