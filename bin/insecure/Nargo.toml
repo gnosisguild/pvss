@@ -5,8 +5,8 @@ members = [
     "verify_shares_trbfv",
     "enc_bfv",
     "dec_bfv",
+    "pk_agg_trbfv",
     "enc_trbfv",
     "dec_share_trbfv",
-    "dec_share_agg_trbfv",
-    "pk_agg_trbfv"
+    "dec_share_agg_trbfv"
 ]

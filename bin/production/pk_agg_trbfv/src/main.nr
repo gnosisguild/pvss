@@ -1,18 +1,18 @@
-use lib::configs::production::trbfv::{L, N};
+use lib::configs::production::trbfv::{L, N, PK_AGG_TRBFV_BIT_PK, PK_AGG_TRBFV_CONFIGS};
 use lib::core::trbfv_pk_agg::TrbfvPublicKeyAggregation;
 use lib::math::polynomial::Polynomial;
 
-/// Honest parties.
+/// Number of honest parties.
 pub global H: u32 = 5;
 
-// TODO: missing configs!
 fn main(
     pk0: [[Polynomial<N>; L]; H],
     pk1: [[Polynomial<N>; L]; H],
     pk0_agg: [Polynomial<N>; L],
     pk1_agg: [Polynomial<N>; L],
-) {
-    let pk_agg_trbfv: TrbfvPublicKeyAggregation<N, H, L> =
-        TrbfvPublicKeyAggregation::new(pk0, pk1, pk0_agg, pk1_agg);
-    pk_agg_trbfv.verify();
+) -> pub Field {
+    let pk_agg_trbfv: TrbfvPublicKeyAggregation<N, H, L, PK_AGG_TRBFV_BIT_PK> =
+        TrbfvPublicKeyAggregation::new(PK_AGG_TRBFV_CONFIGS, pk0, pk1, pk0_agg, pk1_agg);
+
+    pk_agg_trbfv.verify()
 }

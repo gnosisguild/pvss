@@ -68,6 +68,9 @@ pk_agg_trbfv (CIRCUIT 6 - PUBLIC KEY AGGREGATION TRBFV)
 -------------------------------------
 ************************************/
 
+// pk_agg_trbfv - bit parameters
+pub global PK_AGG_TRBFV_BIT_PK: u32 = 52;
+
 // pk_agg_trbfv - configs
 pub global PK_AGG_TRBFV_CONFIGS: PkAggTrBfvConfigs<L> = PkAggTrBfvConfigs::new(QIS);
 
