@@ -61,13 +61,16 @@ pub global VERIFY_SHARES_CONFIGS: VerifySharesConfigs<L> =
 
 /************************************
 -------------------------------------
-enc_trbfv (CIRCUIT 6 - ENCRYPTION THRESHOLD BFV - GRECO)
+pk_agg_trbfv (CIRCUIT 6 - PUBLIC KEY AGGREGATION TRBFV)
 -------------------------------------
 ************************************/
 
+// pk_agg_trbfv - configs
+pub global PK_AGG_TRBFV_CONFIGS: PkAggTrBfvConfigs<L> = PkAggTrBfvConfigs::new(QIS);
+
 /************************************
 -------------------------------------
-greco (CIRCUIT 6 - ENCRYPTION TRBFV - GRECO)
+greco (CIRCUIT 7 - ENCRYPTION TRBFV - GRECO)
 -------------------------------------
 ************************************/
 
@@ -118,7 +121,7 @@ pub global ENC_TRBFV_CONFIGS: GrecoConfigs<N, L> = GrecoConfigs::new(
 
 /************************************
 -------------------------------------
-trbfv_dec_share (CIRCUIT 7 - THRESHOLD BFV DECRYPTION SHARE)
+trbfv_dec_share (CIRCUIT 8 - THRESHOLD BFV DECRYPTION SHARE)
 -------------------------------------
 ************************************/
 
@@ -145,7 +148,7 @@ pub global DEC_SHARES_CONFIGS: DecShareTrBfvConfigs<L> = DecShareTrBfvConfigs::n
 
 /************************************
 -------------------------------------
-trbfv_dec_shares_agg (CIRCUIT 8 - THRESHOLD BFV DECRYPTION SHARES AGGREGATION)
+trbfv_dec_shares_agg (CIRCUIT 9 - THRESHOLD BFV DECRYPTION SHARES AGGREGATION)
 -------------------------------------
 ************************************/
 
@@ -155,12 +158,3 @@ pub global DEC_SHARES_AGG_BIT_NOISE: u32 = 69;
 // dec_share_agg_trbfv - configs
 pub global DEC_SHARES_AGG_CONFIGS: DecShareAggTrBfvConfigs<L> =
     DecShareAggTrBfvConfigs::new(QIS, PLAINTEXT_MODULUS, Q_INVERSE_MOD_T);
-
-/************************************
--------------------------------------
-pk_agg_trbfv (CIRCUIT 9 - PUBLIC KEY AGGREGATION TRBFV)
--------------------------------------
-************************************/
-
-// pk_agg_trbfv - configs
-pub global PK_AGG_TRBFV_CONFIGS: PkAggTrBfvConfigs<L> = PkAggTrBfvConfigs::new(QIS);
