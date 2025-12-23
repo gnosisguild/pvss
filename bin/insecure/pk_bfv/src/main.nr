@@ -12,8 +12,8 @@ fn main(
     r2is: [Polynomial<N - 1>; L],
     pk0is: [Polynomial<N>; L],
     pk1is: [Polynomial<N>; L],
-) {
+) -> pub Field {
     let pk_bfv: BfvPublicKey<N, L, PK_BFV_BIT_EEK, PK_BFV_BIT_SK, PK_BFV_BIT_R1, PK_BFV_BIT_R2> =
         BfvPublicKey::new(PK_BFV_CONFIGS, a, eek, sk, r1is, r2is, pk0is, pk1is);
-    pk_bfv.verify();
+    pk_bfv.verify()
 }

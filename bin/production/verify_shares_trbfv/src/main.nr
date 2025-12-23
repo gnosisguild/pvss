@@ -10,12 +10,13 @@ pub global N_PARTIES: u32 = 5;
 pub global T: u32 = 2;
 
 fn main(
+    expected_sk_commitment: Field,
     sk: Polynomial<N>,
     y: [[[Field; N_PARTIES + 1]; L]; N],
     h: [[[Field; N_PARTIES + 1]; T + 1]; L],
-) -> pub Field {
+) -> pub [[Field; L]; N_PARTIES] {
     let sk_shares: VerifyShares<N, L, N_PARTIES, T, VERIFY_SHARES_BIT_SK, VERIFY_SHARES_BIT_SHARE>
-         = VerifyShares::new(VERIFY_SHARES_CONFIGS, sk, y, h);
+         = VerifyShares::new(VERIFY_SHARES_CONFIGS, expected_sk_commitment, sk, y, h);
 
     sk_shares.verify()
 }
