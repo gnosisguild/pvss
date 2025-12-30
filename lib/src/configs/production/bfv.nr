@@ -1,4 +1,4 @@
-use crate::core::bfv_dec::Configs as BfvDecConfigs;
+//use crate::core::bfv_dec::Configs as BfvDecConfigs;
 use crate::core::bfv_enc::Configs as BfvEncConfigs;
 use crate::core::bfv_pk::Configs as BfvPkConfigs;
 
@@ -118,16 +118,16 @@ pub global DEC_BFV_DELTA: Field = 288230376426438664;
 pub global DEC_BFV_DELTA_HALF: Field = 144115188213219332;
 
 // dec_bfv - configs
-pub global DEC_BFV_CONFIGS: BfvDecConfigs<L_TRBFV, L_PRIME> = BfvDecConfigs::new(
-    QIS,
-    TRBFV_QIS,
-    DEC_BFV_PLAINTEXT_MODULUS,
-    DEC_BFV_Q_INVERSE_MOD_T,
-    DEC_BFV_S_BOUND,
-    DEC_BFV_U_I_BOUNDS,
-    DEC_BFV_U_GLOBAL_BOUND,
-    DEC_BFV_R1_BOUNDS,
-    DEC_BFV_R2_BOUNDS,
-    DEC_BFV_DELTA,
-    DEC_BFV_DELTA_HALF,
-);
+// pub global DEC_BFV_CONFIGS: BfvDecConfigs<L_TRBFV, L_PRIME> = BfvDecConfigs::new(
+//     QIS,
+//     TRBFV_QIS,
+//     DEC_BFV_PLAINTEXT_MODULUS,
+//     DEC_BFV_Q_INVERSE_MOD_T,
+//     DEC_BFV_S_BOUND,
+//     DEC_BFV_U_I_BOUNDS,
+//     DEC_BFV_U_GLOBAL_BOUND,
+//     DEC_BFV_R1_BOUNDS,
+//     DEC_BFV_R2_BOUNDS,
+//     DEC_BFV_DELTA,
+//     DEC_BFV_DELTA_HALF,
+// );
