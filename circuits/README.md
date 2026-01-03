@@ -261,3 +261,304 @@ flowchart LR
 2. **Verifiable**: All operations proven in zero-knowledge
 3. **Composition**: Commitments chain circuits together
 4. **Dishonest Detection**: Phase 1 proofs identify malicious parties before Phase 2
+
+# Proof Aggregation Architecture
+
+## Overview
+
+The PVSS-TRBFV protocol uses recursive proof aggregation to minimize on-chain verification costs. Instead of posting all individual proofs on-chain, proofs are aggregated into constant-size proofs regardless of the number of parties.
+
+## Aggregation Flow
+```mermaid
+flowchart TD
+    subgraph Phase1a["Phase 1a: Proof Generation (All N Parties)"]
+        P1a_pad[" "]
+        P1a_desc["Each party generates proofs for Circuits 1-4"]
+        P1a_out["Proofs broadcast to all ciphernodes"]
+        P1a_pad --- P1a_desc
+    end
+
+    subgraph Phase1b["Phase 1b: Cross-Verification"]
+        P1b_pad[" "]
+        P1b_desc["Ciphernodes verify each other's proofs"]
+        P1b_out["Determine honest party set H"]
+        P1b_pad --- P1b_desc
+    end
+
+    subgraph Phase1c["Phase 1c: Aggregate Honest Proofs Only"]
+        P1c_pad[" "]
+        
+        subgraph PartyWrappers["Per-Party Wrappers (Parallel)"]
+            PW_pad[" "]
+            PW1["Party i wrapper:<br/>C1, C2a, C2b<br/>C3a×(H-1), C3b×(H-1)<br/>C4a, C4b"]
+            PW_out["party_commitment_i"]
+            PW_pad --- PW1
+        end
+        
+        subgraph Fold1["Fold All Party Wrappers"]
+            F1_pad[" "]
+            F1_desc["Iteratively fold H party proofs"]
+            F1_out["phase1_aggregated_proof<br/>phase1_commitment"]
+            F1_pad --- F1_desc
+        end
+        
+        P1c_pad --- PartyWrappers
+        PartyWrappers --> Fold1
+    end
+
+    subgraph Phase2["Phase 2: Public Key Aggregation"]
+        P2_pad[" "]
+        P2_desc["Circuit 5: pk-aggregation-trbfv<br/>Aggregates pk from H honest parties"]
+        P2_out["phase2_proof<br/>pk_agg"]
+        P2_pad --- P2_desc
+    end
+
+    subgraph Phase3["Phase 3: User Encryption (Greco)"]
+        P3_pad[" "]
+        P3_desc["Users encrypt with pk_agg<br/>Homomorphic computation"]
+        P3_out["Result ciphertext"]
+        P3_pad --- P3_desc
+    end
+
+    subgraph Phase4["Phase 4: Threshold Decryption"]
+        P4_pad[" "]
+        
+        subgraph DecShares["Decryption Shares"]
+            DS_pad[" "]
+            DS_desc["H× Circuit 6: dec-share-trbfv"]
+            DS_pad --- DS_desc
+        end
+        
+        subgraph DecResult["Final Decryption"]
+            DR_pad[" "]
+            DR_desc["1× Circuit 7: dec-result-trbfv"]
+            DR_pad --- DR_desc
+        end
+        
+        subgraph Fold4["Fold Phase 4 Proofs"]
+            F4_pad[" "]
+            F4_out["phase4_aggregated_proof<br/>final_message"]
+            F4_pad --- F4_out
+        end
+        
+        P4_pad --- DecShares
+        DecShares --> DecResult
+        DecResult --> Fold4
+    end
+
+    subgraph OnChain["On-Chain Verification"]
+        OC_pad[" "]
+        OC_desc["Verify 3 aggregated proofs"]
+        OC_pad --- OC_desc
+    end
+
+    Phase1a --> Phase1b
+    Phase1b --> Phase1c
+    Phase1c -->|"phase1_proof<br/>phase1_commitment<br/>honest_party_ids"| OnChain
+    Phase1c --> Phase2
+    Phase2 -->|"phase2_proof<br/>pk_agg"| OnChain
+    Phase2 --> Phase3
+    Phase3 --> Phase4
+    Phase4 -->|"phase4_proof<br/>final_message"| OnChain
+
+    style P1a_pad fill:none,stroke:none,color:transparent
+    style P1b_pad fill:none,stroke:none,color:transparent
+    style P1c_pad fill:none,stroke:none,color:transparent
+    style PW_pad fill:none,stroke:none,color:transparent
+    style F1_pad fill:none,stroke:none,color:transparent
+    style P2_pad fill:none,stroke:none,color:transparent
+    style P3_pad fill:none,stroke:none,color:transparent
+    style P4_pad fill:none,stroke:none,color:transparent
+    style DS_pad fill:none,stroke:none,color:transparent
+    style DR_pad fill:none,stroke:none,color:transparent
+    style F4_pad fill:none,stroke:none,color:transparent
+    style OC_pad fill:none,stroke:none,color:transparent
+
+    style Phase1a fill:#e6f3ff,stroke:#4a90d9,stroke-width:2px
+    style Phase1b fill:#e6f3ff,stroke:#4a90d9,stroke-width:2px
+    style Phase1c fill:#e6f3ff,stroke:#4a90d9,stroke-width:2px
+    style Phase2 fill:#e6ffe6,stroke:#4ad94a,stroke-width:2px
+    style Phase3 fill:#f3e6ff,stroke:#9a4ad9,stroke-width:2px
+    style Phase4 fill:#ffe6e6,stroke:#d94a4a,stroke-width:2px
+    style OnChain fill:#fff3e6,stroke:#d9944a,stroke-width:2px
+```
+
+## Proof Counts
+
+### Per-Party Proofs (Phase 1)
+
+| Circuit | Description | Count per Party |
+|---------|-------------|-----------------|
+| C1 | pk-trbfv | 1 |
+| C2a | sk-shares | 1 |
+| C2b | e_sm-shares | 1 |
+| C3a | enc-bfv (sk) to other honest parties | H - 1 |
+| C3b | enc-bfv (e_sm) to other honest parties | H - 1 |
+| C4a | dec-bfv-commit-verify (sk) | 1 |
+| C4b | dec-bfv-commit-verify (e_sm) | 1 |
+| **Total per party** | | **2H + 3** |
+
+### Total Proof Counts
+
+| Phase | Circuit | Count | Formula |
+|-------|---------|-------|---------|
+| 1 | C1: pk-trbfv | H | H |
+| 1 | C2a: sk-shares | H | H |
+| 1 | C2b: e_sm-shares | H | H |
+| 1 | C3a: enc-bfv (sk) | H × (H-1) | H² - H |
+| 1 | C3b: enc-bfv (e_sm) | H × (H-1) | H² - H |
+| 1 | C4a: dec-verify (sk) | H | H |
+| 1 | C4b: dec-verify (e_sm) | H | H |
+| **Phase 1 Total** | | | **2H² + 3H** |
+| 2 | C5: pk-aggregation | 1 | 1 |
+| 4 | C6: dec-share | H | H |
+| 4 | C7: dec-result | 1 | 1 |
+| **Grand Total** | | | **2H² + 4H + 2** |
+
+## Aggregation Layers
+```
+Layer 0: Original Circuit Proofs
+         ┌─────────────────────────────────────────────────────────┐
+         │  H × (2H + 3) proofs for Phase 1                       │
+         │  H proofs for Phase 4 (C6)                             │
+         │  1 proof each for C5, C7                               │
+         └─────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+Layer 1: Per-Party Wrapper Proofs
+         ┌─────────────────────────────────────────────────────────┐
+         │  Each honest party aggregates their own proofs          │
+         │  H wrapper proofs (parallel)                           │
+         │                                                         │
+         │  party_wrapper_1 ─┐                                     │
+         │  party_wrapper_2 ─┼── commitment_i for each party      │
+         │  ...              │                                     │
+         │  party_wrapper_H ─┘                                     │
+         └─────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+Layer 2: Fold All Party Wrappers
+         ┌─────────────────────────────────────────────────────────┐
+         │  Iteratively fold H party proofs into one              │
+         │                                                         │
+         │  fold(empty, wrapper_1) → acc_1                        │
+         │  fold(acc_1, wrapper_2) → acc_2                        │
+         │  fold(acc_2, wrapper_3) → acc_3                        │
+         │  ...                                                    │
+         │  fold(acc_{H-1}, wrapper_H) → phase1_aggregated_proof  │
+         └─────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+Layer 3: On-Chain (Constant Size)
+         ┌─────────────────────────────────────────────────────────┐
+         │  phase1_aggregated_proof + phase1_commitment           │
+         │  phase2_proof + pk_agg                                 │
+         │  phase4_aggregated_proof + final_message               │
+         └─────────────────────────────────────────────────────────┘
+```
+
+## Wrapper Circuit Structure
+
+### Per-Party Wrapper (Phase 1)
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Party Wrapper Circuit                        │
+│                                                                 │
+│  Private Inputs:                                                │
+│    ├── proof_c1, proof_c2a, proof_c2b                          │
+│    ├── proofs_c3a[H-1], proofs_c3b[H-1]                        │
+│    ├── proof_c4a, proof_c4b                                    │
+│    ├── verification_keys (vk_c1, vk_c2, vk_c3, vk_c4)         │
+│    └── public_inputs for each circuit                          │
+│                                                                 │
+│  Logic:                                                         │
+│    1. Verify each original proof                               │
+│    2. Compute commitment to all public inputs                  │
+│                                                                 │
+│  Public Output:                                                 │
+│    └── party_commitment (single Field)                         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Fold Circuit (Dynamic H)
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Fold Circuit                                 │
+│                                                                 │
+│  Private Inputs:                                                │
+│    ├── acc_proof (accumulated proof so far)                    │
+│    ├── acc_commitment                                          │
+│    ├── new_proof (next party's wrapper proof)                  │
+│    ├── new_commitment                                          │
+│    └── wrapper_vk                                              │
+│                                                                 │
+│  Logic:                                                         │
+│    1. Verify acc_proof (if not first iteration)               │
+│    2. Verify new_proof                                         │
+│    3. Combine commitments: hash(acc_commitment, new_commitment)│
+│                                                                 │
+│  Public Output:                                                 │
+│    └── combined_commitment (single Field)                      │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Phase 4 Wrapper
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Phase 4 Wrapper Circuit                      │
+│                                                                 │
+│  Private Inputs:                                                │
+│    ├── proofs_c6[H] (decryption share proofs)                  │
+│    ├── proof_c7 (final decryption proof)                       │
+│    ├── verification_keys (vk_c6, vk_c7)                        │
+│    └── public_inputs for each circuit                          │
+│                                                                 │
+│  Logic:                                                         │
+│    1. Verify all H decryption share proofs (C6)               │
+│    2. Verify final decryption proof (C7)                       │
+│    3. Compute commitment to all public inputs                  │
+│                                                                 │
+│  Public Outputs:                                                │
+│    ├── phase4_commitment (single Field)                        │
+│    └── final_message                                           │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## On-Chain Verification
+
+### Data Posted On-Chain
+
+| Phase | Proof | Public Data | Size |
+|-------|-------|-------------|------|
+| 1 | phase1_proof | phase1_commitment, honest_party_ids | Constant + O(H) |
+| 2 | phase2_proof | phase2_commitment, pk_agg | Constant |
+| 4 | phase4_proof | phase4_commitment, final_message | Constant |
+
+### Verification Flow
+```mermaid
+flowchart LR
+    subgraph OnChain["On-Chain Verifier"]
+        direction TB
+        OC_pad[" "]
+        
+        V1["Verify phase1_proof"]
+        V2["Verify phase2_proof"]
+        V4["Verify phase4_proof"]
+        
+        Check["Check commitment linkage"]
+        Result["Accept/Reject"]
+        
+        OC_pad --- V1
+        V1 --> V2
+        V2 --> V4
+        V4 --> Check
+        Check --> Result
+    end
+
+    P1["phase1_proof<br/>phase1_commitment"] --> V1
+    P2["phase2_proof<br/>pk_agg"] --> V2
+    P4["phase4_proof<br/>final_message"] --> V4
+
+    style OC_pad fill:none,stroke:none,color:transparent
+    style OnChain fill:#fff3e6,stroke:#d9944a,stroke-width:2px
+
