@@ -59,8 +59,7 @@ pub global VERIFY_SHARES_BIT_SHARE: u32 = 54;
 pub global VERIFY_SHARES_SK_BOUND: Field = 1;
 
 // verify_shares - configs
-pub global VERIFY_SHARES_CONFIGS: VerifySharesConfigs<L> =
-    VerifySharesConfigs::new(QIS, VERIFY_SHARES_SK_BOUND);
+pub global VERIFY_SHARES_CONFIGS: VerifySharesConfigs<L> = VerifySharesConfigs::new(QIS);
 
 /************************************
 -------------------------------------
