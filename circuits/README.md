@@ -55,7 +55,7 @@ flowchart TD
         end
 
         C1 -->|"commit(sk_trbfv)"| C2_sk
-        C1 -->|"commit(e_sm)"| C2_e
+        ? -->|"commit(e_sm)"| C2_e
         C2_sk -->|"commit(sk_share[i][j])"| C3_sk
         C2_e -->|"commit(e_sm_share[i][j])"| C3_e
         C2_sk -->|"commit(sk_share)"| C4_sk
