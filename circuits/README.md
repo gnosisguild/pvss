@@ -169,15 +169,15 @@ flowchart TD
 | Circuit | Name | Instances | Phase | Input Commitments | Output |
 |---------|------|-----------|-------|-------------------|--------|
 | 1 | pk-trbfv | N_PARTIES | 1 | - | commit(sk_trbfv), commit(pk_trbfv) |
-| 2a | sk-shares (sk) | 1 | 1 | commit(sk_trbfv) | commit(sk_share[i][j]) |
-| 2b | sk-shares (e_sm) | 1 | 1 | commit(e_sm) | commit(e_sm_share[i][j]) |
+| 2a | sk-shares (sk) | N_PARTIES | 1 | commit(sk_trbfv) | commit(sk_share[i][j]) |
+| 2b | sk-shares (e_sm) | N_PARTIES | 1 | commit(e_sm) | commit(e_sm_share[i][j]) |
 | 3a | enc-bfv (sk) | N_PARTIES × L | 1 | commit(sk_share[i][j]) | ciphertexts |
 | 3b | enc-bfv (e_sm) | N_PARTIES × L | 1 | commit(e_sm_share[i][j]) | ciphertexts |
 | 4a | dec-bfv-commit-verify (sk) | H | 1 | commit(sk_share) | commit(aggregated_sk_shares) |
 | 4b | dec-bfv-commit-verify (e_sm) | H | 1 | commit(e_sm_share) | commit(aggregated_e_sm_shares) |
 | 5 | pk-aggregation-trbfv | 1 | 2 | commit(pk_trbfv) | pk0_agg, pk1_agg |
 | - | Greco | N_USERS | 3 | pk_agg | encrypted data |
-| 6 | dec-share-trbfv | T+1 | 4 | commit(agg_sk), commit(agg_e) | decryption_share d |
+| 6 | dec-share-trbfv | H | 4 | commit(agg_sk), commit(agg_e) | decryption_share d |
 | 7 | dec-result-trbfv | 1 | 4 | decryption_shares | final message |
 
 ## Commitment Flow
