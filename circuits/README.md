@@ -17,7 +17,9 @@ flowchart TD
             C1_desc["Verifies TRBFV public key correctness"]
             C1_out["Output: commit(sk_trbfv), commit(pk_trbfv)"]
         end
-
+        subgraph Commit[" "]
+            Commit_out["Output: commit(pk_bfv), commit(e_sm)"]
+        end
         subgraph C2_sk["Circuit 2a: sk-shares (for sk shares)"]
             C2_sk_pad[ ]
             C2_sk_check["Check: commit(sk_trbfv) == expected"]
@@ -55,11 +57,14 @@ flowchart TD
         end
 
         C1 -->|"commit(sk_trbfv)"| C2_sk
-        ? -->|"commit(e_sm)"| C2_e
+        Commit -->|"commit(e_sm)"| C2_e
         C2_sk -->|"commit(sk_share[i][j])"| C3_sk
         C2_e -->|"commit(e_sm_share[i][j])"| C3_e
         C2_sk -->|"commit(sk_share)"| C4_sk
         C2_e -->|"commit(e_sm_share)"| C4_e
+        Commit -->|"commit(pk_bfv)"| C4_sk
+        Commit -->|"commit(pk_bfv)"| C4_e
+
     end
     subgraph Phase2["Phase 2: Honest Party Aggregation"]
 
