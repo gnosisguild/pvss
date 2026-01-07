@@ -1,4 +1,5 @@
 pub mod bfv_pk;
+pub mod trbfv_pk;
 pub mod bfv_dec;
 pub mod bfv_enc;
 pub mod greco;

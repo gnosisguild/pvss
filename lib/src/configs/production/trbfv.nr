@@ -28,8 +28,12 @@ pub global PK_TRBFV_BIT_EEK: u32 = 6;
 pub global PK_TRBFV_BIT_SK: u32 = 2;
 pub global PK_TRBFV_BIT_R1: u32 = 18;
 pub global PK_TRBFV_BIT_R2: u32 = 53;
+pub global PK_TRBFV_BIT_E_SM: u32 = 53;
+pub global PK_TRBFV_BIT_PK: u32 = 53;
 
 // pk_trbfv - bounds
+//CHANGE IT TO THE CORRECT VALUE
+pub global PK_TRBFV_E_SM_BOUND: Field = 20;
 pub global PK_TRBFV_EEK_BOUND: Field = 20;
 pub global PK_TRBFV_SK_BOUND: Field = 1;
 pub global PK_TRBFV_R1_BOUNDS: [Field; L] = [81920, 81920, 81920, 81920];
