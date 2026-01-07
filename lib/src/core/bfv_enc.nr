@@ -73,12 +73,15 @@ impl<let L: u32> Configs<L> {
 /// BFV Encryption Circuit.
 ///
 /// Verifies:
-/// 1. Message commitment matches expected (from SK shares circuit)
-/// 2. Correct BFV encryption: ct0[l] = pk0[l] * u + e0[l] + k1 * k0[l] + r1[l] * q[l] + r2[l] * (X^N + 1)
+/// 1. Public key commitment matches expected (from Circuit 0)
+/// 2. Message commitment matches expected (from SK shares circuit)
+/// 3. Correct BFV encryption: ct0[l] = pk0[l] * u + e0[l] + k1 * k0[l] + r1[l] * q[l] + r2[l] * (X^N + 1)
 ///    and ct1[l] = pk1[l] * u + e1 + p2[l] * (X^N + 1) + p1[l] * q[l]
 pub struct EncryptionBfv<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_MSG: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> {
     /// Circuit parameters
     configs: Configs<L>,
+    /// Expected commitment to public key (from Circuit 0)
+    expected_pk_commitment: Field,
     /// Expected commitment to message (from SK shares verification circuit)
     expected_message_commitment: Field,
     /// Public key component 0 for each CRT basis (public inputs)
@@ -114,6 +117,7 @@ pub struct EncryptionBfv<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u3
 impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_MSG: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> EncryptionBfv<N, L, BIT_PK, BIT_CT, BIT_U, BIT_E0, BIT_E1, BIT_MSG, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
     pub fn new(
         configs: Configs<L>,
+        expected_pk_commitment: Field,
         expected_message_commitment: Field,
         pk0is: [Polynomial<N>; L],
         pk1is: [Polynomial<N>; L],
@@ -132,6 +136,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     ) -> Self {
         EncryptionBfv {
             configs,
+            expected_pk_commitment,
             expected_message_commitment,
             pk0is,
             pk1is,
@@ -148,6 +153,40 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
             p1is,
             p2is,
         }
+    }
+
+    /// Computes commitment to the BFV public key (must match Circuit 0's scheme)
+    fn compute_pk_commitment(pk0is: [Polynomial<N>; L], pk1is: [Polynomial<N>; L]) -> Field {
+        let mut inputs = Vec::new();
+
+        // Flatten pk0 polynomials
+        inputs = flatten::<_, _, BIT_PK>(inputs, pk0is);
+
+        // Flatten pk1 polynomials
+        inputs = flatten::<_, _, BIT_PK>(inputs, pk1is);
+
+        // Domain separator - "PVSS_pk_bfv" (must match Circuit 0)
+        let domain_separator = [
+            0x50, 0x56, 0x53, 0x53, 0x5f, 0x70, 0x6b, 0x5f, 0x62, 0x66, 0x76, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+
+        let input_size = inputs.len();
+        let io_pattern = [0x80000000 | input_size, 0x00000001];
+
+        compute_safe(domain_separator, inputs, io_pattern).get(0)
+    }
+
+    /// Verifies that the public key hashes to the expected commitment
+    fn verify_pk_commitment(self) {
+        let computed_commitment = Self::compute_pk_commitment(self.pk0is, self.pk1is);
+        assert(
+            computed_commitment == self.expected_pk_commitment,
+            "Public key commitment mismatch",
+        );
     }
 
     /// Computes a cryptographic commitment to the message polynomial
@@ -218,8 +257,9 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     fn payload(self, k1: Polynomial<N>) -> Vec<Field> {
         let mut inputs = Vec::new();
 
-        inputs = flatten::<_, _, BIT_PK>(inputs, self.pk0is);
-        inputs = flatten::<_, _, BIT_PK>(inputs, self.pk1is);
+        // Use pk commitment instead of full pk polynomials
+        inputs.push(self.expected_pk_commitment);
+
         inputs = flatten::<_, _, BIT_CT>(inputs, self.ct0is);
         inputs = flatten::<_, _, BIT_CT>(inputs, self.ct1is);
 
@@ -258,22 +298,25 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
 
     /// Main verification function
     pub fn verify(self) -> bool {
-        // Step 1: Verify message commitment matches expected
+        // Step 1: Verify public key commitment matches expected
+        self.verify_pk_commitment();
+
+        // Step 2: Verify message commitment matches expected
         self.verify_message_commitment();
 
-        // Step 2: Perform range checks
+        // Step 3: Perform range checks
         self.check_range_bounds();
 
-        // Step 3: Check CRT consistency for e0
+        // Step 4: Check CRT consistency for e0
         self.check_e0_crt_consistency();
 
-        // Step 4: Compute scaled message k1 from message
+        // Step 5: Compute scaled message k1 from message
         let k1 = self.compute_scaled_message();
 
-        // Step 5: Generate Fiat-Shamir challenges
+        // Step 6: Generate Fiat-Shamir challenges
         let gammas = self.generate_challenge(k1);
 
-        // Step 6: Verify encryption constraints
+        // Step 7: Verify encryption constraints
         self.verify_evaluations(gammas, k1)
     }
 

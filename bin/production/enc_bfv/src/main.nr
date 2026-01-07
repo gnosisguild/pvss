@@ -6,6 +6,7 @@ use lib::core::bfv_enc::EncryptionBfv;
 use lib::math::polynomial::Polynomial;
 
 fn main(
+    expected_pk_commitment: Field,
     expected_message_commitment: Field,
     pk0is: [Polynomial<N>; L],
     pk1is: [Polynomial<N>; L],
@@ -24,6 +25,7 @@ fn main(
 ) -> pub bool {
     let enc_bfv: EncryptionBfv<N, L, ENC_BFV_BIT_PK, ENC_BFV_BIT_CT, ENC_BFV_BIT_U, ENC_BFV_BIT_E0, ENC_BFV_BIT_E1, ENC_BFV_BIT_MSG, ENC_BFV_BIT_R1, ENC_BFV_BIT_R2, ENC_BFV_BIT_P1, ENC_BFV_BIT_P2> = EncryptionBfv::new(
         ENC_BFV_CONFIGS,
+        expected_pk_commitment,
         expected_message_commitment,
         pk0is,
         pk1is,
