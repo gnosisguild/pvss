@@ -1,6 +1,6 @@
 //use crate::core::bfv_dec::Configs as BfvDecConfigs;
 use crate::core::bfv_enc::Configs as BfvEncConfigs;
-use crate::core::bfv_pk::Configs as BfvPkConfigs;
+// use crate::core::bfv_pk::Configs as BfvPkConfigs;
 
 // Global configs for BFV parameter set
 pub global N: u32 = 8192;
@@ -26,6 +26,7 @@ pub global PK_BFV_BIT_EEK: u32 = 6;
 pub global PK_BFV_BIT_SK: u32 = 2;
 pub global PK_BFV_BIT_R1: u32 = 18;
 pub global PK_BFV_BIT_R2: u32 = 57;
+pub global PK_BFV_BIT_PK: u32 = 57;
 
 // pk_bfv - bounds
 pub global PK_BFV_EEK_BOUND: Field = 20;
@@ -34,13 +35,13 @@ pub global PK_BFV_R1_BOUNDS: [Field; L] = [81920, 81920];
 pub global PK_BFV_R2_BOUNDS: [Field; L] = [36028797041049600, 36028797031219200];
 
 // pk_bfv - configs
-pub global PK_BFV_CONFIGS: BfvPkConfigs<N, L> = BfvPkConfigs::new(
-    QIS,
-    PK_BFV_EEK_BOUND,
-    PK_BFV_SK_BOUND,
-    PK_BFV_R1_BOUNDS,
-    PK_BFV_R2_BOUNDS,
-);
+// pub global PK_BFV_CONFIGS: BfvPkConfigs<N, L> = BfvPkConfigs::new(
+//     QIS,
+//     PK_BFV_EEK_BOUND,
+//     PK_BFV_SK_BOUND,
+//     PK_BFV_R1_BOUNDS,
+//     PK_BFV_R2_BOUNDS,
+// );
 
 /************************************
 -------------------------------------

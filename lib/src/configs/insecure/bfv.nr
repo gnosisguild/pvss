@@ -1,6 +1,6 @@
 use crate::core::bfv_dec_no_hom_add::Config as BfvDecNoHomAddConfig;
 use crate::core::bfv_enc::Configs as BfvEncConfigs;
-use crate::core::bfv_pk::Configs as BfvPkConfigs;
+//use crate::core::bfv_pk::Configs as BfvPkConfigs;
 
 // Global configs for BFV Decryption circuit
 pub global N: u32 = 512;
@@ -24,6 +24,7 @@ pub global PK_BFV_BIT_EEK: u32 = 4;
 pub global PK_BFV_BIT_SK: u32 = 2;
 pub global PK_BFV_BIT_R1: u32 = 12;
 pub global PK_BFV_BIT_R2: u32 = 51;
+pub global PK_BFV_BIT_PK: u32 = 51;
 
 // pk_bfv - bounds
 pub global PK_BFV_EEK_BOUND: Field = 6;
@@ -32,13 +33,13 @@ pub global PK_BFV_R1_BOUNDS: [Field; L] = [1536];
 pub global PK_BFV_R2_BOUNDS: [Field; L] = [1125899906777088];
 
 // pk_bfv - configs
-pub global PK_BFV_CONFIGS: BfvPkConfigs<N, L> = BfvPkConfigs::new(
-    QIS,
-    PK_BFV_EEK_BOUND,
-    PK_BFV_SK_BOUND,
-    PK_BFV_R1_BOUNDS,
-    PK_BFV_R2_BOUNDS,
-);
+// pub global PK_BFV_CONFIGS: BfvPkConfigs<N, L> = BfvPkConfigs::new(
+//     QIS,
+//     PK_BFV_EEK_BOUND,
+//     PK_BFV_SK_BOUND,
+//     PK_BFV_R1_BOUNDS,
+//     PK_BFV_R2_BOUNDS,
+// );
 
 /************************************
 -------------------------------------
