@@ -1,7 +1,7 @@
-use crate::core::bfv_pk::Configs as BfvPkConfigs;
 use crate::core::greco::Configs as GrecoConfigs;
 use crate::core::trbfv_dec_share::Configs as DecShareTrBfvConfigs;
 use crate::core::trbfv_dec_shares_agg::Configs as DecShareAggTrBfvConfigs;
+use crate::core::trbfv_pk::Configs as TrbfvPkConfigs;
 use crate::core::trbfv_pk_agg::Configs as PkAggTrBfvConfigs;
 use crate::core::trbfv_verify_shares::Configs as VerifySharesConfigs;
 
@@ -41,17 +41,18 @@ pub global PK_TRBFV_R2_BOUNDS: [Field; L] =
     [1125899911102464, 2251799813881856, 2251799815716864, 2251799817289728];
 
 // pk_trbfv - configs
-pub global PK_TRBFV_CONFIGS: BfvPkConfigs<N, L> = BfvPkConfigs::new(
+pub global PK_TRBFV_CONFIGS: TrbfvPkConfigs<N, L> = TrbfvPkConfigs::new(
     QIS,
     PK_TRBFV_EEK_BOUND,
     PK_TRBFV_SK_BOUND,
+    PK_TRBFV_E_SM_BOUND,
     PK_TRBFV_R1_BOUNDS,
     PK_TRBFV_R2_BOUNDS,
 );
 
 /************************************
 -------------------------------------
-verify_shares (CIRCUIT 3 - VERIFY SHARES)
+verify_shares (CIRCUIT 2 - VERIFY SHARES)
 -------------------------------------
 ************************************/
 
@@ -67,7 +68,7 @@ pub global VERIFY_SHARES_CONFIGS: VerifySharesConfigs<L> = VerifySharesConfigs::
 
 /************************************
 -------------------------------------
-enc_trbfv (CIRCUIT 6 - ENCRYPTION THRESHOLD BFV - GRECO)
+enc_trbfv (GRECO- ENCRYPTION THRESHOLD BFV)
 -------------------------------------
 ************************************/
 
@@ -123,7 +124,7 @@ pub global ENC_TRBFV_CONFIGS: GrecoConfigs<N, L> = GrecoConfigs::new(
 
 /************************************
 -------------------------------------
-trbfv_dec_share (CIRCUIT 7 - THRESHOLD BFV DECRYPTION SHARE)
+trbfv_dec_share (CIRCUIT 6 - THRESHOLD BFV DECRYPTION SHARE)
 -------------------------------------
 ************************************/
 
@@ -152,7 +153,7 @@ pub global DEC_SHARES_CONFIGS: DecShareTrBfvConfigs<L> = DecShareTrBfvConfigs::n
 
 /************************************
 -------------------------------------
-trbfv_dec_shares_agg (CIRCUIT 8 - THRESHOLD BFV DECRYPTION SHARES AGGREGATION)
+trbfv_dec_shares_agg (CIRCUIT 7 - THRESHOLD BFV DECRYPTION SHARES AGGREGATION)
 -------------------------------------
 ************************************/
 
@@ -168,7 +169,7 @@ pub global DEC_SHARES_AGG_CONFIGS: DecShareAggTrBfvConfigs<L> =
 
 /************************************
 -------------------------------------
-pk_agg_trbfv (CIRCUIT 9 - PUBLIC KEY AGGREGATION TRBFV)
+pk_agg_trbfv (CIRCUIT 5 - PUBLIC KEY AGGREGATION TRBFV)
 -------------------------------------
 ************************************/
 

@@ -1,6 +1,4 @@
-use crate::core::bfv_dec_no_hom_add::Config as BfvDecNoHomAddConfig;
 use crate::core::bfv_enc::Configs as BfvEncConfigs;
-//use crate::core::bfv_pk::Configs as BfvPkConfigs;
 
 // Global configs for BFV Decryption circuit
 pub global N: u32 = 512;
@@ -15,35 +13,16 @@ pub global BFV_PLAINTEXT_MODULUS: Field = 68719403009;
 
 /************************************
 -------------------------------------
-pk_bfv (CIRCUIT 2 - PUBLIC KEY BFV)
+pk_bfv (CIRCUIT 0 - PUBLIC KEY BFV)
 -------------------------------------
 ************************************/
 
 // pk_bfv - bit parameters
-pub global PK_BFV_BIT_EEK: u32 = 4;
-pub global PK_BFV_BIT_SK: u32 = 2;
-pub global PK_BFV_BIT_R1: u32 = 12;
-pub global PK_BFV_BIT_R2: u32 = 51;
 pub global PK_BFV_BIT_PK: u32 = 51;
-
-// pk_bfv - bounds
-pub global PK_BFV_EEK_BOUND: Field = 6;
-pub global PK_BFV_SK_BOUND: Field = 1;
-pub global PK_BFV_R1_BOUNDS: [Field; L] = [1536];
-pub global PK_BFV_R2_BOUNDS: [Field; L] = [1125899906777088];
-
-// pk_bfv - configs
-// pub global PK_BFV_CONFIGS: BfvPkConfigs<N, L> = BfvPkConfigs::new(
-//     QIS,
-//     PK_BFV_EEK_BOUND,
-//     PK_BFV_SK_BOUND,
-//     PK_BFV_R1_BOUNDS,
-//     PK_BFV_R2_BOUNDS,
-// );
 
 /************************************
 -------------------------------------
-enc_bfv (CIRCUIT 4 - BFV ENCRYPTION)
+enc_bfv (CIRCUIT 3 - BFV ENCRYPTION)
 -------------------------------------
 ************************************/
 
@@ -94,39 +73,8 @@ pub global ENC_BFV_CONFIGS: BfvEncConfigs<L> = BfvEncConfigs::new(
 
 /************************************
 -------------------------------------
-dec_bfv (CIRCUIT 5 - DECRYPTION BFV NO HOM ADD)
+dec_bfv (CIRCUIT 4 - DECRYPTION BFV )
 -------------------------------------
 ************************************/
-// dec_bfv_no_hom_add - bit parameters
-pub global DEC_BFV_BIT_CT: u32 = 51;
-pub global DEC_BFV_BIT_S: u32 = 2;
-pub global DEC_BFV_BIT_U: u32 = 61;
-pub global DEC_BFV_BIT_R1: u32 = 11;
-pub global DEC_BFV_BIT_R2: u32 = 51;
+
 pub global DEC_BFV_BIT_MSG: u32 = 16;
-
-// dec_bfv_no_hom_add - bounds
-pub global DEC_BFV_PLAINTEXT_MODULUS: Field = 68719403009;
-pub global DEC_BFV_Q_INVERSE_MOD_T: Field = 39210117854;
-pub global DEC_BFV_S_BOUND: Field = 1;
-pub global DEC_BFV_U_I_BOUNDS: [Field; L_PRIME] = [577586652176646144];
-pub global DEC_BFV_U_GLOBAL_BOUND: Field = 2251799813554177;
-pub global DEC_BFV_R1_BOUNDS: [Field; L_PRIME] = [512];
-pub global DEC_BFV_R2_BOUNDS: [Field; L_PRIME] = [1125899906777088];
-pub global DEC_BFV_DELTA: Field = 32768;
-pub global DEC_BFV_DELTA_HALF: Field = 16384;
-
-// dec_bfv_no_hom_add - configs
-pub global DEC_BFV_CONFIGS: BfvDecNoHomAddConfig<L_TRBFV, L_PRIME> = BfvDecNoHomAddConfig::new(
-    QIS,
-    DEC_BFV_PLAINTEXT_MODULUS,
-    DEC_BFV_Q_INVERSE_MOD_T,
-    TRBFV_QIS,
-    DEC_BFV_S_BOUND,
-    DEC_BFV_U_I_BOUNDS,
-    DEC_BFV_U_GLOBAL_BOUND,
-    DEC_BFV_R1_BOUNDS,
-    DEC_BFV_R2_BOUNDS,
-    DEC_BFV_DELTA,
-    DEC_BFV_DELTA_HALF,
-);
