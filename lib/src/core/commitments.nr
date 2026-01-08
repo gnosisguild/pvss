@@ -19,14 +19,6 @@ pub fn prepare_pk_commitment_payload<let N: u32, let L: u32, let BIT_PK: u32>(
     inputs
 }
 
-/// Prepares the payload for secret commitment (either sk_trbfv or e_sm).
-/// Used in C1, C2.
-pub fn prepare_secret_commitment_payload<let N: u32, let L: u32, let BIT_SECRET: u32>(
-    secret: Polynomial<N>,
-) -> Vec<Field> {
-    flatten::<_, _, BIT_SECRET>(Vec::new(), [secret])
-}
-
 /// Flattens shares for a specific party and modulus into Vec<Field>
 /// Returns N field elements: y[0][mod_idx][party_idx+1], ..., y[N-1][mod_idx][party_idx+1]
 /// Used in C2.
@@ -61,11 +53,11 @@ pub fn prepare_message_commitment_payload<let N: u32>(message: Polynomial<N>) ->
 }
 
 /// Prepares the payload for single polynomial commitment (must match C2).
-/// Used in C4.
-pub fn prepare_single_polynomial_commitment_payload<let N: u32, let BIT_MSG: u32>(
+/// Used in C1, C2, C4.
+pub fn prepare_single_polynomial_commitment_payload<let N: u32, let BIT_POLY: u32>(
     poly: Polynomial<N>,
 ) -> Vec<Field> {
-    flatten::<_, _, BIT_MSG>(Vec::new(), [poly])
+    flatten::<_, _, BIT_POLY>(Vec::new(), [poly])
 }
 
 /// Prepares the payload for aggregated shares commitment.
@@ -104,10 +96,12 @@ pub fn compute_pk_bfv_commitment(payload: Vec<Field>) -> Field {
         0x00, 0x00, 0x00, 0x00,
     ];
 
-    let input_size = payload.len();
-    let io_pattern = [0x80000000 | input_size, 0x00000001];
-
-    compute_safe(domain_separator, payload, io_pattern).get(0)
+    compute_safe(
+        domain_separator,
+        payload,
+        [0x80000000 | payload.len(), 0x00000001],
+    )
+        .get(0)
 }
 
 /// Computes commitment to the TRBFV public key
@@ -122,10 +116,12 @@ pub fn compute_pk_trbfv_commitment(payload: Vec<Field>) -> Field {
         0x00, 0x00, 0x00, 0x00,
     ];
 
-    let input_size = payload.len();
-    let io_pattern = [0x80000000 | input_size, 0x00000001];
-
-    compute_safe(domain_separator, payload, io_pattern).get(0)
+    compute_safe(
+        domain_separator,
+        payload,
+        [0x80000000 | payload.len(), 0x00000001],
+    )
+        .get(0)
 }
 
 /// Computes commitment to the secret (either sk_trbfv or e_sm)
@@ -140,10 +136,12 @@ pub fn compute_secret_commitment(payload: Vec<Field>) -> Field {
         0x00, 0x00, 0x00, 0x00,
     ];
 
-    let input_size = payload.len();
-    let io_pattern = [0x80000000 | input_size, 0x00000001];
-
-    compute_safe(domain_separator, payload, io_pattern).get(0)
+    compute_safe(
+        domain_separator,
+        payload,
+        [0x80000000 | payload.len(), 0x00000001],
+    )
+        .get(0)
 }
 
 /// Computes share party-modulus commitment (either sk_shares or e_sm_shares)
@@ -158,10 +156,12 @@ pub fn compute_shares_party_modulus_commitment(payload: Vec<Field>) -> Field {
         0x00, 0x00, 0x00, 0x00,
     ];
 
-    let input_size = payload.len();
-    let io_pattern = [0x80000000 | input_size, 0x00000001];
-
-    compute_safe(domain_separator, payload, io_pattern).get(0)
+    compute_safe(
+        domain_separator,
+        payload,
+        [0x80000000 | payload.len(), 0x00000001],
+    )
+        .get(0)
 }
 
 /// Computes aggregated shares commitment (either sk_shares or e_sm_shares)
@@ -176,8 +176,96 @@ pub fn compute_aggregated_shares_commitment(payload: Vec<Field>) -> Field {
         0x00, 0x00, 0x00, 0x00,
     ];
 
+    compute_safe(
+        domain_separator,
+        payload,
+        [0x80000000 | payload.len(), 0x00000001],
+    )
+        .get(0)
+}
+
+/// Computes decryption share challenge commitment
+/// Used in C6.
+pub fn compute_dec_share_challenge_commitment(payload: Vec<Field>) -> Field {
+    // Domain separator for decryption share circuit - "DecShare" in hex
+    let domain_separator = [
+        0x44, 0x65, 0x63, 0x53, 0x68, 0x61, 0x72, 0x65, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00,
+    ];
+
+    // IO Pattern: ABSORB(input_size), SQUEEZE(1)
     let input_size = payload.len();
     let io_pattern = [0x80000000 | input_size, 0x00000001];
 
     compute_safe(domain_separator, payload, io_pattern).get(0)
+}
+
+/// Computes TRBFV pk challenge commitment
+/// Used in C1.
+pub fn compute_trbfv_pk_challenge_commitment<let L: u32>(payload: Vec<Field>) -> Vec<Field> {
+    // Domain separator for trbfv_pk circuit - "trbfv_pk" in hex
+    let domain_separator = [
+        0x74, 0x72, 0x62, 0x66, 0x76, 0x5f, 0x70, 0x6b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00,
+    ];
+
+    // IO Pattern: ABSORB(input_size), SQUEEZE(2 * L)
+    let input_size = payload.len();
+    let io_pattern = [0x80000000 | input_size, 0x00000000 | (2 * L)];
+
+    compute_safe(domain_separator, payload, io_pattern)
+}
+
+/// Computes Greco challenge commitment
+/// Used in Greco.
+pub fn compute_greco_challenge_commitment<let L: u32>(
+    commitment_payload: Vec<Field>,
+    gammas_payload: Vec<Field>,
+    pk_commitment: Field,
+) -> Vec<Field> {
+    // Domain separator - "Greco"
+    let domain_separator = [
+        0x47, 0x72, 0x65, 0x63, 0x6f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00,
+    ];
+
+    // IO Pattern: ABSORB(input_size), SQUEEZE(1)
+    let input_size = commitment_payload.len();
+    let io_pattern = [0x80000000 | input_size, 0x00000000 | 1];
+
+    let pk_commit = compute_safe(domain_separator, commitment_payload, io_pattern).get(0);
+    assert(pk_commit == pk_commitment);
+
+    // IO Pattern: ABSORB(input_size), SQUEEZE(2*L)
+    let input_size = gammas_payload.len();
+    let io_pattern = [0x80000000 | input_size, 0x00000000 | (2 * L)];
+
+    compute_safe(domain_separator, gammas_payload, io_pattern)
+}
+
+/// Computes BFV encryption challenge commitment
+/// Used in C3.
+pub fn compute_bfv_enc_challenge_commitment<let L: u32>(payload: Vec<Field>) -> Vec<Field> {
+    // Domain separator - "EncBfv"
+    let domain_separator = [
+        0x45, 0x6e, 0x63, 0x42, 0x66, 0x76, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00,
+    ];
+
+    let input_size = payload.len();
+    let io_pattern = [0x80000000 | input_size, 0x00000000 | (2 * L)];
+
+    compute_safe(domain_separator, payload, io_pattern)
 }

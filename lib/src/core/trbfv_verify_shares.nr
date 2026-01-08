@@ -1,6 +1,6 @@
 use crate::core::commitments::{
     compute_secret_commitment, compute_shares_party_modulus_commitment,
-    prepare_secret_commitment_payload, prepare_shares_party_modulus_commitment_payload,
+    prepare_shares_party_modulus_commitment_payload, prepare_single_polynomial_commitment_payload,
 };
 use crate::math::modulo::U128::ModU128;
 use crate::math::polynomial::Polynomial;
@@ -72,7 +72,7 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32
 
     /// Verifies that secret hashes to expected_secret_commitment
     fn verify_secret_commitment(self) {
-        let payload = prepare_secret_commitment_payload::<N, L, BIT_SECRET>(self.secret);
+        let payload = prepare_single_polynomial_commitment_payload::<N, BIT_SECRET>(self.secret);
         let computed_commitment = compute_secret_commitment(payload);
         assert(computed_commitment == self.expected_secret_commitment, "SK commitment mismatch");
     }

@@ -4,7 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::math::helpers::{compute_safe, flatten};
+use crate::core::commitments::compute_greco_challenge_commitment;
+use crate::math::helpers::flatten;
 use crate::math::polynomial::Polynomial;
 
 /// Cryptographic parameters for Greco circuit.
@@ -317,28 +318,14 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     /// - gamma_1, ..., gamma_{L-1} are used for linear combination of ct0 constraints
     /// - gamma_L, ..., gamma_{2L-1} are used for linear combination of ct1 constraints
     fn generate_challenge(self) -> Vec<Field> {
-        let domain_separator = [
-            0x47, 0x72, 0x65, 0x63, 0x6f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
+        let commitment_payload = self.commitment_payload();
+        let gammas_payload = self.gammas_payload();
 
-        // IO Pattern: ABSORB(input_size), SQUEEZE(1)
-        let inputs = self.commitment_payload();
-        let input_size = inputs.len();
-        let io_pattern = [0x80000000 | input_size, 0x00000000 | 1];
-
-        let pk_commitment = compute_safe(domain_separator, inputs, io_pattern);
-        assert(pk_commitment.get(0) == self.pk_commitment);
-
-        // IO Pattern: ABSORB(input_size), SQUEEZE(2*L)
-        let inputs = self.gammas_payload();
-        let input_size = inputs.len();
-        let io_pattern = [0x80000000 | input_size, 0x00000000 | (2 * L)];
-
-        compute_safe(domain_separator, inputs, io_pattern)
+        compute_greco_challenge_commitment::<L>(
+            commitment_payload,
+            gammas_payload,
+            self.pk_commitment,
+        )
     }
 
     /// Verifies encryption constraints using Fiat-Shamir challenges.

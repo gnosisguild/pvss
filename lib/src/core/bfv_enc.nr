@@ -1,11 +1,11 @@
 use crate::core::commitments::{
-    compute_pk_bfv_commitment, compute_shares_party_modulus_commitment,
+    compute_bfv_enc_challenge_commitment, compute_pk_bfv_commitment,
+    compute_shares_party_modulus_commitment, prepare_message_commitment_payload,
     prepare_pk_commitment_payload,
 };
-use crate::math::helpers::{compute_safe, flatten};
+use crate::math::helpers::flatten;
 use crate::math::modulo::U128::ModU128;
 use crate::math::polynomial::Polynomial;
-use super::commitments::prepare_message_commitment_payload;
 
 /// Cryptographic parameters for BFV encryption circuit.
 pub struct Configs<let L: u32> {
@@ -322,19 +322,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     fn generate_challenge(self, k1: Polynomial<N>) -> Vec<Field> {
         let inputs = self.payload(k1);
 
-        // Domain separator - "EncBfv"
-        let domain_separator = [
-            0x45, 0x6e, 0x63, 0x42, 0x66, 0x76, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
-
-        let input_size = inputs.len();
-        let io_pattern = [0x80000000 | input_size, 0x00000000 | (2 * L)];
-
-        compute_safe(domain_separator, inputs, io_pattern)
+        compute_bfv_enc_challenge_commitment::<L>(inputs)
     }
 
     /// Verifies BFV encryption constraints using Fiat-Shamir challenges and the Schwartz-Zippel lemma

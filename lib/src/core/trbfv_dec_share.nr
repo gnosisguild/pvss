@@ -1,8 +1,9 @@
 use crate::core::commitments::{
     compute_aggregated_shares_commitment, prepare_aggregated_shares_from_values_commitment_payload,
 };
-use crate::math::helpers::{compute_safe, flatten};
+use crate::math::helpers::flatten;
 use crate::math::polynomial::Polynomial;
+use super::commitments::compute_dec_share_challenge_commitment;
 
 /// Cryptographic parameters for TRBFV decryption share circuit.
 pub struct Configs<let L: u32> {
@@ -224,20 +225,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, le
     fn generate_challenge(self) -> Field {
         let inputs = self.payload();
 
-        // Domain separator for decryption share circuit - "DecShare" in hex
-        let domain_separator = [
-            0x44, 0x65, 0x63, 0x53, 0x68, 0x61, 0x72, 0x65, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
-
-        // IO Pattern: ABSORB(input_size), SQUEEZE(1)
-        let input_size = inputs.len();
-        let io_pattern = [0x80000000 | input_size, 0x00000001];
-
-        compute_safe(domain_separator, inputs, io_pattern).get(0)
+        compute_dec_share_challenge_commitment(inputs)
     }
 
     /// Verifies the lifted decryption share computation formula for a specific CRT basis using the Schwartz-Zippel lemma.

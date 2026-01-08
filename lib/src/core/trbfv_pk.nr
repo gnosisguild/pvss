@@ -1,9 +1,11 @@
 use crate::core::commitments::{
     compute_pk_trbfv_commitment, compute_secret_commitment, prepare_pk_commitment_payload,
-    prepare_secret_commitment_payload,
+    prepare_single_polynomial_commitment_payload,
 };
-use crate::math::helpers::{compute_safe, flatten};
+use crate::math::helpers::flatten;
 use crate::math::polynomial::Polynomial;
+use super::commitments::compute_trbfv_pk_challenge_commitment;
+
 /// Cryptographic parameters for TRBFV public key generation circuit.
 pub struct Configs<let N: u32, let L: u32> {
     /// CRT moduli: [q_0, q_1, ..., q_{L-1}]
@@ -33,7 +35,7 @@ impl<let N: u32, let L: u32> Configs<N, L> {
     }
 }
 
-/// TRBFV Public Key Verification Circuit (Circuit 1).
+/// TRBFV Public Key Verification (Circuit 1).
 ///
 /// Verifies:
 /// 1. Range checks on all secret witnesses (secret key, error, smudging noise, quotients)
@@ -126,8 +128,8 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
         self.perform_range_checks();
 
         // Step 2: Compute commitments
-        let sk_payload = prepare_secret_commitment_payload::<N, L, BIT_SK>(self.sk);
-        let e_sm_payload = prepare_secret_commitment_payload::<N, L, BIT_E_SM>(self.e_sm);
+        let sk_payload = prepare_single_polynomial_commitment_payload::<N, BIT_SK>(self.sk);
+        let e_sm_payload = prepare_single_polynomial_commitment_payload::<N, BIT_E_SM>(self.e_sm);
         let pk_payload = prepare_pk_commitment_payload::<N, L, BIT_PK>(self.pk0, self.pk1);
 
         let sk_commitment = compute_secret_commitment(sk_payload);
@@ -154,21 +156,9 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
         pk_commitment: Field,
         e_sm_commitment: Field,
     ) -> Vec<Field> {
-        // Domain separator for trbfv_pk circuit - "trbfv_pk" in hex
-        let domain_separator = [
-            0x74, 0x72, 0x62, 0x66, 0x76, 0x5f, 0x70, 0x6b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
-
-        // IO Pattern: ABSORB(input_size), SQUEEZE(2 * L)
         let inputs = self.payload(sk_commitment, pk_commitment, e_sm_commitment);
-        let input_size = inputs.len();
-        let io_pattern = [0x80000000 | input_size, 0x00000000 | (2 * L)];
 
-        compute_safe(domain_separator, inputs, io_pattern)
+        compute_trbfv_pk_challenge_commitment::<L>(inputs)
     }
 
     /// Performs range checks on all secret witness values
