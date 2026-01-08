@@ -1,5 +1,8 @@
-use crate::math::helpers::{compute_safe, flatten};
 use crate::math::polynomial::Polynomial;
+use super::commitments::{
+    compute_aggregated_shares_commitment, compute_shares_party_modulus_commitment,
+    prepare_aggregated_shares_commitment_payload, prepare_single_polynomial_commitment_payload,
+};
 
 /// BFV Decryption Commitment Verification (Circuit 4).
 ///
@@ -23,31 +26,14 @@ impl<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32> BfvDecCommitVerify<N,
         BfvDecCommitVerify { expected_commitments, decrypted_shares }
     }
 
-    /// Computes commitment to a single polynomial (must match Circuit 3's scheme)
-    fn commit_to_polynomial(poly: Polynomial<N>) -> Field {
-        let inputs = flatten::<_, _, BIT_MSG>(Vec::new(), [poly]);
-
-        // Domain separator - "PVSS_sh_pm" (must match Circuit 3)
-        let domain_separator = [
-            0x50, 0x56, 0x53, 0x53, 0x5f, 0x73, 0x68, 0x5f, 0x70, 0x6d, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
-
-        let input_size = inputs.len();
-        let io_pattern = [0x80000000 | input_size, 0x00000001];
-
-        compute_safe(domain_separator, inputs, io_pattern).get(0)
-    }
-
     /// Verifies all decrypted shares match their expected commitments
     fn verify_commitments(self) {
         for party_idx in 0..H {
             for mod_idx in 0..L {
-                let computed =
-                    Self::commit_to_polynomial(self.decrypted_shares[party_idx][mod_idx]);
+                let payload = prepare_single_polynomial_commitment_payload::<N, BIT_MSG>(
+                    self.decrypted_shares[party_idx][mod_idx],
+                );
+                let computed = compute_shares_party_modulus_commitment(payload);
                 assert(
                     computed == self.expected_commitments[party_idx][mod_idx],
                     "Commitment mismatch",
@@ -76,25 +62,6 @@ impl<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32> BfvDecCommitVerify<N,
         sum
     }
 
-    /// Commits to aggregated shares
-    fn commit_to_aggregated(aggregated: [Polynomial<N>; L]) -> Field {
-        let inputs = flatten::<_, _, BIT_MSG>(Vec::new(), aggregated);
-
-        // Domain separator - "PVSS_agg_sh"
-        let domain_separator = [
-            0x50, 0x56, 0x53, 0x53, 0x5f, 0x61, 0x67, 0x67, 0x5f, 0x73, 0x68, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
-
-        let input_size = inputs.len();
-        let io_pattern = [0x80000000 | input_size, 0x00000001];
-
-        compute_safe(domain_separator, inputs, io_pattern).get(0)
-    }
-
     /// Main verification function
     /// Returns commitment to aggregated shares
     pub fn verify(self) -> Field {
@@ -105,6 +72,7 @@ impl<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32> BfvDecCommitVerify<N,
         let aggregated = self.compute_aggregated_shares();
 
         // Step 3: Return commitment to aggregated shares
-        Self::commit_to_aggregated(aggregated)
+        let payload = prepare_aggregated_shares_commitment_payload::<N, L, BIT_MSG>(aggregated);
+        compute_aggregated_shares_commitment(payload)
     }
 }

@@ -1,4 +1,7 @@
-use crate::math::helpers::{compute_safe, flatten};
+use crate::core::commitments::{
+    compute_secret_commitment, compute_shares_party_modulus_commitment,
+    prepare_secret_commitment_payload, prepare_shares_party_modulus_commitment_payload,
+};
 use crate::math::modulo::U128::ModU128;
 use crate::math::polynomial::Polynomial;
 
@@ -67,28 +70,10 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32
         self.commit_to_party_shares()
     }
 
-    /// Computes commitment to sk (must match C1 commit_to_secret)
-    fn compute_secret_commitment(sk: Polynomial<N>) -> Field {
-        let sk_payload = flatten::<_, _, BIT_SECRET>(Vec::new(), [sk]);
-
-        // Domain separator - "PVSS_secret" (must match C1)
-        let domain_separator = [
-            0x50, 0x56, 0x53, 0x53, 0x5f, 0x73, 0x65, 0x63, 0x72, 0x65, 0x74, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
-
-        let input_size = sk_payload.len();
-        let io_pattern = [0x80000000 | input_size, 0x00000001];
-
-        compute_safe(domain_separator, sk_payload, io_pattern).get(0)
-    }
-
     /// Verifies that secret hashes to expected_secret_commitment
     fn verify_secret_commitment(self) {
-        let computed_commitment = Self::compute_secret_commitment(self.secret);
+        let payload = prepare_secret_commitment_payload::<N, L, BIT_SECRET>(self.secret);
+        let computed_commitment = compute_secret_commitment(payload);
         assert(computed_commitment == self.expected_secret_commitment, "SK commitment mismatch");
     }
 
@@ -173,40 +158,6 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32
         }
     }
 
-    /// Flattens shares for a specific party and modulus into Vec<Field>
-    /// Returns N field elements: y[0][mod_idx][party_idx+1], ..., y[N-1][mod_idx][party_idx+1]
-    fn party_modulus_payload(self, party_idx: u32, mod_idx: u32) -> Vec<Field> {
-        let mut inputs = Vec::new();
-
-        for coeff_idx in 0..N {
-            inputs.push(self.y[coeff_idx][mod_idx][party_idx + 1]);
-        }
-
-        inputs
-    }
-
-    /// Commits to shares
-    fn commit_to_single_party_modulus(self, party_idx: u32, mod_idx: u32) -> Field {
-        let inputs = self.party_modulus_payload(party_idx, mod_idx);
-        // Domain separator - "PVSS_sh_pm" (shares party-modulus)
-        let domain_separator = [
-            0x50, 0x56, 0x53, 0x53, 0x5f, 0x73, 0x68, 0x5f, 0x70, 0x6d, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
-
-        // Include party_idx and mod_idx in the hash
-        let mut inputs_with_indices = inputs;
-        inputs_with_indices.push(party_idx as Field);
-        inputs_with_indices.push(mod_idx as Field);
-        let input_size = inputs_with_indices.len();
-        let io_pattern = [0x80000000 | input_size, 0x00000001];
-
-        compute_safe(domain_separator, inputs_with_indices, io_pattern).get(0)
-    }
-
     /// Commits to shares for each party and modulus
     /// Returns [[Field; L]; N_PARTIES] where commitments[party_idx][mod_idx]
     fn commit_to_party_shares(self) -> [[Field; L]; N_PARTIES] {
@@ -214,8 +165,13 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32
 
         for party_idx in 0..N_PARTIES {
             for mod_idx in 0..L {
-                commitments[party_idx][mod_idx] =
-                    self.commit_to_single_party_modulus(party_idx, mod_idx);
+                let payload = prepare_shares_party_modulus_commitment_payload::<N, L, N_PARTIES>(
+                    self.y,
+                    party_idx,
+                    mod_idx,
+                );
+
+                commitments[party_idx][mod_idx] = compute_shares_party_modulus_commitment(payload);
             }
         }
 

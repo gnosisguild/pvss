@@ -1,6 +1,9 @@
+use crate::core::commitments::{
+    compute_pk_trbfv_commitment, compute_secret_commitment, prepare_pk_commitment_payload,
+    prepare_secret_commitment_payload,
+};
 use crate::math::helpers::{compute_safe, flatten};
 use crate::math::polynomial::Polynomial;
-
 /// Cryptographic parameters for TRBFV public key generation circuit.
 pub struct Configs<let N: u32, let L: u32> {
     /// CRT moduli: [q_0, q_1, ..., q_{L-1}]
@@ -89,58 +92,6 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
         TrbfvPublicKey { configs, a, eek, sk, e_sm, r1, r2, pk0, pk1 }
     }
 
-    /// Computes commitment to the secret (sk_trbfv or e_sm)
-    fn commit_to_secret(payload: Vec<Field>) -> Field {
-        // Domain separator - "PVSS_secret" in hex
-        let domain_separator = [
-            0x50, 0x56, 0x53, 0x53, 0x5f, 0x73, 0x65, 0x63, 0x72, 0x65, 0x74, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
-
-        let input_size = payload.len();
-        let io_pattern = [0x80000000 | input_size, 0x00000001];
-
-        compute_safe(domain_separator, payload, io_pattern).get(0)
-    }
-
-    /// Flattens sk into Vec<Field> for commitment
-    fn sk_payload(sk: Polynomial<N>) -> Vec<Field> {
-        flatten::<_, _, BIT_SK>(Vec::new(), [sk])
-    }
-
-    /// Flattens e_sm into Vec<Field> for commitment
-    fn e_sm_payload(e_sm: Polynomial<N>) -> Vec<Field> {
-        flatten::<_, _, BIT_E_SM>(Vec::new(), [e_sm])
-    }
-
-    /// Computes commitment to the public key
-    fn commit_to_pk(self) -> Field {
-        let mut inputs = Vec::new();
-
-        // Flatten pk0 polynomials
-        inputs = flatten::<_, _, BIT_PK>(inputs, self.pk0);
-
-        // Flatten pk1 polynomials
-        inputs = flatten::<_, _, BIT_PK>(inputs, self.pk1);
-
-        // Domain separator - "PVSS_pk_trbfv" in hex
-        let domain_separator = [
-            0x50, 0x56, 0x53, 0x53, 0x5f, 0x70, 0x6b, 0x5f, 0x74, 0x72, 0x62, 0x66, 0x76, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
-
-        let input_size = inputs.len();
-        let io_pattern = [0x80000000 | input_size, 0x00000001];
-
-        compute_safe(domain_separator, inputs, io_pattern).get(0)
-    }
-
     /// Flattens all witness data into a single array for Fiat-Shamir challenge generation
     fn payload(
         self,
@@ -175,12 +126,13 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
         self.perform_range_checks();
 
         // Step 2: Compute commitments
-        let sk_payload = Self::sk_payload(self.sk);
-        let e_sm_payload = Self::e_sm_payload(self.e_sm);
+        let sk_payload = prepare_secret_commitment_payload::<N, L, BIT_SK>(self.sk);
+        let e_sm_payload = prepare_secret_commitment_payload::<N, L, BIT_E_SM>(self.e_sm);
+        let pk_payload = prepare_pk_commitment_payload::<N, L, BIT_PK>(self.pk0, self.pk1);
 
-        let sk_commitment = Self::commit_to_secret(sk_payload);
-        let pk_commitment = self.commit_to_pk();
-        let e_sm_commitment = Self::commit_to_secret(e_sm_payload);
+        let sk_commitment = compute_secret_commitment(sk_payload);
+        let e_sm_commitment = compute_secret_commitment(e_sm_payload);
+        let pk_commitment = compute_pk_trbfv_commitment(pk_payload);
 
         // Step 3: Generate Fiat-Shamir challenges using commitments
         let gammas = self.generate_challenge(sk_commitment, pk_commitment, e_sm_commitment);

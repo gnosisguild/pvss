@@ -1,6 +1,11 @@
+use crate::core::commitments::{
+    compute_pk_bfv_commitment, compute_shares_party_modulus_commitment,
+    prepare_pk_commitment_payload,
+};
 use crate::math::helpers::{compute_safe, flatten};
 use crate::math::modulo::U128::ModU128;
 use crate::math::polynomial::Polynomial;
+use super::commitments::prepare_message_commitment_payload;
 
 /// Cryptographic parameters for BFV encryption circuit.
 pub struct Configs<let L: u32> {
@@ -155,66 +160,20 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         }
     }
 
-    /// Computes commitment to the BFV public key (must match Circuit 0's scheme)
-    fn compute_pk_commitment(pk0is: [Polynomial<N>; L], pk1is: [Polynomial<N>; L]) -> Field {
-        let mut inputs = Vec::new();
-
-        // Flatten pk0 polynomials
-        inputs = flatten::<_, _, BIT_PK>(inputs, pk0is);
-
-        // Flatten pk1 polynomials
-        inputs = flatten::<_, _, BIT_PK>(inputs, pk1is);
-
-        // Domain separator - "PVSS_pk_bfv" (must match Circuit 0)
-        let domain_separator = [
-            0x50, 0x56, 0x53, 0x53, 0x5f, 0x70, 0x6b, 0x5f, 0x62, 0x66, 0x76, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
-
-        let input_size = inputs.len();
-        let io_pattern = [0x80000000 | input_size, 0x00000001];
-
-        compute_safe(domain_separator, inputs, io_pattern).get(0)
-    }
-
     /// Verifies that the public key hashes to the expected commitment
     fn verify_pk_commitment(self) {
-        let computed_commitment = Self::compute_pk_commitment(self.pk0is, self.pk1is);
+        let payload = prepare_pk_commitment_payload::<N, L, BIT_PK>(self.pk0is, self.pk1is);
+        let computed_commitment = compute_pk_bfv_commitment(payload);
         assert(
             computed_commitment == self.expected_pk_commitment,
             "Public key commitment mismatch",
         );
     }
 
-    /// Computes a cryptographic commitment to the message polynomial
-    fn compute_message_commitment(message: Polynomial<N>) -> Field {
-        let mut inputs = Vec::new();
-
-        for i in 0..N {
-            inputs.push(message.coefficients[i]);
-        }
-
-        // Domain separator - "PVSS_sh_pm" (must match SK shares circuit)
-        let domain_separator = [
-            0x50, 0x56, 0x53, 0x53, 0x5f, 0x73, 0x68, 0x5f, 0x70, 0x6d, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
-
-        let input_size = inputs.len();
-        let io_pattern = [0x80000000 | input_size, 0x00000001];
-
-        compute_safe(domain_separator, inputs, io_pattern).get(0)
-    }
-
     /// Verifies that the message polynomial hashes to the expected commitment
     fn verify_message_commitment(self) {
-        let computed_commitment = Self::compute_message_commitment(self.message);
+        let payload = prepare_message_commitment_payload::<N>(self.message);
+        let computed_commitment = compute_shares_party_modulus_commitment(payload);
         assert(
             computed_commitment == self.expected_message_commitment,
             "Message commitment mismatch",

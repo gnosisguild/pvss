@@ -1,3 +1,6 @@
+use crate::core::commitments::{
+    compute_aggregated_shares_commitment, prepare_aggregated_shares_from_values_commitment_payload,
+};
 use crate::math::helpers::{compute_safe, flatten};
 use crate::math::polynomial::Polynomial;
 
@@ -88,40 +91,17 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, le
         }
     }
 
-    /// Computes commitment to aggregated values (must match BFV decryption circuit)
-    fn compute_aggregated_commitment(values: [Polynomial<N>; L]) -> Field {
-        let mut inputs = Vec::new();
-
-        for basis_idx in 0..L {
-            for coeff_idx in 0..N {
-                inputs.push(values[basis_idx].coefficients[coeff_idx]);
-            }
-        }
-
-        // Domain separator - "PVSS_agg_sh" (must match BFV decryption circuit)
-        let domain_separator = [
-            0x50, 0x56, 0x53, 0x53, 0x5f, 0x61, 0x67, 0x67, 0x5f, 0x73, 0x68, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
-
-        let input_size = inputs.len();
-        let io_pattern = [0x80000000 | input_size, 0x00000001];
-
-        compute_safe(domain_separator, inputs, io_pattern).get(0)
-    }
-
     /// Verifies that s hashes to expected_s_commitment
     fn verify_s_commitment(self) {
-        let computed_commitment = Self::compute_aggregated_commitment(self.s);
+        let payload = prepare_aggregated_shares_from_values_commitment_payload::<N, L>(self.s);
+        let computed_commitment = compute_aggregated_shares_commitment(payload);
         assert(computed_commitment == self.expected_s_commitment, "S commitment mismatch");
     }
 
     /// Verifies that e hashes to expected_e_commitment
     fn verify_e_commitment(self) {
-        let computed_commitment = Self::compute_aggregated_commitment(self.e);
+        let payload = prepare_aggregated_shares_from_values_commitment_payload::<N, L>(self.e);
+        let computed_commitment = compute_aggregated_shares_commitment(payload);
         assert(computed_commitment == self.expected_e_commitment, "E commitment mismatch");
     }
 
