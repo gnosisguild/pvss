@@ -70,7 +70,7 @@ impl<let L: u32> Configs<L> {
     }
 }
 
-/// BFV Encryption Circuit.
+/// BFV Encryption Circuit (Circuit 3).
 ///
 /// Verifies:
 /// 1. Public key commitment matches expected (from Circuit 0)

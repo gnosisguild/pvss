@@ -24,7 +24,7 @@ impl<let L: u32> Configs<L> {
     }
 }
 
-/// TRBFV Decryption Share Correctness Circuit.
+/// TRBFV Decryption Share Correctness (Circuit 6).
 ///
 /// Verifies:
 /// 1. Commitment to s matches expected (from BFV decryption circuit)

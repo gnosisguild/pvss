@@ -14,19 +14,21 @@ impl<let L: u32> Configs<L> {
     }
 }
 
-/// TRBFV Secret Share Verification Circuit.
+/// TRBFV Secret Share Verification Circuit (Circuit 2).
 ///
 /// Verifies:
-/// 1. sk commitment: verify sk hashes to expected_sk_commitment
-/// 2. sk consistency: y[i][j][0] == sk[i] for all i, j
+/// 1. secret commitment: verify secret hashes to expected_secret_commitment
+/// 2. secret consistency: y[i][j][0] == secret[i] for all i, j
 /// 3. Range check: shares are in [0, q_j)
 /// 4. Parity check: H[j] * y[i][j]^T == 0 mod q_j for all i, j
-pub struct VerifyShares<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32, let BIT_SHARE: u32> {
+pub struct VerifyShares<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32, let BIT_SHARE: u32> {
     configs: Configs<L>,
-    /// Expected commitment to sk (from BFV public key circuit)
-    expected_sk_commitment: Field,
-    /// Secret key polynomial (trinary coefficients)
-    sk: Polynomial<N>,
+    /// Expected commitment to secret (from C1)
+    /// This can be either commit(e_sm) or commit(sk_trbfv).
+    expected_secret_commitment: Field,
+    /// Secret polynomial (trinary coefficients)
+    /// This can be either e_sm or sk_trbfv.
+    secret: Polynomial<N>,
     /// Shares: y[coeff_idx][mod_idx][0..N_PARTIES+1]
     /// y[i][j][0] = sk[i] = f(0), y[i][j][k] = f(k) for k = 1..N_PARTIES
     y: [[[Field; N_PARTIES + 1]; L]; N],
@@ -36,24 +38,24 @@ pub struct VerifyShares<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, 
     h: [[[Field; N_PARTIES + 1]; N_PARTIES - T]; L],
 }
 
-impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32, let BIT_SHARE: u32> VerifyShares<N, L, N_PARTIES, T, BIT_SK, BIT_SHARE> {
+impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32, let BIT_SHARE: u32> VerifyShares<N, L, N_PARTIES, T, BIT_SECRET, BIT_SHARE> {
     pub fn new(
         configs: Configs<L>,
-        expected_sk_commitment: Field,
-        sk: Polynomial<N>,
+        expected_secret_commitment: Field,
+        secret: Polynomial<N>,
         y: [[[Field; N_PARTIES + 1]; L]; N],
         h: [[[Field; N_PARTIES + 1]; N_PARTIES - T]; L],
     ) -> Self {
-        VerifyShares { configs, expected_sk_commitment, sk, y, h }
+        VerifyShares { configs, expected_secret_commitment, secret, y, h }
     }
 
     /// Main verification function
     pub fn verify(self) -> [[Field; L]; N_PARTIES] {
-        // Step 1: Verify sk commitment matches expected
-        self.verify_sk_commitment();
+        // Step 1: Verify secret commitment matches expected
+        self.verify_secret_commitment();
 
-        // Step 2: Verify sk consistency
-        self.verify_sk_consistency();
+        // Step 2: Verify secret consistency
+        self.verify_secret_consistency();
 
         // Step 3: Range checks
         self.check_range_bounds();
@@ -65,13 +67,13 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32, le
         self.commit_to_party_shares()
     }
 
-    /// Computes commitment to sk (must match BFV circuit's commit_to_sk)
-    fn compute_sk_commitment(sk: Polynomial<N>) -> Field {
-        let sk_payload = flatten::<_, _, BIT_SK>(Vec::new(), [sk]);
+    /// Computes commitment to sk (must match C1 commit_to_secret)
+    fn compute_secret_commitment(sk: Polynomial<N>) -> Field {
+        let sk_payload = flatten::<_, _, BIT_SECRET>(Vec::new(), [sk]);
 
-        // Domain separator - "PVSS_sk_comm" (must match BFV circuit)
+        // Domain separator - "PVSS_secret" (must match C1)
         let domain_separator = [
-            0x50, 0x56, 0x53, 0x53, 0x5f, 0x73, 0x6b, 0x5f, 0x63, 0x6f, 0x6d, 0x6d, 0x00, 0x00,
+            0x50, 0x56, 0x53, 0x53, 0x5f, 0x73, 0x65, 0x63, 0x72, 0x65, 0x74, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -84,28 +86,28 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32, le
         compute_safe(domain_separator, sk_payload, io_pattern).get(0)
     }
 
-    /// Verifies that sk hashes to expected_sk_commitment
-    fn verify_sk_commitment(self) {
-        let computed_commitment = Self::compute_sk_commitment(self.sk);
-        assert(computed_commitment == self.expected_sk_commitment, "SK commitment mismatch");
+    /// Verifies that secret hashes to expected_secret_commitment
+    fn verify_secret_commitment(self) {
+        let computed_commitment = Self::compute_secret_commitment(self.secret);
+        assert(computed_commitment == self.expected_secret_commitment, "SK commitment mismatch");
     }
 
-    /// Verifies secret key consistency: `y[i][j][0] == sk[i]` for all i, j.
+    /// Verifies secret consistency: `y[i][j][0] == secret[i]` for all i, j.
     ///
     /// This function ensures that for each coefficient i and CRT basis j, the share
-    /// at party ID 0 equals the corresponding secret key coefficient. This is a
+    /// at party ID 0 equals the corresponding secret coefficient. This is a
     /// fundamental property of Shamir secret sharing where the secret is the
     /// evaluation of the sharing polynomial at point 0.
     ///
     /// # Panics
-    /// The circuit will fail if secret key consistency doesn't hold for any
+    /// The circuit will fail if secret consistency doesn't hold for any
     /// coefficient or CRT basis.
-    fn verify_sk_consistency(self) {
+    fn verify_secret_consistency(self) {
         for coeff_idx in 0..N {
-            let sk_coeff = self.sk.coefficients[coeff_idx];
+            let secret_coeff = self.secret.coefficients[coeff_idx];
 
             for mod_idx in 0..L {
-                assert(self.y[coeff_idx][mod_idx][0] == sk_coeff);
+                assert(self.y[coeff_idx][mod_idx][0] == secret_coeff);
             }
         }
     }

@@ -1,16 +1,18 @@
 {
   "circuits": [
-    "pk_trbfv",
     "pk_bfv",
+    "pk_trbfv",
     "verify_shares_trbfv",
     "enc_bfv",
     "dec_bfv",
     "pk_agg_trbfv",
-    "enc_trbfv",
+    "greco",
     "dec_share_trbfv",
     "dec_share_agg_trbfv"
   ],
-  "oracles": ["default"],
+  "oracles": [
+    "default"
+  ],
   "mode": "insecure",
   "bin_dir": "../bin",
   "output_dir": "results",

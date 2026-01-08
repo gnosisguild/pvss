@@ -54,7 +54,7 @@ verify_shares (CIRCUIT 2 - VERIFY SHARES)
 ************************************/
 
 // verify_shares - bit parameters
-pub global VERIFY_SHARES_BIT_SK: u32 = 2;
+pub global VERIFY_SHARES_BIT_SECRET: u32 = 2;
 pub global VERIFY_SHARES_BIT_SHARE: u32 = 37;
 
 // verify_shares - bounds
@@ -70,48 +70,48 @@ greco (GRECO  - ENCRYPTION TRBFV)
 ************************************/
 
 // greco - bit parameters
-pub global ENC_TRBFV_BIT_PK: u32 = 36;
-pub global ENC_TRBFV_BIT_CT: u32 = 36;
-pub global ENC_TRBFV_BIT_U: u32 = 2;
-pub global ENC_TRBFV_BIT_E0: u32 = 6;
-pub global ENC_TRBFV_BIT_E1: u32 = 6;
-pub global ENC_TRBFV_BIT_K: u32 = 4;
-pub global ENC_TRBFV_BIT_R1: u32 = 10;
-pub global ENC_TRBFV_BIT_R2: u32 = 36;
-pub global ENC_TRBFV_BIT_P1: u32 = 10;
-pub global ENC_TRBFV_BIT_P2: u32 = 36;
+pub global GRECO_BIT_PK: u32 = 36;
+pub global GRECO_BIT_CT: u32 = 36;
+pub global GRECO_BIT_U: u32 = 2;
+pub global GRECO_BIT_E0: u32 = 6;
+pub global GRECO_BIT_E1: u32 = 6;
+pub global GRECO_BIT_K: u32 = 4;
+pub global GRECO_BIT_R1: u32 = 10;
+pub global GRECO_BIT_R2: u32 = 36;
+pub global GRECO_BIT_P1: u32 = 10;
+pub global GRECO_BIT_P2: u32 = 36;
 
 // greco - bounds
-pub global ENC_TRBFV_Q_MOD_T: Field = 3;
-pub global ENC_TRBFV_K0IS: [Field; L] = [61847462708, 20615769293];
-pub global ENC_TRBFV_PK_BOUNDS: [Field; L] = [34359701504, 34359615488];
-pub global ENC_TRBFV_E0_BOUND: Field = 20;
-pub global ENC_TRBFV_E1_BOUND: Field = 20;
-pub global ENC_TRBFV_U_BOUND: Field = 1;
-pub global ENC_TRBFV_K1_LOW_BOUND: Field = 5;
-pub global ENC_TRBFV_K1_UP_BOUND: Field = 4;
-pub global ENC_TRBFV_R1_LOW_BOUNDS: [Field; L] = [261, 258];
-pub global ENC_TRBFV_R1_UP_BOUNDS: [Field; L] = [260, 258];
-pub global ENC_TRBFV_R2_BOUNDS: [Field; L] = [34359701504, 34359615488];
-pub global ENC_TRBFV_P1_BOUNDS: [Field; L] = [256, 256];
-pub global ENC_TRBFV_P2_BOUNDS: [Field; L] = [34359701504, 34359615488];
+pub global GRECO_Q_MOD_T: Field = 3;
+pub global GRECO_K0IS: [Field; L] = [61847462708, 20615769293];
+pub global GRECO_PK_BOUNDS: [Field; L] = [34359701504, 34359615488];
+pub global GRECO_E0_BOUND: Field = 20;
+pub global GRECO_E1_BOUND: Field = 20;
+pub global GRECO_U_BOUND: Field = 1;
+pub global GRECO_K1_LOW_BOUND: Field = 5;
+pub global GRECO_K1_UP_BOUND: Field = 4;
+pub global GRECO_R1_LOW_BOUNDS: [Field; L] = [261, 258];
+pub global GRECO_R1_UP_BOUNDS: [Field; L] = [260, 258];
+pub global GRECO_R2_BOUNDS: [Field; L] = [34359701504, 34359615488];
+pub global GRECO_P1_BOUNDS: [Field; L] = [256, 256];
+pub global GRECO_P2_BOUNDS: [Field; L] = [34359701504, 34359615488];
 
 // greco - configs
-pub global ENC_TRBFV_CONFIGS: GrecoConfigs<N, L> = GrecoConfigs::new(
-    ENC_TRBFV_Q_MOD_T,
+pub global GRECO_CONFIGS: GrecoConfigs<N, L> = GrecoConfigs::new(
+    GRECO_Q_MOD_T,
     QIS,
-    ENC_TRBFV_K0IS,
-    ENC_TRBFV_PK_BOUNDS,
-    ENC_TRBFV_E0_BOUND,
-    ENC_TRBFV_E1_BOUND,
-    ENC_TRBFV_U_BOUND,
-    ENC_TRBFV_R1_LOW_BOUNDS,
-    ENC_TRBFV_R1_UP_BOUNDS,
-    ENC_TRBFV_R2_BOUNDS,
-    ENC_TRBFV_P1_BOUNDS,
-    ENC_TRBFV_P2_BOUNDS,
-    ENC_TRBFV_K1_LOW_BOUND,
-    ENC_TRBFV_K1_UP_BOUND,
+    GRECO_K0IS,
+    GRECO_PK_BOUNDS,
+    GRECO_E0_BOUND,
+    GRECO_E1_BOUND,
+    GRECO_U_BOUND,
+    GRECO_R1_LOW_BOUNDS,
+    GRECO_R1_UP_BOUNDS,
+    GRECO_R2_BOUNDS,
+    GRECO_P1_BOUNDS,
+    GRECO_P2_BOUNDS,
+    GRECO_K1_LOW_BOUND,
+    GRECO_K1_UP_BOUND,
 );
 
 /************************************

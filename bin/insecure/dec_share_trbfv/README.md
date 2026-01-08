@@ -1,1 +1,1 @@
-insecure instantiation of dec_share_trbfv circuit (PVSS #8)
+insecure instantiation of dec_share_trbfv circuit (PVSS #6)

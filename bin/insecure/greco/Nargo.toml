@@ -1,5 +1,5 @@
 [package]
-name = "enc_trbfv"
+name = "greco"
 type = "bin"
 authors = [""]
 

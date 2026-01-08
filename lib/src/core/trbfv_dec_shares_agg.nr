@@ -20,7 +20,7 @@ impl<let L: u32> Configs<L> {
     }
 }
 
-/// Decryption Share Aggregation Circuit (Circuit 8: dec-result-trbfv)
+/// Decryption Share Aggregation Circuit (Circuit 7)
 ///
 /// Verifies:
 /// 1. Lagrange interpolation to compute u^{(l)} for each CRT basis

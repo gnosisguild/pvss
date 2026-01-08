@@ -89,28 +89,31 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
         TrbfvPublicKey { configs, a, eek, sk, e_sm, r1, r2, pk0, pk1 }
     }
 
-    /// Computes commitment to the secret key
-    fn commit_to_sk(self) -> Field {
-        let sk_payload = Self::sk_payload(self.sk);
-
-        // Domain separator - "PVSS_sk_comm" in hex
+    /// Computes commitment to the secret (sk_trbfv or e_sm)
+    fn commit_to_secret(payload: Vec<Field>) -> Field {
+        // Domain separator - "PVSS_secret" in hex
         let domain_separator = [
-            0x50, 0x56, 0x53, 0x53, 0x5f, 0x73, 0x6b, 0x5f, 0x63, 0x6f, 0x6d, 0x6d, 0x00, 0x00,
+            0x50, 0x56, 0x53, 0x53, 0x5f, 0x73, 0x65, 0x63, 0x72, 0x65, 0x74, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
 
-        let input_size = sk_payload.len();
+        let input_size = payload.len();
         let io_pattern = [0x80000000 | input_size, 0x00000001];
 
-        compute_safe(domain_separator, sk_payload, io_pattern).get(0)
+        compute_safe(domain_separator, payload, io_pattern).get(0)
     }
 
     /// Flattens sk into Vec<Field> for commitment
     fn sk_payload(sk: Polynomial<N>) -> Vec<Field> {
         flatten::<_, _, BIT_SK>(Vec::new(), [sk])
+    }
+
+    /// Flattens e_sm into Vec<Field> for commitment
+    fn e_sm_payload(e_sm: Polynomial<N>) -> Vec<Field> {
+        flatten::<_, _, BIT_E_SM>(Vec::new(), [e_sm])
     }
 
     /// Computes commitment to the public key
@@ -136,30 +139,6 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
         let io_pattern = [0x80000000 | input_size, 0x00000001];
 
         compute_safe(domain_separator, inputs, io_pattern).get(0)
-    }
-
-    /// Computes commitment to the smudging noise
-    fn commit_to_e_sm(self) -> Field {
-        let e_sm_payload = Self::e_sm_payload(self.e_sm);
-
-        // Domain separator - "PVSS_e_sm" in hex
-        let domain_separator = [
-            0x50, 0x56, 0x53, 0x53, 0x5f, 0x65, 0x5f, 0x73, 0x6d, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
-
-        let input_size = e_sm_payload.len();
-        let io_pattern = [0x80000000 | input_size, 0x00000001];
-
-        compute_safe(domain_separator, e_sm_payload, io_pattern).get(0)
-    }
-
-    /// Flattens e_sm into Vec<Field> for commitment
-    fn e_sm_payload(e_sm: Polynomial<N>) -> Vec<Field> {
-        flatten::<_, _, BIT_E_SM>(Vec::new(), [e_sm])
     }
 
     /// Flattens all witness data into a single array for Fiat-Shamir challenge generation
@@ -196,9 +175,12 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
         self.perform_range_checks();
 
         // Step 2: Compute commitments
-        let sk_commitment = self.commit_to_sk();
+        let sk_payload = Self::sk_payload(self.sk);
+        let e_sm_payload = Self::e_sm_payload(self.e_sm);
+
+        let sk_commitment = Self::commit_to_secret(sk_payload);
         let pk_commitment = self.commit_to_pk();
-        let e_sm_commitment = self.commit_to_e_sm();
+        let e_sm_commitment = Self::commit_to_secret(e_sm_payload);
 
         // Step 3: Generate Fiat-Shamir challenges using commitments
         let gammas = self.generate_challenge(sk_commitment, pk_commitment, e_sm_commitment);

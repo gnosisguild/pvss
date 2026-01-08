@@ -1,1 +1,1 @@
-production instantiation of verify_shares_trbfv circuit (PVSS #3)
+production instantiation of verify_shares_trbfv circuit (PVSS #2)

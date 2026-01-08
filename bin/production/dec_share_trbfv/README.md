@@ -1,1 +1,1 @@
-production instantiation of dec_share_trbfv circuit (PVSS #8)
+production instantiation of dec_share_trbfv circuit (PVSS #6)

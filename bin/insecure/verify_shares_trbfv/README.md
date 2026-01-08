@@ -1,1 +1,1 @@
-insecure instantiation of verify_shares_trbfv circuit (PVSS #3)
+insecure instantiation of verify_shares_trbfv circuit (PVSS #2)

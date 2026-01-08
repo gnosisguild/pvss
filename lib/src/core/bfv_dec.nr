@@ -1,7 +1,7 @@
 use crate::math::helpers::{compute_safe, flatten};
 use crate::math::polynomial::Polynomial;
 
-/// BFV Decryption Commitment Verification Circuit (Simplified).
+/// BFV Decryption Commitment Verification (Circuit 4).
 ///
 /// Verifies:
 /// 1. Each decrypted share from H honest parties matches its commitment from Circuit 3
