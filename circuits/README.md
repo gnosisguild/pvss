@@ -27,13 +27,13 @@ flowchart TD
             C1_out["Output: commit(sk_trbfv), commit(pk_trbfv), commit(e_sm)"]
         end
 
-        subgraph C2_sk["Circuit 2a: sk-shares (for sk shares)"]
+        subgraph C2_sk["Circuit 2a: verify-shares (for sk shares)"]
             C2_sk_pad[" "]
             C2_sk_check["Check: commit(sk_trbfv) == expected"]
             C2_sk_out["Output: commit(sk_share[i][j])"]
         end
 
-        subgraph C2_e["Circuit 2b: sk-shares (for e_sm shares)"]
+        subgraph C2_e["Circuit 2b: verify-shares (for e_sm shares)"]
             C2_e_pad[" "]
             C2_e_check["Check: commit(e_sm) == expected"]
             C2_e_out["Output: commit(e_sm_share[i][j])"]
