@@ -1,1 +1,1 @@
-insecure instantiation of Threshold BFV Public Key Aggregation circuit (PVSS #9)
+insecure instantiation of Threshold BFV Public Key Aggregation circuit (PVSS #6)
