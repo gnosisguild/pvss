@@ -6,13 +6,11 @@ use crate::math::polynomial::Polynomial;
 pub struct Configs<let L: u32> {
     /// CRT moduli: [q_0, q_1, ..., q_{L-1}]
     pub qis: [Field; L],
-    /// Bound for secret key polynomial coefficients (trinary: -1, 0, 1)
-    pub sk_bound: Field,
 }
 
 impl<let L: u32> Configs<L> {
-    pub fn new(qis: [Field; L], sk_bound: Field) -> Self {
-        Configs { qis, sk_bound }
+    pub fn new(qis: [Field; L]) -> Self {
+        Configs { qis }
     }
 }
 
@@ -21,9 +19,8 @@ impl<let L: u32> Configs<L> {
 /// Verifies:
 /// 1. sk commitment: verify sk hashes to expected_sk_commitment
 /// 2. sk consistency: y[i][j][0] == sk[i] for all i, j
-/// 3. Range check: sk coefficients are trinary (-1, 0, 1)
-/// 4. Range check: shares are in [0, q_j)
-/// 5. Parity check: H[j] * y[i][j]^T == 0 mod q_j for all i, j
+/// 3. Range check: shares are in [0, q_j)
+/// 4. Parity check: H[j] * y[i][j]^T == 0 mod q_j for all i, j
 pub struct VerifyShares<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32, let BIT_SHARE: u32> {
     configs: Configs<L>,
     /// Expected commitment to sk (from BFV public key circuit)
@@ -116,7 +113,6 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32, le
     /// Performs range checks on secret key and share values.
     ///
     /// This function constrains all values to be within their expected bounds:
-    /// - Secret key coefficients must be trinary (-1, 0, 1) as required by BFV
     /// - Share values for parties k >= 1 must be in [0, q_j) for each CRT modulus q_j
     ///
     /// These bounds are critical for security and correctness of the threshold BFV scheme.
@@ -125,9 +121,6 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32, le
     /// This function will cause the circuit to fail if any value is outside
     /// its expected bounds.
     fn check_range_bounds(self) {
-        // sk coefficients should be in {-1, 0, 1}
-        self.sk.range_check_2bounds::<BIT_SK>(self.configs.sk_bound, self.configs.sk_bound);
-
         // Shares y[i][j][k] for k >= 1 should be in [0, q_j)
         for mod_idx in 0..L {
             let q_j = self.configs.qis[mod_idx];

@@ -1,7 +1,7 @@
-use crate::core::bfv_pk::Configs as BfvPkConfigs;
 use crate::core::greco::Configs as GrecoConfigs;
 use crate::core::trbfv_dec_share::Configs as DecShareTrBfvConfigs;
 use crate::core::trbfv_dec_shares_agg::Configs as DecShareAggTrBfvConfigs;
+use crate::core::trbfv_pk::Configs as TrbfvPkConfigs;
 use crate::core::trbfv_pk_agg::Configs as PkAggTrBfvConfigs;
 use crate::core::trbfv_verify_shares::Configs as VerifySharesConfigs;
 
@@ -26,25 +26,30 @@ pub global PK_TRBFV_BIT_EEK: u32 = 6;
 pub global PK_TRBFV_BIT_SK: u32 = 2;
 pub global PK_TRBFV_BIT_R1: u32 = 14;
 pub global PK_TRBFV_BIT_R2: u32 = 36;
+pub global PK_TRBFV_BIT_E_SM: u32 = 36;
+pub global PK_TRBFV_BIT_PK: u32 = 53;
 
 // pk_trbfv - bounds
+//CHANGE IT TO THE CORRECT VALUE
+pub global PK_TRBFV_E_SM_BOUND: Field = 20;
 pub global PK_TRBFV_EEK_BOUND: Field = 20;
 pub global PK_TRBFV_SK_BOUND: Field = 1;
 pub global PK_TRBFV_R1_BOUNDS: [Field; L] = [5120, 5120];
 pub global PK_TRBFV_R2_BOUNDS: [Field; L] = [34359701504, 34359615488];
 
 // pk_trbfv - configs
-pub global PK_TRBFV_CONFIGS: BfvPkConfigs<N, L> = BfvPkConfigs::new(
+pub global PK_TRBFV_CONFIGS: TrbfvPkConfigs<N, L> = TrbfvPkConfigs::new(
     QIS,
     PK_TRBFV_EEK_BOUND,
     PK_TRBFV_SK_BOUND,
+    PK_TRBFV_E_SM_BOUND,
     PK_TRBFV_R1_BOUNDS,
     PK_TRBFV_R2_BOUNDS,
 );
 
 /************************************
 -------------------------------------
-verify_shares (CIRCUIT 3 - VERIFY SHARES)
+verify_shares (CIRCUIT 2 - VERIFY SHARES)
 -------------------------------------
 ************************************/
 
@@ -56,24 +61,11 @@ pub global VERIFY_SHARES_BIT_SHARE: u32 = 37;
 pub global VERIFY_SHARES_SK_BOUND: Field = 1;
 
 // verify_shares - configs
-pub global VERIFY_SHARES_CONFIGS: VerifySharesConfigs<L> =
-    VerifySharesConfigs::new(QIS, VERIFY_SHARES_SK_BOUND);
+pub global VERIFY_SHARES_CONFIGS: VerifySharesConfigs<L> = VerifySharesConfigs::new(QIS);
 
 /************************************
 -------------------------------------
-pk_agg_trbfv (CIRCUIT 6 - PUBLIC KEY AGGREGATION TRBFV)
--------------------------------------
-************************************/
-
-// pk_agg_trbfv - bit parameters
-pub global PK_AGG_TRBFV_BIT_PK: u32 = 36;
-
-// pk_agg_trbfv - configs
-pub global PK_AGG_TRBFV_CONFIGS: PkAggTrBfvConfigs<L> = PkAggTrBfvConfigs::new(QIS);
-
-/************************************
--------------------------------------
-greco (CIRCUIT 7 - ENCRYPTION TRBFV - GRECO)
+greco (GRECO  - ENCRYPTION TRBFV)
 -------------------------------------
 ************************************/
 
@@ -124,7 +116,7 @@ pub global ENC_TRBFV_CONFIGS: GrecoConfigs<N, L> = GrecoConfigs::new(
 
 /************************************
 -------------------------------------
-trbfv_dec_share (CIRCUIT 8 - THRESHOLD BFV DECRYPTION SHARE)
+trbfv_dec_share (CIRCUIT 6 - THRESHOLD BFV DECRYPTION SHARE)
 -------------------------------------
 ************************************/
 
@@ -151,7 +143,7 @@ pub global DEC_SHARES_CONFIGS: DecShareTrBfvConfigs<L> = DecShareTrBfvConfigs::n
 
 /************************************
 -------------------------------------
-trbfv_dec_shares_agg (CIRCUIT 9 - THRESHOLD BFV DECRYPTION SHARES AGGREGATION)
+trbfv_dec_shares_agg (CIRCUIT 7 - THRESHOLD BFV DECRYPTION SHARES AGGREGATION)
 -------------------------------------
 ************************************/
 
@@ -161,3 +153,15 @@ pub global DEC_SHARES_AGG_BIT_NOISE: u32 = 69;
 // dec_share_agg_trbfv - configs
 pub global DEC_SHARES_AGG_CONFIGS: DecShareAggTrBfvConfigs<L> =
     DecShareAggTrBfvConfigs::new(QIS, PLAINTEXT_MODULUS, Q_INVERSE_MOD_T);
+
+/************************************
+-------------------------------------
+pk_agg_trbfv (CIRCUIT 5 - PUBLIC KEY AGGREGATION TRBFV)
+-------------------------------------
+************************************/
+
+// pk_agg_trbfv - bit parameters
+pub global PK_AGG_TRBFV_BIT_PK: u32 = 36;
+
+// pk_agg_trbfv - configs
+pub global PK_AGG_TRBFV_CONFIGS: PkAggTrBfvConfigs<L> = PkAggTrBfvConfigs::new(QIS);
