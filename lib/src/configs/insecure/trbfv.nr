@@ -24,16 +24,15 @@ pk_trbfv (CIRCUIT 1 - PUBLIC KEY THRESHOLD BFV)
 // pk_trbfv - bit parameters
 pub global PK_TRBFV_BIT_EEK: u32 = 6;
 pub global PK_TRBFV_BIT_SK: u32 = 2;
+pub global PK_TRBFV_BIT_E_SM: u32 = 18;
 pub global PK_TRBFV_BIT_R1: u32 = 14;
 pub global PK_TRBFV_BIT_R2: u32 = 36;
-pub global PK_TRBFV_BIT_E_SM: u32 = 36;
-pub global PK_TRBFV_BIT_PK: u32 = 53;
+pub global PK_TRBFV_BIT_PK: u32 = 36;
 
 // pk_trbfv - bounds
-//CHANGE IT TO THE CORRECT VALUE
-pub global PK_TRBFV_E_SM_BOUND: Field = 20;
 pub global PK_TRBFV_EEK_BOUND: Field = 20;
 pub global PK_TRBFV_SK_BOUND: Field = 1;
+pub global PK_TRBFV_E_SM_BOUND: Field = 122892;
 pub global PK_TRBFV_R1_BOUNDS: [Field; L] = [5120, 5120];
 pub global PK_TRBFV_R2_BOUNDS: [Field; L] = [34359701504, 34359615488];
 
