@@ -26,34 +26,34 @@ impl<let L: u32> Configs<L> {
 /// 1. Lagrange interpolation to compute u^{(l)} for each CRT basis
 /// 2. CRT reconstruction: u^{(l)} + r^{(l)} * q_l = u_global
 /// 3. Decoding verification: message = -Q^{-1} * (t * u_global)_Q mod t
-pub struct DecryptionSharesAggregation<let MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u32> {
+pub struct DecryptionSharesAggregation<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u32> {
     /// Circuit parameters including crypto constants
     configs: Configs<L>,
 
     /// Decryption shares from t+1 parties (public inputs)
-    decryption_shares: [[Polynomial<MSG_NON_ZERO_COEFFS>; L]; T + 1],
+    decryption_shares: [[Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L]; T + 1],
 
     /// Party IDs (x-coordinates) for interpolation (public inputs)
     party_ids: [Field; T + 1],
 
     /// Message polynomial m(x) (public output)
-    message: Polynomial<MSG_NON_ZERO_COEFFS>,
+    message: Polynomial<MAX_MSG_NON_ZERO_COEFFS>,
 
     /// Global u polynomial (secret witness)
-    u_global: Polynomial<MSG_NON_ZERO_COEFFS>,
+    u_global: Polynomial<MAX_MSG_NON_ZERO_COEFFS>,
 
     /// CRT quotient polynomials (secret witnesses)
-    crt_quotients: [Polynomial<MSG_NON_ZERO_COEFFS>; L],
+    crt_quotients: [Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L],
 }
 
-impl<let MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionSharesAggregation<MSG_NON_ZERO_COEFFS, L, T, BIT_NOISE> {
+impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptionSharesAggregation<MAX_MSG_NON_ZERO_COEFFS, L, T, BIT_NOISE> {
     pub fn new(
         configs: Configs<L>,
-        decryption_shares: [[Polynomial<MSG_NON_ZERO_COEFFS>; L]; T + 1],
+        decryption_shares: [[Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L]; T + 1],
         party_ids: [Field; T + 1],
-        message: Polynomial<MSG_NON_ZERO_COEFFS>,
-        u_global: Polynomial<MSG_NON_ZERO_COEFFS>,
-        crt_quotients: [Polynomial<MSG_NON_ZERO_COEFFS>; L],
+        message: Polynomial<MAX_MSG_NON_ZERO_COEFFS>,
+        u_global: Polynomial<MAX_MSG_NON_ZERO_COEFFS>,
+        crt_quotients: [Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L],
     ) -> Self {
         DecryptionSharesAggregation {
             configs,
@@ -165,17 +165,17 @@ impl<let MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u32> D
     fn compute_crt_components(
         self,
         lagrange_coeffs: [[Field; T + 1]; L],
-    ) -> [Polynomial<MSG_NON_ZERO_COEFFS>; L] {
-        let mut u_crts: [Polynomial<MSG_NON_ZERO_COEFFS>; L] =
-            [Polynomial::new([0; MSG_NON_ZERO_COEFFS]); L];
+    ) -> [Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L] {
+        let mut u_crts: [Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L] =
+            [Polynomial::new([0; MAX_MSG_NON_ZERO_COEFFS]); L];
 
         for basis_idx in 0..L {
             let q_l = self.configs.qis[basis_idx];
             let m = ModU128::new(q_l);
-            let mut u_coeffs = [0 as Field; MSG_NON_ZERO_COEFFS];
+            let mut u_coeffs = [0 as Field; MAX_MSG_NON_ZERO_COEFFS];
 
             // For each coefficient position
-            for coeff_idx in 0..MSG_NON_ZERO_COEFFS {
+            for coeff_idx in 0..MAX_MSG_NON_ZERO_COEFFS {
                 let mut u_coeff = 0 as Field;
 
                 // Sum all contributions: u = SUM(i=0..T) [d_i * L_i(0)] mod q_l
@@ -198,7 +198,7 @@ impl<let MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u32> D
     }
 
     /// Verifies CRT reconstruction: u^{(l)} + r^{(l)} * q_l = u_global for all bases l
-    fn verify_crt_reconstruction(self, u_crts: [Polynomial<MSG_NON_ZERO_COEFFS>; L]) {
+    fn verify_crt_reconstruction(self, u_crts: [Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L]) {
         for basis_idx in 0..L {
             let q_l = self.configs.qis[basis_idx];
 
@@ -210,7 +210,7 @@ impl<let MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u32> D
 
             // Verify: u^{(l)} + r^{(l)} * q_l = u_global
             // Must hold for every coefficient
-            for coeff_idx in 0..MSG_NON_ZERO_COEFFS {
+            for coeff_idx in 0..MAX_MSG_NON_ZERO_COEFFS {
                 assert(
                     reconstructed.coefficients[coeff_idx] == self.u_global.coefficients[coeff_idx],
                     "CRT reconstruction verification failed",
@@ -232,7 +232,7 @@ impl<let MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u32> D
 
         let q_half_bn = q_bn.udiv(Enclave_TRBFV_8192::from(2));
 
-        for coeff_idx in 0..MSG_NON_ZERO_COEFFS {
+        for coeff_idx in 0..MAX_MSG_NON_ZERO_COEFFS {
             // Compute (t * u_global) mod Q using BigNum
             let u_bn_q = Enclave_TRBFV_8192::from(self.u_global.coefficients[coeff_idx]);
             let t_bn_q = Enclave_TRBFV_8192::from(self.configs.plaintext_modulus);
@@ -283,7 +283,7 @@ impl<let MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u32> D
         // For centered arithmetic
         let q_half = q_modulus as u128 / 2;
 
-        for coeff_idx in 0..MSG_NON_ZERO_COEFFS {
+        for coeff_idx in 0..MAX_MSG_NON_ZERO_COEFFS {
             // Compute (t * u_global) mod Q using BigNum
             let q_mod = ModU128::new(q_modulus);
             let t_mod = ModU128::new(t);
