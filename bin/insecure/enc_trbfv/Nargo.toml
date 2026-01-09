@@ -1,7 +1,0 @@
-[package]
-name = "enc_trbfv"
-type = "bin"
-authors = [""]
-
-[dependencies]
-lib = { path = "../../../lib" }

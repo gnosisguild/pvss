@@ -1,7 +1,6 @@
 use lib::configs::production::trbfv::{
-    ENC_TRBFV_BIT_CT, ENC_TRBFV_BIT_E0, ENC_TRBFV_BIT_E1, ENC_TRBFV_BIT_K, ENC_TRBFV_BIT_P1,
-    ENC_TRBFV_BIT_P2, ENC_TRBFV_BIT_PK, ENC_TRBFV_BIT_R1, ENC_TRBFV_BIT_R2, ENC_TRBFV_BIT_U,
-    ENC_TRBFV_CONFIGS, L, N,
+    GRECO_BIT_CT, GRECO_BIT_E0, GRECO_BIT_E1, GRECO_BIT_K, GRECO_BIT_P1, GRECO_BIT_P2, GRECO_BIT_PK,
+    GRECO_BIT_R1, GRECO_BIT_R2, GRECO_BIT_U, GRECO_CONFIGS, L, N,
 };
 use lib::core::greco::Greco;
 use lib::math::polynomial::Polynomial;
@@ -23,8 +22,8 @@ fn main(
     p1is: [Polynomial<(2 * N) - 1>; L],
     p2is: [Polynomial<N - 1>; L],
 ) {
-    let greco: Greco<N, L, ENC_TRBFV_BIT_PK, ENC_TRBFV_BIT_CT, ENC_TRBFV_BIT_U, ENC_TRBFV_BIT_E0, ENC_TRBFV_BIT_E1, ENC_TRBFV_BIT_K, ENC_TRBFV_BIT_R1, ENC_TRBFV_BIT_R2, ENC_TRBFV_BIT_P1, ENC_TRBFV_BIT_P2> = Greco::new(
-        ENC_TRBFV_CONFIGS,
+    let greco: Greco<N, L, GRECO_BIT_PK, GRECO_BIT_CT, GRECO_BIT_U, GRECO_BIT_E0, GRECO_BIT_E1, GRECO_BIT_K, GRECO_BIT_R1, GRECO_BIT_R2, GRECO_BIT_P1, GRECO_BIT_P2> = Greco::new(
+        GRECO_CONFIGS,
         pk_commitment,
         pk0is,
         pk1is,

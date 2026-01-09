@@ -1,1 +1,1 @@
-insecure instantiation of BFV Public Key circuit (PVSS #2)
+insecure instantiation of BFV Public Key circuit (PVSS #0)

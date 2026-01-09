@@ -1,7 +1,9 @@
 [package]
 name = "verify_shares_trbfv"
 type = "bin"
-authors = [""]
+authors = ["Gnosis Guild / Enclave"]
+version = "1.0.0-beta.15"
+
 
 [dependencies]
 lib = { path = "../../../lib" }
