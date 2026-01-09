@@ -1,10 +1,9 @@
-use crate::core::commitments::{
-    compute_pk_trbfv_commitment, compute_secret_commitment, prepare_pk_commitment_payload,
-    prepare_single_polynomial_commitment_payload,
+use crate::math::commitments::{
+    compute_pk_trbfv_commitment, compute_secret_commitment, compute_trbfv_pk_challenge_commitment,
+    prepare_pk_commitment_payload, prepare_single_polynomial_commitment_payload,
 };
 use crate::math::helpers::flatten;
 use crate::math::polynomial::Polynomial;
-use super::commitments::compute_trbfv_pk_challenge_commitment;
 
 /// Cryptographic parameters for TRBFV public key generation circuit.
 pub struct Configs<let N: u32, let L: u32> {

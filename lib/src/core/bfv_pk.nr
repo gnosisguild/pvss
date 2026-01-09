@@ -1,4 +1,4 @@
-use crate::core::commitments::{compute_pk_bfv_commitment, prepare_pk_commitment_payload};
+use crate::math::commitments::{compute_pk_bfv_commitment, prepare_pk_commitment_payload};
 use crate::math::polynomial::Polynomial;
 
 /// BFV Public Key Commitment Circuit (Circuit 0).

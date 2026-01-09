@@ -1,8 +1,8 @@
-use crate::math::polynomial::Polynomial;
-use super::commitments::{
+use crate::math::commitments::{
     compute_aggregated_shares_commitment, compute_shares_party_modulus_commitment,
     prepare_aggregated_shares_commitment_payload, prepare_single_polynomial_commitment_payload,
 };
+use crate::math::polynomial::Polynomial;
 
 /// BFV Decryption Commitment Verification (Circuit 4).
 ///

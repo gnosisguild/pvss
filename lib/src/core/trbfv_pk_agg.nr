@@ -1,4 +1,4 @@
-use crate::core::commitments::{compute_pk_trbfv_commitment, prepare_pk_commitment_payload};
+use crate::math::commitments::{compute_pk_trbfv_commitment, prepare_pk_commitment_payload};
 use crate::math::helpers::{compute_safe, flatten};
 use crate::math::modulo::U128::ModU128;
 use crate::math::polynomial::Polynomial;

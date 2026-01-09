@@ -1,9 +1,9 @@
-use crate::core::commitments::{
-    compute_aggregated_shares_commitment, prepare_aggregated_shares_from_values_commitment_payload,
+use crate::math::commitments::{
+    compute_aggregated_shares_commitment, compute_dec_share_challenge_commitment,
+    prepare_aggregated_shares_from_values_commitment_payload,
 };
 use crate::math::helpers::flatten;
 use crate::math::polynomial::Polynomial;
-use super::commitments::compute_dec_share_challenge_commitment;
 
 /// Cryptographic parameters for TRBFV decryption share circuit.
 pub struct Configs<let L: u32> {

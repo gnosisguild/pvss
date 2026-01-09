@@ -1,4 +1,4 @@
-use crate::core::commitments::{
+use crate::math::commitments::{
     compute_bfv_enc_challenge_commitment, compute_pk_bfv_commitment,
     compute_shares_party_modulus_commitment, prepare_message_commitment_payload,
     prepare_pk_commitment_payload,

@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::core::commitments::compute_greco_challenge_commitment;
+use crate::math::commitments::compute_greco_challenge_commitment;
 use crate::math::helpers::flatten;
 use crate::math::polynomial::Polynomial;
 

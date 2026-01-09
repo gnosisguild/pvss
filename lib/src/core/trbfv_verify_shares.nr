@@ -1,4 +1,4 @@
-use crate::core::commitments::{
+use crate::math::commitments::{
     compute_secret_commitment, compute_shares_party_modulus_commitment,
     prepare_shares_party_modulus_commitment_payload, prepare_single_polynomial_commitment_payload,
 };
