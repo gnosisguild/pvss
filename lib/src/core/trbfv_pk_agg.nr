@@ -1,5 +1,5 @@
+use crate::math::commitments::compute_greco_pk_agg_commitment;
 use crate::math::commitments::{compute_pk_trbfv_commitment, prepare_pk_commitment_payload};
-use crate::math::helpers::{compute_safe, flatten};
 use crate::math::modulo::U128::ModU128;
 use crate::math::polynomial::Polynomial;
 
@@ -72,37 +72,6 @@ impl<let N: u32, let H: u32, let L: u32, let BIT_PK: u32> TrbfvPublicKeyAggregat
         }
     }
 
-    /// Computes commitment to the aggregated public key
-    fn commit_to_pk_agg(self) -> Field {
-        let pk_agg_payload = Self::pk_agg_payload(self.pk0_agg, self.pk1_agg);
-
-        // Domain separator - "Greco" (must match greco circuit)
-        let domain_separator = [
-            0x47, 0x72, 0x65, 0x63, 0x6f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
-
-        let input_size = pk_agg_payload.len();
-        let io_pattern = [0x80000000 | input_size, 0x00000001];
-
-        compute_safe(domain_separator, pk_agg_payload, io_pattern).get(0)
-    }
-
-    /// Flattens aggregated public key polynomials into Vec<Field> for commitment
-    fn pk_agg_payload(pk0_agg: [Polynomial<N>; L], pk1_agg: [Polynomial<N>; L]) -> Vec<Field> {
-        let mut inputs = Vec::new();
-
-        // Flatten pk0_agg polynomials
-        inputs = flatten::<_, _, BIT_PK>(inputs, pk0_agg);
-        // Flatten pk1_agg polynomials
-        inputs = flatten::<_, _, BIT_PK>(inputs, pk1_agg);
-
-        inputs
-    }
-
     fn verify_pk_for_basis(
         self,
         pk: [[Polynomial<N>; L]; H],
@@ -143,6 +112,7 @@ impl<let N: u32, let H: u32, let L: u32, let BIT_PK: u32> TrbfvPublicKeyAggregat
         }
 
         // 2. Commit to aggregated public key
-        self.commit_to_pk_agg()
+        let payload = prepare_pk_commitment_payload::<N, L, BIT_PK>(self.pk0_agg, self.pk1_agg);
+        compute_greco_pk_agg_commitment(payload)
     }
 }

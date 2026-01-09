@@ -222,6 +222,25 @@ pub fn compute_trbfv_pk_challenge_commitment<let L: u32>(payload: Vec<Field>) ->
     compute_safe(domain_separator, payload, io_pattern)
 }
 
+/// Computes Greco pk agg commitment
+/// Used in Greco, C5.
+pub fn compute_greco_pk_agg_commitment(payload: Vec<Field>) -> Field {
+    // Domain separator - "Greco"
+    let domain_separator = [
+        0x47, 0x72, 0x65, 0x63, 0x6f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00,
+    ];
+
+    // IO Pattern: ABSORB(input_size), SQUEEZE(1)
+    let input_size = payload.len();
+    let io_pattern = [0x80000000 | input_size, 0x00000000 | 1];
+
+    compute_safe(domain_separator, payload, io_pattern).get(0)
+}
+
 /// Computes Greco challenge commitment
 /// Used in Greco.
 pub fn compute_greco_challenge_commitment<let L: u32>(
@@ -238,12 +257,7 @@ pub fn compute_greco_challenge_commitment<let L: u32>(
         0x00, 0x00, 0x00, 0x00,
     ];
 
-    // IO Pattern: ABSORB(input_size), SQUEEZE(1)
-    let input_size = commitment_payload.len();
-    let io_pattern = [0x80000000 | input_size, 0x00000000 | 1];
-
-    let pk_commit = compute_safe(domain_separator, commitment_payload, io_pattern).get(0);
-    assert(pk_commit == pk_commitment);
+    assert(compute_greco_pk_agg_commitment(commitment_payload) == pk_commitment);
 
     // IO Pattern: ABSORB(input_size), SQUEEZE(2*L)
     let input_size = gammas_payload.len();
