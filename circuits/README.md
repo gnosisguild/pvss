@@ -75,7 +75,7 @@ flowchart TD
         subgraph C5["Circuit 5: pk-aggregation-trbfv (1×)"]
             C5_pad[" "]
             C5_check["Check: commit(pk_trbfv) from honest parties"]
-            C5_out["Output: pk0_agg, pk1_agg"]
+            C5_out["Output: commit(pk0_agg, pk1_agg)"]
         end
     end
 
