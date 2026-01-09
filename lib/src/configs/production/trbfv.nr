@@ -68,6 +68,18 @@ pub global VERIFY_SHARES_CONFIGS: VerifySharesConfigs<L> = VerifySharesConfigs::
 
 /************************************
 -------------------------------------
+pk_agg_trbfv (CIRCUIT 5 - PUBLIC KEY AGGREGATION TRBFV)
+-------------------------------------
+************************************/
+
+// pk_agg_trbfv - bit parameters
+pub global PK_AGG_TRBFV_BIT_PK: u32 = 36;
+
+// pk_agg_trbfv - configs
+pub global PK_AGG_TRBFV_CONFIGS: PkAggTrBfvConfigs<L> = PkAggTrBfvConfigs::new(QIS);
+
+/************************************
+-------------------------------------
 GRECO (GRECO- ENCRYPTION THRESHOLD BFV)
 -------------------------------------
 ************************************/
@@ -166,15 +178,3 @@ pub global DEC_SHARES_AGG_PLAINTEXT_MODULUS: Field = 100;
 // trbfv_dec_shares_agg - configs
 pub global DEC_SHARES_AGG_CONFIGS: DecShareAggTrBfvConfigs<L> =
     DecShareAggTrBfvConfigs::new(QIS, DEC_SHARES_AGG_PLAINTEXT_MODULUS, Q_INVERSE_MOD_T);
-
-/************************************
--------------------------------------
-pk_agg_trbfv (CIRCUIT 5 - PUBLIC KEY AGGREGATION TRBFV)
--------------------------------------
-************************************/
-
-// pk_agg_trbfv - bit parameters
-pub global PK_AGG_TRBFV_BIT_PK: u32 = 36;
-
-// pk_agg_trbfv - configs
-pub global PK_AGG_TRBFV_CONFIGS: PkAggTrBfvConfigs<L> = PkAggTrBfvConfigs::new(QIS);
