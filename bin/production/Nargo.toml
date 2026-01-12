@@ -2,7 +2,8 @@
 members = [
     "pk_bfv",
     "pk_trbfv",
-    "verify_shares_trbfv",
+    "verify_shares_trbfv_sk",
+    "verify_shares_trbfv_e_sm",
     "enc_bfv",
     "dec_bfv",
     "pk_agg_trbfv",

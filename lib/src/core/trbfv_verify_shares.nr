@@ -4,9 +4,6 @@ use crate::math::commitments::{
 };
 use crate::math::modulo::U128::ModU128;
 use crate::math::polynomial::Polynomial;
-use dep::bignum::BigNum;
-use dep::bignum::bignum::to_field;
-use dep::bignum::Enclave_TRBFV_8192;
 
 /// Cryptographic parameters for TRBFV secret share verification circuit.
 pub struct Configs<let L: u32> {
@@ -58,13 +55,13 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32
     /// Main verification function
     pub fn verify(self) -> [[Field; L]; N_PARTIES] {
         // Step 1: Verify secret commitment matches expected
-        //   self.verify_secret_commitment();
+        self.verify_secret_commitment();
 
         // Step 2: Verify secret consistency
-        // self.verify_secret_consistency();
+        self.verify_secret_consistency();
 
         // Step 3: Range checks
-        //   self.check_range_bounds();
+        self.check_range_bounds();
 
         // Step 4: Verify parity check
         self.verify_parity_check();
@@ -143,23 +140,19 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32
         for coeff_idx in 0..N {
             for mod_idx in 0..L {
                 let q_j = self.configs.qis[mod_idx];
-                let q_j_bn = Enclave_TRBFV_8192::from(q_j);
 
                 // For each row of H, compute dot product with y and verify == 0
                 for row in 0..(N_PARTIES - T) {
-                    let mut sum: Enclave_TRBFV_8192 = Enclave_TRBFV_8192::from(0);
+                    let mut sum: Field = 0;
 
                     for col in 0..(N_PARTIES + 1) {
-                        let h_bn = Enclave_TRBFV_8192::from(self.h[mod_idx][row][col]);
-                        let y_bn = Enclave_TRBFV_8192::from(self.y[coeff_idx][mod_idx][col]);
-                        sum = sum + (h_bn * y_bn);
+                        sum = sum + self.h[mod_idx][row][col] * self.y[coeff_idx][mod_idx][col];
                     }
 
                     // Reduce mod q_j and verify == 0
-
-                    let result = sum.umod(q_j_bn);
-                    let result_field = to_field(result);
-                    assert(result_field == 0, "Parity check failed");
+                    let m = ModU128::new(q_j);
+                    let result = m.reduce_mod(sum);
+                    assert(result == 0, "Parity check failed");
                 }
             }
         }
