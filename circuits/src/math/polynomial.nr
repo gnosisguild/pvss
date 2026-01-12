@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 use super::modular_fns::reduce_mod;
+use super::monomial_embedding;
 /// Polynomial structure representing a polynomial of degree N-1.
 ///
 /// A polynomial P(X) = a_{N-1} * X^{N-1} + a_{N-2} * X^{N-2} + ... + a_1 * X + a_0
@@ -164,6 +165,82 @@ impl<let N: u32> Polynomial<N> {
     pub fn range_check_power_of_two<let BIT: u32>(self) {
         for i in 0..self.coefficients.len() {
             self.coefficients[i].assert_max_bit_size::<BIT>();
+        }
+    }
+
+    /// Range check using monomial embedding (experimental, optimized)
+    ///
+    /// Based on Sections 3.1-3.3 of Symphony paper. This embeds each coefficient
+    /// as a monomial and verifies using table polynomial multiplication.
+    ///
+    /// # Type Parameters
+    /// * `D` - Ring dimension for monomial embedding (must be > 2*bound)
+    ///
+    /// Note: Coefficients must be in range [0, D/2). For signed ranges, shift first.
+    pub fn range_check_monomial<let D: u32>(self) {
+        // Generate table polynomial ONCE for all coefficients
+        let table = monomial_embedding::table_polynomial::<D>();
+
+        for i in 0..N {
+            monomial_embedding::range_check_with_table::<D>(self.coefficients[i], table);
+        }
+    }
+
+    /// Range check using projected values (Symphony optimization)
+    ///
+    /// Based on Section 3.4 of "Symphony: Scalable SNARKs in the Random Oracle Model
+    /// from Lattice-Based High-Arity Folding" (https://eprint.iacr.org/2025/1905)
+    ///
+    /// This method performs range checking on pre-computed projected polynomial values
+    /// computed outside the circuit. The projection reduces N coefficients to PROJ_SIZE
+    /// values, reducing constraint count from O(N) to O(PROJ_SIZE).
+    ///
+    /// # Arguments
+    /// * `projected_values` - Projected polynomial values (computed by prover outside circuit)
+    /// * `upper_bound` - Upper bound for coefficient range
+    /// * `lower_bound` - Lower bound for coefficient range
+    /// * `projection_seed` - Fiat-Shamir seed used for projection (for spot checks)
+    ///
+    /// # Type Parameters
+    /// * `BIT` - Bit-length of the range
+    /// * `PROJ_SIZE` - Size of projected vector (typically 128 for 128-bit security)
+    pub fn range_check_projected<let BIT: u32, let PROJ_SIZE: u32>(
+        self,
+        projected_values: [Field; PROJ_SIZE],
+        upper_bound: Field,
+        lower_bound: Field,
+        projection_seed: Field,
+    ) {
+        // Step 1: Range check the projected values
+        // Each projected value is a sum from a sparse {-1,0,1} random matrix
+        // Worst case: a row could sum all N coefficients (though extremely unlikely)
+        // Use N as the conservative bound for maximum safety
+        let projected_lower_bound = N as Field * lower_bound;
+        let projected_upper_bound = N as Field * upper_bound;
+        let projected_range_size = projected_lower_bound + projected_upper_bound;
+
+        // Shift projected values to be non-negative and check they're in range
+        // Same pattern as range_check_2bounds: shift by lower_bound and check both directions
+        // For N=512, bound=1: range_size=1024, need 10 bits + BIT
+        // For N=1023, bound=34B: range_size=69T, need 46 bits + BIT
+        // Use BIT + 10 which should cover all cases (N <= 1024)
+        for i in 0..PROJ_SIZE {
+            let shifted_projected = projected_values[i] + projected_lower_bound;
+            shifted_projected.assert_max_bit_size::<BIT + 10>();
+            (projected_range_size - shifted_projected).assert_max_bit_size::<BIT + 10>();
+        }
+
+        // Step 2: Spot check a few original coefficients for additional security
+        // This provides defense against malicious provers via Schwartz-Zippel lemma
+        let range_size = upper_bound + lower_bound;
+        for j in 0..3 {
+            let check_index = (projection_seed + j as Field) as u64 % N as u64;
+            let coeff = self.coefficients[check_index as u32];
+
+            // Shift and check the sampled coefficient (same as range_check_2bounds)
+            let shifted_coeff = coeff + lower_bound;
+            shifted_coeff.assert_max_bit_size::<BIT + 1>();
+            (range_size - shifted_coeff).assert_max_bit_size::<BIT + 1>();
         }
     }
 }

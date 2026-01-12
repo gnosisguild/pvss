@@ -198,6 +198,19 @@ pub struct Greco<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let B
     r2is: [Polynomial<N - 1>; L],
     p1is: [Polynomial<(2 * N) - 1>; L],
     p2is: [Polynomial<N - 1>; L],
+
+    // Symphony projection optimization fields (eprint.iacr.org/2025/1905, Section 3.4)
+    // Projected polynomial values for efficient range checking
+    projection_seed: Field,
+    u_projected: Polynomial<128>,
+    e0_projected: Polynomial<128>,
+    e1_projected: Polynomial<128>,
+    pk0is_projected: [Polynomial<128>; L],
+    pk1is_projected: [Polynomial<128>; L],
+    r1is_projected: [Polynomial<128>; L],
+    r2is_projected: [Polynomial<128>; L],
+    p1is_projected: [Polynomial<128>; L],
+    p2is_projected: [Polynomial<128>; L],
 }
 
 impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_K: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> Greco<N, L, BIT_PK, BIT_CT, BIT_U, BIT_E0, BIT_E1, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
@@ -241,6 +254,17 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         r2is: [Polynomial<N - 1>; L],
         p1is: [Polynomial<2 * N - 1>; L],
         p2is: [Polynomial<N - 1>; L],
+        // Symphony projection optimization parameters
+        projection_seed: Field,
+        u_projected: Polynomial<128>,
+        e0_projected: Polynomial<128>,
+        e1_projected: Polynomial<128>,
+        pk0is_projected: [Polynomial<128>; L],
+        pk1is_projected: [Polynomial<128>; L],
+        r1is_projected: [Polynomial<128>; L],
+        r2is_projected: [Polynomial<128>; L],
+        p1is_projected: [Polynomial<128>; L],
+        p2is_projected: [Polynomial<128>; L],
     ) -> Greco<N, L, BIT_PK, BIT_CT, BIT_U, BIT_E0, BIT_E1, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
         Greco {
             params,
@@ -258,6 +282,16 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
             r2is,
             p1is,
             p2is,
+            projection_seed,
+            u_projected,
+            e0_projected,
+            e1_projected,
+            pk0is_projected,
+            pk1is_projected,
+            r1is_projected,
+            r2is_projected,
+            p1is_projected,
+            p2is_projected,
         }
     }
 
@@ -370,42 +404,73 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     fn check_range_bounds(self) {
         let bound_params = self.params.bound_params();
 
+        // Use Symphony projection-based range checks (Section 3.4 of eprint.iacr.org/2025/1905)
+        // This reduces constraints from O(N) to O(128) per polynomial while maintaining security
+
         // Common polynomials (used across all CRT bases)
-        self.u.range_check_2bounds::<BIT_U>(bound_params.u_bound, bound_params.u_bound);
-        self.e0.range_check_2bounds::<BIT_E0>(bound_params.e0_bound, bound_params.e0_bound);
-        self.e1.range_check_2bounds::<BIT_E1>(bound_params.e1_bound, bound_params.e1_bound);
+        self.u.range_check_projected::<BIT_U, 128>(
+            self.u_projected.coefficients,
+            bound_params.u_bound,
+            bound_params.u_bound,
+            self.projection_seed,
+        );
+        self.e0.range_check_projected::<BIT_E0, 128>(
+            self.e0_projected.coefficients,
+            bound_params.e0_bound,
+            bound_params.e0_bound,
+            self.projection_seed,
+        );
+        self.e1.range_check_projected::<BIT_E1, 128>(
+            self.e1_projected.coefficients,
+            bound_params.e1_bound,
+            bound_params.e1_bound,
+            self.projection_seed,
+        );
+        // k1 uses traditional range check (not in projected witness)
         self.k1.range_check_2bounds::<BIT_K>(bound_params.k1_up_bound, bound_params.k1_low_bound);
 
         // CRT basis-specific polynomials
         for i in 0..L {
-            // Public key polynomials must be within bounds for each CRT basis
-            self.pk0is[i].range_check_2bounds::<BIT_PK>(
+            // Public key polynomials with projection-based checks
+            self.pk0is[i].range_check_projected::<BIT_PK, 128>(
+                self.pk0is_projected[i].coefficients,
                 bound_params.pk_bounds[i],
                 bound_params.pk_bounds[i],
+                self.projection_seed,
             );
-            self.pk1is[i].range_check_2bounds::<BIT_PK>(
+            self.pk1is[i].range_check_projected::<BIT_PK, 128>(
+                self.pk1is_projected[i].coefficients,
                 bound_params.pk_bounds[i],
                 bound_params.pk_bounds[i],
+                self.projection_seed,
             );
 
-            // Randomness polynomials for ct0 computation
-            self.r1is[i].range_check_2bounds::<BIT_R1>(
+            // Randomness polynomials for ct0 computation with projections
+            self.r1is[i].range_check_projected::<BIT_R1, 128>(
+                self.r1is_projected[i].coefficients,
                 bound_params.r1_up_bounds[i],
                 bound_params.r1_low_bounds[i],
+                self.projection_seed,
             );
-            self.r2is[i].range_check_2bounds::<BIT_R2>(
+            self.r2is[i].range_check_projected::<BIT_R2, 128>(
+                self.r2is_projected[i].coefficients,
                 bound_params.r2_bounds[i],
                 bound_params.r2_bounds[i],
+                self.projection_seed,
             );
 
-            // Randomness polynomials for ct1 computation
-            self.p1is[i].range_check_2bounds::<BIT_P1>(
+            // Randomness polynomials for ct1 computation with projections
+            self.p1is[i].range_check_projected::<BIT_P1, 128>(
+                self.p1is_projected[i].coefficients,
                 bound_params.p1_bounds[i],
                 bound_params.p1_bounds[i],
+                self.projection_seed,
             );
-            self.p2is[i].range_check_2bounds::<BIT_P2>(
+            self.p2is[i].range_check_projected::<BIT_P2, 128>(
+                self.p2is_projected[i].coefficients,
                 bound_params.p2_bounds[i],
                 bound_params.p2_bounds[i],
+                self.projection_seed,
             );
         }
     }

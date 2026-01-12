@@ -16,6 +16,17 @@ fn main(
     r2is: [Polynomial<511>; 1],
     p1is: [Polynomial<1023>; 1],
     p2is: [Polynomial<511>; 1],
+    // Symphony projection optimization parameters
+    projection_seed: Field,
+    u_projected: Polynomial<128>,
+    e0_projected: Polynomial<128>,
+    e1_projected: Polynomial<128>,
+    pk0is_projected: [Polynomial<128>; 1],
+    pk1is_projected: [Polynomial<128>; 1],
+    r1is_projected: [Polynomial<128>; 1],
+    r2is_projected: [Polynomial<128>; 1],
+    p1is_projected: [Polynomial<128>; 1],
+    p2is_projected: [Polynomial<128>; 1],
 ) {
     let greco: Greco<512, 1, 51, 51, 2, 4, 4, 36, 36, 51, 10, 51> = Greco::new(
         params,
@@ -33,6 +44,16 @@ fn main(
         r2is,
         p1is,
         p2is,
+        projection_seed,
+        u_projected,
+        e0_projected,
+        e1_projected,
+        pk0is_projected,
+        pk1is_projected,
+        r1is_projected,
+        r2is_projected,
+        p1is_projected,
+        p2is_projected,
     );
     let is_greco_valid = greco.verify();
     assert(is_greco_valid);
