@@ -22,7 +22,7 @@ pub global PK_BFV_BIT_PK: u32 = 51;
 
 /************************************
 -------------------------------------
-enc_bfv (CIRCUIT 3 - BFV ENCRYPTION)
+enc_bfv (CIRCUIT 3a - BFV ENCRYPTION SK)
 -------------------------------------
 ************************************/
 
@@ -54,7 +54,31 @@ pub global ENC_BFV_P2_BOUNDS: [Field; L] = [1125899906777088];
 pub global ENC_BFV_MSG_BOUND: Field = 68719403008;
 
 // enc_bfv - configs
-pub global ENC_BFV_CONFIGS: BfvEncConfigs<L> = BfvEncConfigs::new(
+pub global ENC_BFV_CONFIGS_SK: BfvEncConfigs<L> = BfvEncConfigs::new(
+    ENC_BFV_T,
+    ENC_BFV_Q_MOD_T,
+    QIS,
+    ENC_BFV_K0IS,
+    ENC_BFV_PK_BOUNDS,
+    ENC_BFV_E0_BOUND,
+    ENC_BFV_E1_BOUND,
+    ENC_BFV_U_BOUND,
+    ENC_BFV_R1_LOW_BOUNDS,
+    ENC_BFV_R1_UP_BOUNDS,
+    ENC_BFV_R2_BOUNDS,
+    ENC_BFV_P1_BOUNDS,
+    ENC_BFV_P2_BOUNDS,
+    ENC_BFV_MSG_BOUND,
+);
+
+/************************************
+-------------------------------------
+enc_bfv (CIRCUIT 3b - BFV ENCRYPTION E_SM)
+-------------------------------------
+************************************/
+
+// enc_bfv E_SM uses the same bit parameters and bounds as SK
+pub global ENC_BFV_CONFIGS_E_SM: BfvEncConfigs<L> = BfvEncConfigs::new(
     ENC_BFV_T,
     ENC_BFV_Q_MOD_T,
     QIS,
