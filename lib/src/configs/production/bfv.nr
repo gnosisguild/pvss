@@ -100,8 +100,18 @@ pub global ENC_BFV_CONFIGS_E_SM: BfvEncConfigs<L> = BfvEncConfigs::new(
 
 /************************************
 -------------------------------------
-dec_bfv (CIRCUIT 4 - DECRYPTION BFV)
+dec_bfv (CIRCUIT 4a - BFV DECRYPTION SK)
 -------------------------------------
 ************************************/
+
 // dec_bfv - bit parameters
-pub global DEC_BFV_BIT_MSG: u32 = 59;
+pub global DEC_BFV_BIT_MSG_SK: u32 = 56;
+
+/************************************
+-------------------------------------
+dec_bfv (CIRCUIT 4b - BFV DECRYPTION E_SM)
+-------------------------------------
+************************************/
+
+// dec_bfv - bit parameters
+pub global DEC_BFV_BIT_MSG_E_SM: u32 = 56;
