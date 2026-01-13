@@ -163,7 +163,7 @@ pub global DEC_SHARES_CONFIGS: DecShareTrBfvConfigs<L> = DecShareTrBfvConfigs::n
 
 /************************************
 -------------------------------------
-trbfv_dec_shares_agg (CIRCUIT 7 - THRESHOLD BFV DECRYPTION SHARES AGGREGATION)
+dec_share_agg_trbfv (CIRCUIT 7 - DECRYPTION SHARE AGGREGATION TRBFV)
 -------------------------------------
 ************************************/
 

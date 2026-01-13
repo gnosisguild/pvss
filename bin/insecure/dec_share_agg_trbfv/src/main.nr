@@ -2,8 +2,8 @@ use lib::configs::insecure::trbfv::{DEC_SHARES_AGG_BIT_NOISE, DEC_SHARES_AGG_CON
 use lib::core::trbfv_dec_shares_agg::DecryptionSharesAggregation;
 use lib::math::polynomial::Polynomial;
 
-/// Number of max number of non-zero coefficients in the message polynomial.
-pub global MAX_MSG_NON_ZERO_COEFFS: u32 = 5;
+/// Max number of non-zero coefficients in the message polynomial.
+pub global MAX_MSG_NON_ZERO_COEFFS: u32 = 80;
 /// Threshold.
 pub global T: u32 = 2;
 
