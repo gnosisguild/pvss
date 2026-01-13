@@ -67,7 +67,7 @@ impl<let N: u32, let H: u32, let L: u32, let BIT_PK: u32> TrbfvPublicKeyAggregat
             let computed_commitment = compute_pk_trbfv_commitment(payload);
             assert(
                 computed_commitment == self.expected_pk_trbfv_commitments[i],
-                "SK commitment mismatch",
+                "PK commitment mismatch",
             );
         }
     }
