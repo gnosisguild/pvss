@@ -85,7 +85,7 @@ pub global PK_AGG_TRBFV_CONFIGS: PkAggTrBfvConfigs<L> = PkAggTrBfvConfigs::new(Q
 
 /************************************
 -------------------------------------
-greco (GRECO  - ENCRYPTION TRBFV)
+greco (USED FOR ENCRYPTION TRBFV x PVSS)
 -------------------------------------
 ************************************/
 
@@ -136,7 +136,7 @@ pub global GRECO_CONFIGS: GrecoConfigs<N, L> = GrecoConfigs::new(
 
 /************************************
 -------------------------------------
-trbfv_dec_share (CIRCUIT 6 - THRESHOLD BFV DECRYPTION SHARE)
+dec_share_trbfv (CIRCUIT 6 - DECRYPTION SHARE TRBFV)
 -------------------------------------
 ************************************/
 

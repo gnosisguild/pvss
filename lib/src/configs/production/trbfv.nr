@@ -88,7 +88,7 @@ pub global PK_AGG_TRBFV_CONFIGS: PkAggTrBfvConfigs<L> = PkAggTrBfvConfigs::new(Q
 
 /************************************
 -------------------------------------
-GRECO (GRECO- ENCRYPTION THRESHOLD BFV)
+greco (USED FOR ENCRYPTION TRBFV x PVSS)
 -------------------------------------
 ************************************/
 
