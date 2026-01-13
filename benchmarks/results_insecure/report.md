@@ -13,20 +13,16 @@
 
 | Circuit                  | Compile | Execute | Prove  | Verify | Status |
 | ------------------------ | ------- | ------- | ------ | ------ | ------ |
-| dec_bfv                  | 0.60 s  | 2.21 s  | 5.84 s | 0.02 s | ✅     |
 | dec_bfv_e_sm             | 0.25 s  | 0.28 s  | 0.31 s | 0.02 s | ✅     |
 | dec_bfv_sk               | 0.25 s  | 0.28 s  | 0.30 s | 0.02 s | ✅     |
 | dec_shares_agg_trbfv     | 0.52 s  | 0.32 s  | 0.46 s | 0.02 s | ✅     |
 | dec_share_trbfv          | 1.51 s  | 0.41 s  | 0.61 s | 0.02 s | ✅     |
-| enc_bfv                  | 0.29 s  | 0.43 s  | 0.82 s | 0.02 s | ✅     |
 | enc_bfv_e_sm             | 1.95 s  | 0.43 s  | 0.84 s | 0.02 s | ✅     |
 | enc_bfv_sk               | 1.93 s  | 0.43 s  | 0.83 s | 0.02 s | ✅     |
-| enc_trbfv                | 0.29 s  | 0.48 s  | 0.57 s | 0.02 s | ✅     |
 | greco                    | 1.87 s  | 0.47 s  | 0.57 s | 0.02 s | ✅     |
 | pk_agg_trbfv             | 1.41 s  | 0.43 s  | 0.88 s | 0.02 s | ✅     |
 | pk_bfv                   | 0.24 s  | 0.25 s  | 0.12 s | 0.03 s | ✅     |
 | pk_trbfv                 | 1.10 s  | 0.36 s  | 0.35 s | 0.02 s | ✅     |
-| verify_shares_trbfv      | 0.32 s  | 0.56 s  | 1.53 s | 0.02 s | ✅     |
 | verify_shares_trbfv_e_sm | 2.68 s  | 0.52 s  | 1.59 s | 0.02 s | ✅     |
 | verify_shares_trbfv_sk   | 2.49 s  | 0.50 s  | 1.55 s | 0.02 s | ✅     |
 
@@ -34,40 +30,20 @@
 
 | Circuit                  | Opcodes | Gates   | Circuit Size | Witness   | VK Size | Proof Size |
 | ------------------------ | ------- | ------- | ------------ | --------- | ------- | ---------- |
-| dec_bfv                  | 603086  | 1.53M   | 8.92 MB      | 3.76 MB   | 3.59 KB | 15.88 KB   |
 | dec_bfv_e_sm             | 2076    | 34.73K  | 159.01 KB    | 139.99 KB | 3.59 KB | 15.88 KB   |
 | dec_bfv_sk               | 2076    | 34.73K  | 159.01 KB    | 139.97 KB | 3.59 KB | 15.88 KB   |
 | dec_shares_agg_trbfv     | 31544   | 80.18K  | 504.70 KB    | 77.07 KB  | 3.59 KB | 15.88 KB   |
 | dec_share_trbfv          | 32836   | 125.96K | 577.54 KB    | 605.47 KB | 3.59 KB | 15.88 KB   |
-| enc_bfv                  | 48324   | 136.88K | 790.60 KB    | 532.61 KB | 3.59 KB | 15.88 KB   |
 | enc_bfv_e_sm             | 48327   | 137.59K | 801.19 KB    | 532.48 KB | 3.59 KB | 15.88 KB   |
 | enc_bfv_sk               | 48327   | 137.59K | 801.19 KB    | 532.53 KB | 3.59 KB | 15.88 KB   |
-| enc_trbfv                | 56590   | 106.70K | 836.46 KB    | 706.73 KB | 3.59 KB | 15.88 KB   |
 | greco                    | 56590   | 106.70K | 846.47 KB    | 706.04 KB | 3.59 KB | 15.88 KB   |
 | pk_agg_trbfv             | 47818   | 169.89K | 881.00 KB    | 360.79 KB | 3.59 KB | 15.88 KB   |
 | pk_bfv                   | 344     | 6.85K   | 86.76 KB     | 29.08 KB  | 3.59 KB | 15.88 KB   |
 | pk_trbfv                 | 27726   | 57.95K  | 517.44 KB    | 422.78 KB | 3.59 KB | 15.88 KB   |
-| verify_shares_trbfv      | 92875   | 336.94K | 1.49 MB      | 467.35 KB | 3.59 KB | 15.88 KB   |
 | verify_shares_trbfv_e_sm | 90874   | 339.88K | 1.48 MB      | 472.32 KB | 3.59 KB | 15.88 KB   |
 | verify_shares_trbfv_sk   | 90827   | 338.98K | 1.47 MB      | 465.50 KB | 3.59 KB | 15.88 KB   |
 
 ## Circuit Details
-
-### dec_bfv
-
-| Metric               | Value    |
-| -------------------- | -------- |
-| **Compilation**      | 0.60 s   |
-| **Execution**        | 2.21 s   |
-| **VK Generation**    | 2.62 s   |
-| **Proof Generation** | 5.84 s   |
-| **Verification**     | 0.02 s   |
-| **ACIR Opcodes**     | 603086   |
-| **Total Gates**      | 1532968  |
-| **Circuit Size**     | 8.92 MB  |
-| **Witness Size**     | 3.76 MB  |
-| **VK Size**          | 3.59 KB  |
-| **Proof Size**       | 15.88 KB |
 
 ### dec_bfv_e_sm
 
@@ -133,22 +109,6 @@
 | **VK Size**          | 3.59 KB   |
 | **Proof Size**       | 15.88 KB  |
 
-### enc_bfv
-
-| Metric               | Value     |
-| -------------------- | --------- |
-| **Compilation**      | 0.29 s    |
-| **Execution**        | 0.43 s    |
-| **VK Generation**    | 0.27 s    |
-| **Proof Generation** | 0.82 s    |
-| **Verification**     | 0.02 s    |
-| **ACIR Opcodes**     | 48324     |
-| **Total Gates**      | 136876    |
-| **Circuit Size**     | 790.60 KB |
-| **Witness Size**     | 532.61 KB |
-| **VK Size**          | 3.59 KB   |
-| **Proof Size**       | 15.88 KB  |
-
 ### enc_bfv_e_sm
 
 | Metric               | Value     |
@@ -178,22 +138,6 @@
 | **Total Gates**      | 137585    |
 | **Circuit Size**     | 801.19 KB |
 | **Witness Size**     | 532.53 KB |
-| **VK Size**          | 3.59 KB   |
-| **Proof Size**       | 15.88 KB  |
-
-### enc_trbfv
-
-| Metric               | Value     |
-| -------------------- | --------- |
-| **Compilation**      | 0.29 s    |
-| **Execution**        | 0.48 s    |
-| **VK Generation**    | 0.22 s    |
-| **Proof Generation** | 0.57 s    |
-| **Verification**     | 0.02 s    |
-| **ACIR Opcodes**     | 56590     |
-| **Total Gates**      | 106699    |
-| **Circuit Size**     | 836.46 KB |
-| **Witness Size**     | 706.73 KB |
 | **VK Size**          | 3.59 KB   |
 | **Proof Size**       | 15.88 KB  |
 
@@ -258,22 +202,6 @@
 | **Total Gates**      | 57945     |
 | **Circuit Size**     | 517.44 KB |
 | **Witness Size**     | 422.78 KB |
-| **VK Size**          | 3.59 KB   |
-| **Proof Size**       | 15.88 KB  |
-
-### verify_shares_trbfv
-
-| Metric               | Value     |
-| -------------------- | --------- |
-| **Compilation**      | 0.32 s    |
-| **Execution**        | 0.56 s    |
-| **VK Generation**    | 0.63 s    |
-| **Proof Generation** | 1.53 s    |
-| **Verification**     | 0.02 s    |
-| **ACIR Opcodes**     | 92875     |
-| **Total Gates**      | 336936    |
-| **Circuit Size**     | 1.49 MB   |
-| **Witness Size**     | 467.35 KB |
 | **VK Size**          | 3.59 KB   |
 | **Proof Size**       | 15.88 KB  |
 
