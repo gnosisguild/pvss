@@ -53,8 +53,8 @@ verify_shares (CIRCUIT 2a - VERIFY SHARES SK)
 ************************************/
 
 // verify_shares - bit parameters
-pub global VERIFY_SHARES_BIT_SECRET_SK: u32 = 2;
 pub global VERIFY_SHARES_BIT_SHARE: u32 = 37;
+pub global VERIFY_SHARES_BIT_SECRET_SK: u32 = 2;
 
 // verify_shares - configs
 pub global VERIFY_SHARES_CONFIGS_SK: VerifySharesConfigs<L> = VerifySharesConfigs::new(QIS);

@@ -21,19 +21,24 @@ impl<let L: u32> Configs<L> {
 ///
 /// Verifies:
 /// 1. secret commitment: verify secret hashes to expected_secret_commitment
-/// 2. secret consistency: y[i][j][0] == secret[i] for all i, j
+/// 2. secret consistency: y[i][j][0] == secret_crt[j][i] for all i, j
 /// 3. Range check: shares are in [0, q_j)
 /// 4. Parity check: H[j] * y[i][j]^T == 0 mod q_j for all i, j
+///
+/// For SK: secret_crt[j] is the same for all j (trinary coefficients)
+/// For ESM: secret_crt[j] is the RNS representation at modulus j
 pub struct VerifyShares<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32, let BIT_SHARE: u32> {
     configs: Configs<L>,
     /// Expected commitment to secret (from C1)
     /// This can be either commit(e_sm) or commit(sk_trbfv).
+    /// For ESM, this is computed from the first modulus's RNS representation.
     expected_secret_commitment: Field,
-    /// Secret polynomial (trinary coefficients)
-    /// This can be either e_sm or sk_trbfv.
-    secret: Polynomial<N>,
+    /// Secret polynomial per modulus: [Polynomial<N>; L]
+    /// For SK: all moduli use the same polynomial (trinary coefficients)
+    /// For ESM: each modulus has its own polynomial (RNS representation)
+    secret_crt: [Polynomial<N>; L],
     /// Shares: y[coeff_idx][mod_idx][0..N_PARTIES+1]
-    /// y[i][j][0] = sk[i] = f(0), y[i][j][k] = f(k) for k = 1..N_PARTIES
+    /// y[i][j][0] = secret_crt[j][i] = f(0), y[i][j][k] = f(k) for k = 1..N_PARTIES
     y: [[[Field; N_PARTIES + 1]; L]; N],
     /// Parity check matrices: H[mod_idx][row][col]
     /// Size per modulus: (N_PARTIES - T) * (N_PARTIES + 1)
@@ -45,11 +50,11 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32
     pub fn new(
         configs: Configs<L>,
         expected_secret_commitment: Field,
-        secret: Polynomial<N>,
+        secret_crt: [Polynomial<N>; L],
         y: [[[Field; N_PARTIES + 1]; L]; N],
         h: [[[Field; N_PARTIES + 1]; N_PARTIES - T]; L],
     ) -> Self {
-        VerifyShares { configs, expected_secret_commitment, secret, y, h }
+        VerifyShares { configs, expected_secret_commitment, secret_crt, y, h }
     }
 
     /// Main verification function
@@ -71,28 +76,39 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32
     }
 
     /// Verifies that secret hashes to expected_secret_commitment
+    /// For commitment verification, we use the first modulus's secret polynomial
+    /// (matches C1's computation which uses the first modulus's RNS representation)
     fn verify_secret_commitment(self) {
-        let payload = prepare_single_polynomial_commitment_payload::<N, BIT_SECRET>(self.secret);
+        let payload =
+            prepare_single_polynomial_commitment_payload::<N, BIT_SECRET>(self.secret_crt[0]);
         let computed_commitment = compute_secret_commitment(payload);
-        assert(computed_commitment == self.expected_secret_commitment, "SK commitment mismatch");
+        assert(
+            computed_commitment == self.expected_secret_commitment,
+            "Secret commitment mismatch",
+        );
     }
 
-    /// Verifies secret consistency: `y[i][j][0] == secret[i]` for all i, j.
+    /// Verifies secret consistency: `y[i][j][0] == secret_crt[j][i]` for all i, j.
     ///
     /// This function ensures that for each coefficient i and CRT basis j, the share
-    /// at party ID 0 equals the corresponding secret coefficient. This is a
-    /// fundamental property of Shamir secret sharing where the secret is the
+    /// at party ID 0 equals the corresponding secret coefficient for that modulus.
+    /// This is a fundamental property of Shamir secret sharing where the secret is the
     /// evaluation of the sharing polynomial at point 0.
+    ///
+    /// For SK: secret_crt[j] is the same for all j, so y[i][j][0] is the same for all j.
+    /// For ESM: secret_crt[j] is the RNS representation at modulus j, so y[i][j][0] varies per modulus.
     ///
     /// # Panics
     /// The circuit will fail if secret consistency doesn't hold for any
     /// coefficient or CRT basis.
     fn verify_secret_consistency(self) {
         for coeff_idx in 0..N {
-            let secret_coeff = self.secret.coefficients[coeff_idx];
-
             for mod_idx in 0..L {
-                assert(self.y[coeff_idx][mod_idx][0] == secret_coeff);
+                let secret_coeff = self.secret_crt[mod_idx].coefficients[coeff_idx];
+                assert(
+                    self.y[coeff_idx][mod_idx][0] == secret_coeff,
+                    "Secret consistency check failed",
+                );
             }
         }
     }

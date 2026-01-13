@@ -11,14 +11,14 @@ pub global T: u32 = 2;
 
 fn main(
     expected_secret_commitment: Field,
-    secret: Polynomial<N>,
+    secret_crt: [Polynomial<N>; L],
     y: [[[Field; N_PARTIES + 1]; L]; N],
     h: [[[Field; N_PARTIES + 1]; N_PARTIES - T]; L],
 ) -> pub [[Field; L]; N_PARTIES] {
     let verify_shares: VerifyShares<N, L, N_PARTIES, T, VERIFY_SHARES_BIT_SECRET_E_SM, VERIFY_SHARES_BIT_SHARE> = VerifyShares::new(
         VERIFY_SHARES_CONFIGS_E_SM,
         expected_secret_commitment,
-        secret,
+        secret_crt,
         y,
         h,
     );
