@@ -1,7 +1,0 @@
-[package]
-name = "enc_bfv"
-type = "bin"
-authors = [""]
-
-[dependencies]
-lib = { path = "../../../lib" }

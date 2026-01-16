@@ -1,7 +1,0 @@
-[package]
-name = "verify_shares_trbfv"
-type = "bin"
-authors = [""]
-
-[dependencies]
-lib = { path = "../../../lib" }

@@ -40,7 +40,7 @@ Edit `config.json`:
 
 ```json
 {
-  "circuits": ["pk_trbfv", "enc_trbfv"],
+  "circuits": ["pk_trbfv", "greco"],
   "oracles": ["default"],
   "mode": "insecure",
   "bin_dir": "../bin",

@@ -1,65 +1,40 @@
+use crate::math::commitments::{
+    compute_secret_commitment, compute_shares_party_modulus_commitment,
+    prepare_shares_party_modulus_commitment_payload, prepare_single_polynomial_commitment_payload,
+};
 use crate::math::modulo::U128::ModU128;
 use crate::math::polynomial::Polynomial;
-use crate::math::safe::SafeSponge;
 
-/// Cryptographic parameters for the TRBFV secret share verification circuit.
-///
-/// This struct contains all the mathematical constants and bounds needed to verify
-/// correct Shamir secret sharing of the TRBFV secret key.
-///
-/// # Generic Parameters
-/// * `L` - The number of CRT (Chinese Remainder Theorem) bases
+/// Cryptographic parameters for TRBFV secret share verification circuit.
 pub struct Configs<let L: u32> {
     /// CRT moduli: [q_0, q_1, ..., q_{L-1}]
     pub qis: [Field; L],
-    /// Bound for secret key polynomial coefficients (trinary: -1, 0, 1)
-    pub sk_bound: Field,
 }
 
 impl<let L: u32> Configs<L> {
-    /// Creates a new `Configs` instance with the specified cryptographic parameters.
-    ///
-    /// # Arguments
-    /// All parameters correspond to the fields of the `Configs` struct. See the struct
-    /// documentation for details on each parameter.
-    ///
-    /// # Returns
-    /// A new `Configs` instance ready for use with the `VerifyShares` circuit.
-    pub fn new(qis: [Field; L], sk_bound: Field) -> Self {
-        Configs { qis, sk_bound }
+    pub fn new(qis: [Field; L]) -> Self {
+        Configs { qis }
     }
 }
 
-/// TRBFV Secret Share Verification Circuit.
+/// TRBFV Secret Share Verification Circuit for secret key (Circuit 2a - VERIFY SHARES SK).
 ///
-/// This circuit implements a zero-knowledge proof for the correct Shamir secret sharing
-/// of the TRBFV secret key. It verifies that secret key shares are correctly generated
-/// and satisfy the Reed-Solomon parity check constraints.
+/// Verifies:
+/// 1. secret commitment: verify secret hashes to expected_secret_commitment
+/// 2. secret consistency: y[i][j][0] == secret_sk[i] for all i, j
+/// 3. Range check: shares are in [0, q_j)
+/// 4. Parity check: H[j] * y[i][j]^T == 0 mod q_j for all i, j
 ///
-/// The circuit verifies:
-/// 1. **Secret Key Consistency**: For each coefficient i and CRT basis j,
-///    `y[i][j][0] == sk[i]`, ensuring shares at party ID 0 equal the secret key
-/// 2. **Range Checks**: Secret key coefficients are trinary (-1, 0, 1) and shares
-///    are in the valid range [0, q_j) for each CRT modulus
-/// 3. **Parity Check**: For each coefficient i and CRT basis j, the Reed-Solomon
-///    parity check matrix H[j] satisfies `H[j] * y[i][j]^T == 0 mod q_j`
-///
-/// The parity check ensures that shares form a valid Reed-Solomon codeword, which
-/// guarantees that any T+1 shares can correctly reconstruct the secret key.
-///
-/// # Generic Parameters
-/// * `N` - Number of TRBFV secret key coefficients (ring dimension)
-/// * `L` - Number of CRT moduli
-/// * `N_PARTIES` - Number of parties (shares per coefficient)
-/// * `T` - Threshold (degree of sharing polynomial, need T+1 shares to reconstruct)
-/// * `BIT_SK` - Bit-width bound per coefficient for secret key polynomial
-/// * `BIT_SHARE` - Bit-width bound per coefficient for share values
-pub struct VerifyShares<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32, let BIT_SHARE: u32> {
+/// For SK: secret_sk is the trinary coefficients
+pub struct VerifySharesSk<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32, let BIT_SHARE: u32> {
     configs: Configs<L>,
-    /// Secret key polynomial (trinary coefficients)
-    sk: Polynomial<N>,
+    /// Expected commitment to secret (from C1)
+    expected_secret_commitment: Field,
+    /// Secret key polynomial: Polynomial<N>
+    /// trinary coefficients
+    secret_sk: Polynomial<N>,
     /// Shares: y[coeff_idx][mod_idx][0..N_PARTIES+1]
-    /// y[i][j][0] = sk[i] = f(0), y[i][j][k] = f(k) for k = 1..N_PARTIES
+    /// y[i][j][0] = secret_sk[i] = f(0), y[i][j][k] = f(k) for k = 1..N_PARTIES
     y: [[[Field; N_PARTIES + 1]; L]; N],
     /// Parity check matrices: H[mod_idx][row][col]
     /// Size per modulus: (N_PARTIES - T) * (N_PARTIES + 1)
@@ -67,209 +42,241 @@ pub struct VerifyShares<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, 
     h: [[[Field; N_PARTIES + 1]; N_PARTIES - T]; L],
 }
 
-impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SK: u32, let BIT_SHARE: u32> VerifyShares<N, L, N_PARTIES, T, BIT_SK, BIT_SHARE> {
-    /// Creates a new `VerifyShares` circuit instance.
-    ///
-    /// This constructor initializes all the polynomials and parameters needed for
-    /// the zero-knowledge proof of correct secret key sharing.
-    ///
-    /// # Arguments
-    /// * `configs` - Cryptographic parameters including moduli and bounds
-    /// * `sk` - Secret key polynomial with trinary coefficients (secret witness)
-    /// * `y` - Share values: `y[coeff_idx][mod_idx][party_idx]` where
-    ///         `y[i][j][0] = sk[i]` and `y[i][j][k]` for k >= 1 are shares for party k
-    /// * `h` - Parity check matrices: `H[mod_idx][row][col]` of size
-    ///         `(N_PARTIES - T) * (N_PARTIES + 1)` for each CRT basis
-    ///
-    /// # Returns
-    /// A new `VerifyShares` instance ready for constraint checking via the `verify()` method
+/// TRBFV Secret Share Verification Circuit for smudging noise (Circuit 2b - VERIFY SHARES E_SM).
+///
+/// Verifies:
+/// 1. secret commitment: verify secret hashes to expected_secret_commitment
+/// 2. secret consistency: y[i][j][0] == e_sm[j][i] for all i, j
+/// 3. Range check: shares are in [0, q_j)
+/// 4. Parity check: H[j] * y[i][j]^T == 0 mod q_j for all i, j
+///
+/// For ESM: e_sm[j] is the RNS representation at modulus j
+pub struct VerifySharesEsm<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32, let BIT_SHARE: u32> {
+    configs: Configs<L>,
+    /// Expected commitment to secret (from C1)
+    /// This is computed from the first modulus's RNS representation.
+    expected_secret_commitment: Field,
+    /// Smudging noise polynomial per modulus: [Polynomial<N>; L]
+    /// For ESM: each modulus has its own polynomial (RNS representation)
+    secret_e_sm: [Polynomial<N>; L],
+    /// Shares: y[coeff_idx][mod_idx][0..N_PARTIES+1]
+    /// y[i][j][0] = e_sm[j][i] = f(0), y[i][j][k] = f(k) for k = 1..N_PARTIES
+    y: [[[Field; N_PARTIES + 1]; L]; N],
+    /// Parity check matrices: H[mod_idx][row][col]
+    /// Size per modulus: (N_PARTIES - T) * (N_PARTIES + 1)
+    /// H * y^T = 0 mod q_j
+    h: [[[Field; N_PARTIES + 1]; N_PARTIES - T]; L],
+}
+
+impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32, let BIT_SHARE: u32> VerifySharesSk<N, L, N_PARTIES, T, BIT_SECRET, BIT_SHARE> {
     pub fn new(
         configs: Configs<L>,
-        sk: Polynomial<N>,
+        expected_secret_commitment: Field,
+        secret_sk: Polynomial<N>,
         y: [[[Field; N_PARTIES + 1]; L]; N],
         h: [[[Field; N_PARTIES + 1]; N_PARTIES - T]; L],
     ) -> Self {
-        VerifyShares { configs, sk, y, h }
+        VerifySharesSk { configs, expected_secret_commitment, secret_sk, y, h }
     }
 
-    /// Main verification function that performs all circuit checks.
-    ///
-    /// This function implements the complete zero-knowledge proof by verifying:
-    /// 1. Secret key consistency across all CRT bases
-    /// 2. Range bounds on secret key and share values
-    /// 3. Reed-Solomon parity check constraints for all coefficients and CRT bases
-    ///
-    /// After successful verification, returns a commitment to the shares (excluding
-    /// the secret key values) that can be used for public verification.
-    ///
-    /// # Returns
-    /// A commitment hash to all share values (excluding secret key values), computed
-    /// using the SAFE sponge API. This commitment can be used to verify that shares
-    /// were correctly generated without revealing the secret key.
-    ///
-    /// # Panics
-    /// This function will cause the circuit to fail if any verification step fails.
-    /// The circuit fails if:
-    /// - Secret key consistency doesn't hold for any coefficient or CRT basis
-    /// - Any value is outside its expected bounds
-    /// - Parity check doesn't hold for any coefficient or CRT basis
-    pub fn verify(self) -> Field {
-        // Step 1: Verify sk consistency
-        self.verify_sk_consistency();
+    /// Main verification function
+    pub fn verify(self) -> [[Field; L]; N_PARTIES] {
+        // Step 1: Verify secret commitment matches expected
+        self.verify_secret_commitment();
 
-        // Step 2: Range checks
-        self.check_range_bounds();
+        // Step 2: Verify secret consistency
+        self.verify_secret_consistency();
 
-        // Step 3: Verify parity check
-        self.verify_parity_check();
+        // Step 3: Range checks
+        check_range_bounds::<N, L, N_PARTIES, BIT_SHARE>(self.configs.qis, self.y);
 
-        // Step 4: Commit to shares (excluding sk values)
-        Self::commit_to_shares(self.y)
+        // Step 4: Verify parity check
+        verify_parity_check::<N, L, N_PARTIES, T>(self.configs.qis, self.h, self.y);
+
+        // Step 5: Commit to shares for each party and modulus
+        commit_to_party_shares::<N, L, N_PARTIES>(self.y)
     }
 
-    /// Verifies secret key consistency: `y[i][j][0] == sk[i]` for all i, j.
+    /// Verifies that secret hashes to expected_secret_commitment
+    fn verify_secret_commitment(self) {
+        let payload = prepare_single_polynomial_commitment_payload::<N, BIT_SECRET>(self.secret_sk);
+        let computed_commitment = compute_secret_commitment(payload);
+        assert(computed_commitment == self.expected_secret_commitment, "SK commitment mismatch");
+    }
+
+    /// Verifies secret consistency: `y[i][j][0] == secret_sk[i]` for all i, j.
     ///
     /// This function ensures that for each coefficient i and CRT basis j, the share
-    /// at party ID 0 equals the corresponding secret key coefficient. This is a
-    /// fundamental property of Shamir secret sharing where the secret is the
+    /// at party ID 0 equals the corresponding secret coefficient for that modulus.
+    /// This is a fundamental property of Shamir secret sharing where the secret is the
     /// evaluation of the sharing polynomial at point 0.
     ///
+    /// secret_sk is the trinary coefficients, so y[i][j][0] is the same for all j.
+    ///
     /// # Panics
-    /// The circuit will fail if secret key consistency doesn't hold for any
+    /// The circuit will fail if secret consistency doesn't hold for any
     /// coefficient or CRT basis.
-    fn verify_sk_consistency(self) {
+    fn verify_secret_consistency(self) {
         for coeff_idx in 0..N {
-            let sk_coeff = self.sk.coefficients[coeff_idx];
+            let secret_coeff = self.secret_sk.coefficients[coeff_idx];
 
             for mod_idx in 0..L {
-                assert_eq(self.y[coeff_idx][mod_idx][0], sk_coeff);
+                assert(self.y[coeff_idx][mod_idx][0] == secret_coeff);
             }
         }
     }
+}
 
-    /// Performs range checks on secret key and share values.
+impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32, let BIT_SHARE: u32> VerifySharesEsm<N, L, N_PARTIES, T, BIT_SECRET, BIT_SHARE> {
+    pub fn new(
+        configs: Configs<L>,
+        expected_secret_commitment: Field,
+        secret_e_sm: [Polynomial<N>; L],
+        y: [[[Field; N_PARTIES + 1]; L]; N],
+        h: [[[Field; N_PARTIES + 1]; N_PARTIES - T]; L],
+    ) -> Self {
+        VerifySharesEsm { configs, expected_secret_commitment, secret_e_sm, y, h }
+    }
+
+    /// Main verification function
+    pub fn verify(self) -> [[Field; L]; N_PARTIES] {
+        // Step 1: Verify secret commitment matches expected
+        self.verify_secret_commitment();
+
+        // Step 2: Verify secret consistency
+        self.verify_secret_consistency();
+
+        // Step 3: Range checks
+        check_range_bounds::<N, L, N_PARTIES, BIT_SHARE>(self.configs.qis, self.y);
+
+        // Step 4: Verify parity check
+        verify_parity_check::<N, L, N_PARTIES, T>(self.configs.qis, self.h, self.y);
+
+        // Step 5: Commit to shares for each party and modulus
+        commit_to_party_shares::<N, L, N_PARTIES>(self.y)
+    }
+
+    /// Verifies that secret hashes to expected_secret_commitment
+    /// For commitment verification, we use the first modulus's secret polynomial
+    /// (matches C1's computation which uses the first modulus's RNS representation)
+    fn verify_secret_commitment(self) {
+        let payload =
+            prepare_single_polynomial_commitment_payload::<N, BIT_SECRET>(self.secret_e_sm[0]);
+        let computed_commitment = compute_secret_commitment(payload);
+        assert(computed_commitment == self.expected_secret_commitment, "ESM commitment mismatch");
+    }
+
+    /// Verifies secret consistency: `y[i][j][0] == secret_e_sm[j][i]` for all i, j.
     ///
-    /// This function constrains all values to be within their expected bounds:
-    /// - Secret key coefficients must be trinary (-1, 0, 1) as required by BFV
-    /// - Share values for parties k >= 1 must be in [0, q_j) for each CRT modulus q_j
+    /// This function ensures that for each coefficient i and CRT basis j, the share
+    /// at party ID 0 equals the corresponding secret coefficient for that modulus.
+    /// This is a fundamental property of Shamir secret sharing where the secret is the
+    /// evaluation of the sharing polynomial at point 0.
     ///
-    /// These bounds are critical for security and correctness of the threshold BFV scheme.
+    /// secret_e_sm[j] is the RNS representation at modulus j, so y[i][j][0] varies per modulus.
     ///
     /// # Panics
-    /// This function will cause the circuit to fail if any value is outside
-    /// its expected bounds.
-    fn check_range_bounds(self) {
-        // sk coefficients should be in {-1, 0, 1}
-        self.sk.range_check_2bounds::<BIT_SK>(self.configs.sk_bound, self.configs.sk_bound);
+    /// The circuit will fail if secret consistency doesn't hold for any
+    /// coefficient or CRT basis.
+    fn verify_secret_consistency(self) {
+        for coeff_idx in 0..N {
+            for mod_idx in 0..L {
+                let secret_coeff = self.secret_e_sm[mod_idx].coefficients[coeff_idx];
+                assert(
+                    self.y[coeff_idx][mod_idx][0] == secret_coeff,
+                    "Secret consistency check failed",
+                );
+            }
+        }
+    }
+}
 
-        // Shares y[i][j][k] for k >= 1 should be in [0, q_j)
+/// Performs range checks on secret key and share values.
+///
+/// This function constrains all values to be within their expected bounds:
+/// - Share values for parties k >= 1 must be in [0, q_j) for each CRT modulus q_j
+///
+/// These bounds are critical for security and correctness of the threshold BFV scheme.
+///
+/// # Panics
+/// This function will cause the circuit to fail if any value is outside
+/// its expected bounds.
+pub fn check_range_bounds<let N: u32, let L: u32, let N_PARTIES: u32, let BIT_SHARE: u32>(
+    qis: [Field; L],
+    y: [[[Field; N_PARTIES + 1]; L]; N],
+) {
+    // Shares y[i][j][k] for k >= 1 should be in [0, q_j)
+    for mod_idx in 0..L {
+        let q_j = qis[mod_idx];
+
+        for coeff_idx in 0..N {
+            for party_idx in 1..(N_PARTIES + 1) {
+                // Use range_check_standard from Polynomial by creating a single-coefficient polynomial
+                Polynomial::new([y[coeff_idx][mod_idx][party_idx]])
+                    .range_check_standard::<BIT_SHARE>(q_j);
+            }
+        }
+    }
+}
+
+/// Verifies Reed-Solomon parity check: `H[j] * y[i][j]^T == 0 mod q_j` for all i, j.
+///
+/// This function verifies that for each coefficient i and CRT basis j, the share
+/// vector `y[i][j]` forms a valid Reed-Solomon codeword by satisfying the parity
+/// check equation with the parity check matrix `H[j]`.
+///
+/// The parity check matrix H[j] has dimensions `(N_PARTIES - T) * (N_PARTIES + 1)`,
+/// and the share vector `y[i][j]` has length `N_PARTIES + 1`. The parity check
+/// ensures that any T+1 shares can correctly reconstruct the secret key via
+/// Lagrange interpolation.
+///
+/// # Panics
+/// The circuit will fail if the parity check doesn't hold for any coefficient,
+/// CRT basis, or parity check row.
+pub fn verify_parity_check<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32>(
+    qis: [Field; L],
+    h: [[[Field; N_PARTIES + 1]; N_PARTIES - T]; L],
+    y: [[[Field; N_PARTIES + 1]; L]; N],
+) {
+    for coeff_idx in 0..N {
         for mod_idx in 0..L {
-            let q_j = self.configs.qis[mod_idx];
+            let q_j = qis[mod_idx];
 
-            for coeff_idx in 0..N {
-                for party_idx in 1..(N_PARTIES + 1) {
-                    // Use range_check_standard from Polynomial by creating a single-coefficient polynomial
-                    Polynomial::new([self.y[coeff_idx][mod_idx][party_idx]])
-                        .range_check_standard::<BIT_SHARE>(q_j);
+            // For each row of H, compute dot product with y and verify == 0
+            for row in 0..(N_PARTIES - T) {
+                let mut sum: Field = 0;
+
+                for col in 0..(N_PARTIES + 1) {
+                    sum = sum + h[mod_idx][row][col] * y[coeff_idx][mod_idx][col];
                 }
+
+                // Reduce mod q_j and verify == 0
+                let m = ModU128::new(q_j);
+                let result = m.reduce_mod(sum);
+                assert(result == 0, "Parity check failed");
             }
         }
     }
+}
 
-    /// Verifies Reed-Solomon parity check: `H[j] * y[i][j]^T == 0 mod q_j` for all i, j.
-    ///
-    /// This function verifies that for each coefficient i and CRT basis j, the share
-    /// vector `y[i][j]` forms a valid Reed-Solomon codeword by satisfying the parity
-    /// check equation with the parity check matrix `H[j]`.
-    ///
-    /// The parity check matrix H[j] has dimensions `(N_PARTIES - T) * (N_PARTIES + 1)`,
-    /// and the share vector `y[i][j]` has length `N_PARTIES + 1`. The parity check
-    /// ensures that any T+1 shares can correctly reconstruct the secret key via
-    /// Lagrange interpolation.
-    ///
-    /// # Panics
-    /// The circuit will fail if the parity check doesn't hold for any coefficient,
-    /// CRT basis, or parity check row.
-    fn verify_parity_check(self) {
-        for coeff_idx in 0..N {
-            for mod_idx in 0..L {
-                let q_j = self.configs.qis[mod_idx];
+/// Commits to shares for each party and modulus
+/// Returns [[Field; L]; N_PARTIES] where commitments[party_idx][mod_idx]
+pub fn commit_to_party_shares<let N: u32, let L: u32, let N_PARTIES: u32>(
+    y: [[[Field; N_PARTIES + 1]; L]; N],
+) -> [[Field; L]; N_PARTIES] {
+    let mut commitments: [[Field; L]; N_PARTIES] = [[0; L]; N_PARTIES];
 
-                // For each row of H, compute dot product with y and verify == 0
-                for row in 0..(N_PARTIES - T) {
-                    let mut sum: Field = 0;
+    for party_idx in 0..N_PARTIES {
+        for mod_idx in 0..L {
+            let payload = prepare_shares_party_modulus_commitment_payload::<N, L, N_PARTIES>(
+                y,
+                party_idx,
+                mod_idx,
+            );
 
-                    for col in 0..(N_PARTIES + 1) {
-                        sum = sum + self.h[mod_idx][row][col] * self.y[coeff_idx][mod_idx][col];
-                    }
-
-                    // Reduce mod q_j and verify == 0
-                    let m = ModU128::new(q_j);
-                    let result = m.reduce_mod(sum);
-                    assert(result == 0, "Parity check failed");
-                }
-            }
+            commitments[party_idx][mod_idx] = compute_shares_party_modulus_commitment(payload);
         }
     }
 
-    /// Flattens shares (excluding secret key values) into a single array.
-    ///
-    /// This function serializes all share values into a 1D array, excluding the
-    /// secret key values at index 0. The flattened data is used to generate a
-    /// commitment to the shares without revealing the secret key.
-    ///
-    /// # Arguments
-    /// * `y` - Share values array: `y[coeff_idx][mod_idx][party_idx]`
-    ///
-    /// # Returns
-    /// A vector containing all share values (excluding secret key values) in flattened form
-    fn payload(y: [[[Field; N_PARTIES + 1]; L]; N]) -> Vec<Field> {
-        let mut inputs = Vec::new();
-
-        for coeff_idx in 0..N {
-            for mod_idx in 0..L {
-                // Only include shares, not sk (skip index 0)
-                for party_idx in 1..(N_PARTIES + 1) {
-                    inputs.push(y[coeff_idx][mod_idx][party_idx]);
-                }
-            }
-        }
-
-        inputs
-    }
-
-    /// Commits to shares using the SAFE cryptographic sponge.
-    ///
-    /// This function generates a cryptographic commitment to all share values
-    /// (excluding secret key values) using the SAFE sponge API. The commitment
-    /// can be used for public verification that shares were correctly generated
-    /// without revealing the secret key.
-    ///
-    /// # Arguments
-    /// * `y` - Share values array: `y[coeff_idx][mod_idx][party_idx]`
-    ///
-    /// # Returns
-    /// A single field element representing the commitment hash to all shares
-    fn commit_to_shares(y: [[[Field; N_PARTIES + 1]; L]; N]) -> Field {
-        let inputs = Self::payload(y);
-
-        // Domain separator - "PVSS_verify"
-        let domain_separator = [
-            0x50, 0x56, 0x53, 0x53, 0x5f, 0x76, 0x65, 0x72, 0x69, 0x66, 0x79, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
-
-        let input_size = inputs.len();
-        let io_pattern = [0x80000000 | input_size, 0x00000001];
-
-        let mut sponge = SafeSponge::start(io_pattern, domain_separator);
-        sponge.absorb(inputs);
-        let commitment = sponge.squeeze();
-        sponge.finish();
-
-        commitment.get(0)
-    }
+    commitments
 }

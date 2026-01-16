@@ -1,13 +1,17 @@
 {
   "circuits": [
-    "pk_trbfv",
     "pk_bfv",
-    "enc_bfv",
-    "dec_bfv",
-    "enc_trbfv",
+    "pk_trbfv",
+    "verify_shares_trbfv_sk",
+    "verify_shares_trbfv_e_sm",
+    "enc_bfv_sk",
+    "enc_bfv_e_sm",
+    "dec_bfv_sk",
+    "dec_bfv_e_sm",
+    "pk_agg_trbfv",
+    "greco",
     "dec_share_trbfv",
-    "dec_share_agg_trbfv",
-    "verify_shares_trbfv"
+    "dec_share_agg_trbfv"
   ],
   "oracles": ["default"],
   "mode": "insecure",
