@@ -1,7 +1,0 @@
-[package]
-name = "pk_circuit"
-type = "bin"
-authors = [""]
-
-[dependencies]
-circuits = { path = "../../circuits" }

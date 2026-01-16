@@ -1,4 +1,6 @@
 target
+out
 Prover.toml
-!examples/**/Prover.toml
-**/output/**/constants.nr
+benchmarks/results_production/raw
+benchmarks/results_insecure/raw
+.DS_Store
