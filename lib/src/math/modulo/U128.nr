@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 //! Constrained modular arithmetic operations for u128 values.
 //!
 //! This module provides a `ModU128` struct that implements modular arithmetic operations
@@ -58,7 +64,7 @@ impl ModU128 {
         // Safety: __compute_mod_reduction is safe to call here because we assert the properties of the output
         let (q, r) = unsafe { __compute_mod_reduction(n, self.m) };
 
-        // Ensure remainder is in [0, q)
+        // Ensure remainder is in [0, m)
         assert(r as u128 < self.m as u128);
         // Verify the reduction is correct
         assert(n == q * self.m + r);

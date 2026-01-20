@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use crate::core::greco::Configs as GrecoConfigs;
 use crate::core::trbfv_dec_share::Configs as DecShareTrBfvConfigs;
 use crate::core::trbfv_dec_shares_agg::Configs as DecShareAggTrBfvConfigs;
@@ -157,29 +163,24 @@ pub global DEC_SHARES_BIT_R2: u32 = 53;
 pub global DEC_SHARES_BIT_D: u32 = 53;
 
 // dec_share_trbfv - bounds
-pub global DEC_SHARES_DECRYPTION_SHARE_BOUND: Field = 2251799817289728;
 pub global DEC_SHARES_R1_BOUNDS: [Field; L] =
     [4611686035875690497, 9223372037660080129, 9223372045176272897, 9223372051618723841];
 pub global DEC_SHARES_R2_BOUNDS: [Field; L] =
     [1125899911102464, 2251799813881856, 2251799815716864, 2251799817289728];
 
 // dec_share_trbfv - configs
-pub global DEC_SHARES_CONFIGS: DecShareTrBfvConfigs<L> = DecShareTrBfvConfigs::new(
-    QIS,
-    DEC_SHARES_DECRYPTION_SHARE_BOUND,
-    DEC_SHARES_R1_BOUNDS,
-    DEC_SHARES_R2_BOUNDS,
-);
+pub global DEC_SHARES_CONFIGS: DecShareTrBfvConfigs<L> =
+    DecShareTrBfvConfigs::new(QIS, DEC_SHARES_R1_BOUNDS, DEC_SHARES_R2_BOUNDS);
 
 /************************************
 -------------------------------------
-dec_share_agg_trbfv (CIRCUIT 7 - DECRYPTION SHARE AGGREGATION TRBFV)
+dec_shares_agg_trbfv (CIRCUIT 7 - DECRYPTION SHARE AGGREGATION TRBFV)
 -------------------------------------
 ************************************/
 
-// dec_share_agg_trbfv - bit parameters
+// dec_shares_agg_trbfv - bit parameters
 pub global DEC_SHARES_AGG_BIT_NOISE: u32 = 201;
 
-// dec_share_agg_trbfv - configs
+// dec_shares_agg_trbfv - configs
 pub global DEC_SHARES_AGG_CONFIGS: DecShareAggTrBfvConfigs<L> =
     DecShareAggTrBfvConfigs::new(QIS, PLAINTEXT_MODULUS, Q_INVERSE_MOD_T);

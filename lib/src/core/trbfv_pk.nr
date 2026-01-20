@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use crate::math::commitments::{
     compute_pk_trbfv_commitment, compute_secret_commitment, compute_trbfv_pk_challenge_commitment,
     prepare_pk_commitment_payload, prepare_single_polynomial_commitment_payload,
@@ -103,7 +109,7 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
         let mut inputs = Vec::new();
 
         // Flatten CRS polynomials a (L polynomials of degree N)
-        inputs = flatten::<_, _, BIT_EEK>(inputs, self.a);
+        inputs = flatten::<_, _, BIT_PK>(inputs, self.a);
 
         // Flatten error polynomial eek (1 polynomial of degree N)
         inputs = flatten::<_, _, BIT_EEK>(inputs, [self.eek]);

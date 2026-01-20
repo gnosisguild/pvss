@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use lib::configs::insecure::bfv::{
     ENC_BFV_BIT_CT, ENC_BFV_BIT_E0, ENC_BFV_BIT_E1, ENC_BFV_BIT_MSG, ENC_BFV_BIT_P1, ENC_BFV_BIT_P2,
     ENC_BFV_BIT_PK, ENC_BFV_BIT_R1, ENC_BFV_BIT_R2, ENC_BFV_BIT_U, ENC_BFV_CONFIGS_SK, L, N,
@@ -6,8 +12,8 @@ use lib::core::bfv_enc::EncryptionBfv;
 use lib::math::polynomial::Polynomial;
 
 fn main(
-    expected_pk_commitment: Field,
-    expected_message_commitment: Field,
+    expected_pk_commitment: pub Field,
+    expected_message_commitment: pub Field,
     pk0is: [Polynomial<N>; L],
     pk1is: [Polynomial<N>; L],
     ct0is: [Polynomial<N>; L],

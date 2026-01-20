@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 //! Unconstrained functions for modular u128 arithmetic.
 //!
 //! This module provides unconstrained functions that perform modular arithmetic
@@ -57,10 +63,14 @@ pub unconstrained fn __neg(val: Field, m: Field) -> Field {
 /// Computes `(lhs - rhs) mod m`, handling the case where `lhs < rhs` by adding
 /// the modulus. Returns both the result and a flag indicating if underflow occurred.
 ///
+/// # Preconditions
+/// Inputs must be reduced modulo `m` such that `lhs, rhs in [0, m)`. This ensures
+/// that the computed difference is bounded and cannot overflow `u128`.
+///
 /// # Arguments
-/// * `lhs` - Left-hand side value (minuend)
-/// * `rhs` - Right-hand side value (subtrahend)
-/// * `m` - The modulus
+/// * `lhs` - Left-hand side value (minuend), must be in `[0, m)`
+/// * `rhs` - Right-hand side value (subtrahend), must be in `[0, m)`
+/// * `m` - The modulus, must satisfy `m <= u128::MAX`
 ///
 /// # Returns
 /// A tuple `(result, underflow)` where:
@@ -69,6 +79,10 @@ pub unconstrained fn __neg(val: Field, m: Field) -> Field {
 ///
 /// # Safety
 /// This is an unconstrained function. The result must be verified in constrained code.
+/// As long as inputs are reduced modulo `m` (and `m <= u128::MAX`), the subtraction-with-underflow
+/// logic is safe and will not overflow `u128`. This function is used by the constrained `sub` method
+/// in `modulo::U128`, which ensures inputs are properly reduced before calling `__sub_with_underflow`.
+/// See the surrounding `modulo/unconstrained_U128` module documentation for details.
 pub unconstrained fn __sub_with_underflow(lhs: Field, rhs: Field, m: Field) -> (Field, bool) {
     let lhs_u128 = lhs as u128;
     let rhs_u128 = rhs as u128;
@@ -76,7 +90,11 @@ pub unconstrained fn __sub_with_underflow(lhs: Field, rhs: Field, m: Field) -> (
 
     let underflow = lhs_u128 < rhs_u128;
     let result = if underflow {
-        (lhs_u128 + m_u128 - rhs_u128) as Field
+        // Compute (lhs - rhs + m) mod m safely to avoid u128 overflow
+        // Since lhs < rhs, we compute: m - (rhs - lhs)
+        // This avoids the potential overflow in lhs + m
+        let diff = rhs_u128 - lhs_u128; // This is safe since rhs > lhs
+        (m_u128 - diff) as Field
     } else {
         (lhs_u128 - rhs_u128) as Field
     };
@@ -95,15 +113,24 @@ pub unconstrained fn __sub_with_underflow(lhs: Field, rhs: Field, m: Field) -> (
 /// # Returns
 /// A tuple `(quotient, remainder)` where `lhs * rhs = m * quotient + remainder`
 ///
-/// # Note
-/// For u128 values, the product can overflow Field, but for typical use cases
-/// (e.g., party IDs <= 100), this is safe.
+/// # Overflow Warning
+/// Field multiplication wraps modulo the field prime (~254 bits). For two u128 values
+/// near 2^128, their product (up to 2^256) exceeds the Field modulus, causing silent
+/// wraparound before the mod reduction. This can produce incorrect results.
+///
+/// # Safe Input Range
+/// To avoid overflow, ensure `lhs * rhs < Field::MODULUS`. For typical use cases:
+/// - Party IDs, polynomial coefficients, and small cryptographic values (< 2^64) are safe
+/// - Arbitrary u128 values may overflow and should be validated by callers
 ///
 /// # Safety
 /// This is an unconstrained function. The result must be verified in constrained code.
+/// Callers must ensure inputs are within the safe range to prevent silent overflow.
 pub unconstrained fn __mul_with_quotient(lhs: Field, rhs: Field, m: Field) -> (Field, Field) {
-    // For u128 values, product can overflow Field
-    // But since our values are small (party IDs <= 100), this is safe
+    // WARNING: Field multiplication can overflow for large inputs.
+    // For u128 values near 2^128, the product (up to 2^256) exceeds Field modulus (~2^254),
+    // causing wraparound. This is safe for typical use cases (party IDs, small coefficients),
+    // but callers must validate input ranges for arbitrary u128 values.
     let product = lhs * rhs;
     __compute_mod_reduction(product, m)
 }

@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use crate::math::modulo::U128::ModU128;
 use crate::math::polynomial::Polynomial;
 use dep::bignum::BigNum;
@@ -34,6 +40,7 @@ pub struct DecryptionSharesAggregation<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: 
     decryption_shares: [[Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L]; T + 1],
 
     /// Party IDs (x-coordinates) for interpolation (public inputs)
+    /// Note: Must be in strictly increasing order for correct Lagrange sign computation
     party_ids: [Field; T + 1],
 
     /// Message polynomial m(x) (public output)
@@ -234,9 +241,12 @@ impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u3
 
         for coeff_idx in 0..MAX_MSG_NON_ZERO_COEFFS {
             // Compute (t * u_global) mod Q using BigNum
-            let u_bn_q = Enclave_TRBFV_8192::from(self.u_global.coefficients[coeff_idx]);
-            let t_bn_q = Enclave_TRBFV_8192::from(self.configs.plaintext_modulus);
-            let t_times_u_bn_q = t_bn_q * u_bn_q;
+            let u_bn = Enclave_TRBFV_8192::from(self.u_global.coefficients[coeff_idx]);
+            let t_bn = Enclave_TRBFV_8192::from(self.configs.plaintext_modulus);
+            let u_bn_mod_q = u_bn.umod(q_bn);
+            let t_bn_mod_q = t_bn.umod(q_bn);
+            let t_times_u_bn_q = (t_bn_mod_q * u_bn_mod_q).umod(q_bn);
+
             let m = ModU128::new(self.configs.plaintext_modulus);
 
             // Check if centering is needed
@@ -247,13 +257,13 @@ impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u3
                 // Centered value is conceptually negative: (t_times_u_mod_q - Q)
                 // -Q^{-1} * (negative) = positive result
                 let centered_positive = q_bn - t_times_u_bn_q;
-                let centered_positive_mod_t = centered_positive.umod(t_bn_q);
+                let centered_positive_mod_t = centered_positive.umod(t_bn);
                 let centered_field = to_field(centered_positive_mod_t);
                 m.mul_mod(self.configs.q_inverse_mod_t, centered_field)
             } else {
                 // When (t*u) mod Q < Q/2: stays positive in centered form
                 // -Q^{-1} * (positive) = negative result = t - result
-                let t_times_u_bn_t = t_times_u_bn_q.umod(t_bn_q);
+                let t_times_u_bn_t = t_times_u_bn_q.umod(t_bn);
                 let t_times_u_field = to_field(t_times_u_bn_t);
                 let product = m.mul_mod(self.configs.q_inverse_mod_t, t_times_u_field);
                 if product == 0 {

@@ -1,4 +1,10 @@
-use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_honk_proof_non_zk};
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
+use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_ultrahonk_proof};
 use lib::math::commitments::compute_aggregation_commitment;
 
 // Number of proofs.
@@ -13,7 +19,7 @@ fn main(
     key_hash: Field,
 ) -> pub Field {
     for i in 0..N_PROOFS {
-        verify_honk_proof_non_zk(verification_key, proofs[i], commitments[i], key_hash);
+        verify_ultrahonk_proof(verification_key, proofs[i], commitments[i], key_hash);
     }
 
     let mut aggregated_commitments = Vec::new();

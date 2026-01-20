@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use lib::configs::production::trbfv::{L, N, PK_AGG_TRBFV_BIT_PK, PK_AGG_TRBFV_CONFIGS};
 use lib::core::trbfv_pk_agg::TrbfvPublicKeyAggregation;
 use lib::math::polynomial::Polynomial;
@@ -6,7 +12,7 @@ use lib::math::polynomial::Polynomial;
 pub global H: u32 = 5;
 
 fn main(
-    expected_pk_trbfv_commitments: [Field; H],
+    expected_pk_trbfv_commitments: pub [Field; H],
     pk0: [[Polynomial<N>; L]; H],
     pk1: [[Polynomial<N>; L]; H],
     pk0_agg: [Polynomial<N>; L],

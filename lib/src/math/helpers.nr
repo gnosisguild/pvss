@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 //! Helper functions for circuit construction and cryptographic operations.
 use crate::math::polynomial::Polynomial;
 use crate::math::safe::SafeSponge;
@@ -293,6 +299,7 @@ fn test_safe_hashing_with_safe_helper() {
 
     assert(digests2.len() == 1);
     assert(digests2.get(0) != 0);
+    assert(digests2.get(0) == digests1.get(0));
 }
 
 #[test]

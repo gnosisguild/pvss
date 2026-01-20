@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use super::modulo::U128::ModU128;
 
 /// Polynomial structure representing a polynomial of degree N-1.
@@ -104,9 +110,9 @@ impl<let N: u32> Polynomial<N> {
     /// modular reductions to prevent overflow. The result is guaranteed to be in
     /// the range `[0, q)`.
     ///
-    /// The function performs lazy reduction: it only reduces the accumulator modulo
-    /// `q` when it exceeds the modulus, which is more efficient than reducing after
-    /// every operation while still preventing overflow.
+    /// The function performs modular reduction after each multiplication and addition
+    /// to ensure the accumulator always remains in the range `[0, q)`, preventing
+    /// any potential overflow issues.
     ///
     /// # Arguments
     /// * `x` - The point at which to evaluate the polynomial
@@ -115,33 +121,25 @@ impl<let N: u32> Polynomial<N> {
     /// # Returns
     /// The value `P(x) mod q` in the range `[0, q)`
     pub fn eval_mod(self, x: Field, q: ModU128) -> Field {
-        let m = q.get_mod_field();
         let mut acc = self.coefficients[0];
         let len = self.coefficients.len();
 
         for i in 1..len {
-            acc = acc * x + self.coefficients[i];
-            // Only reduce if accumulator exceeds q
-            if acc as u64 >= m as u64 {
-                acc = q.reduce_mod(acc);
-            }
+            acc = q.mul_mod(acc, x);
+            acc = q.add(acc, self.coefficients[i]);
         }
 
-        // Final reduction to ensure result is in [0, q)
-        if acc as u64 >= m as u64 {
-            q.reduce_mod(acc)
-        } else {
-            acc
-        }
+        acc
     }
 
     /// Performs range checking on polynomial coefficients using asymmetric bounds.
     ///
-    /// This function constrains all polynomial coefficients to be in the range [lower_bound, upper_bound].
+    /// This function constrains all polynomial coefficients to be in the range [-lower_bound, upper_bound],
+    /// where `lower_bound` is a non-negative magnitude.
     /// It uses a shifting technique to handle negative numbers efficiently:
     /// 1. Shifts each coefficient by adding `lower_bound`: c' = c + lower_bound
     /// 2. Checks that shifted coefficients are in [0, upper_bound + lower_bound] using bit-size assertions
-    /// 3. This ensures original coefficients are in [lower_bound, upper_bound]
+    /// 3. This ensures original coefficients are in [-lower_bound, upper_bound]
     ///
     /// The function uses two bit-size checks per coefficient to ensure the value is within bounds:
     /// - `shifted_coefficient.assert_max_bit_size::<BIT + 1>()` ensures c' >= 0
@@ -149,12 +147,12 @@ impl<let N: u32> Polynomial<N> {
     ///
     /// # Arguments
     /// * `upper_bound` - The upper bound for coefficient range checking
-    /// * `lower_bound` - The lower bound for coefficient range checking
-    ///                   Coefficients must satisfy: lower_bound <= c <= upper_bound
+    /// * `lower_bound` - Non-negative magnitude of the negative bound
+    ///                   Coefficients must satisfy: -lower_bound <= c <= upper_bound
     ///
     /// # Generic Parameters
-    /// * `BIT` - The bit-length of the total range `upper_bound - lower_bound`
-    ///           (choose `BIT` so `upper_bound - lower_bound < 2^BIT`). Since all checked
+    /// * `BIT` - The bit-length of the total range `upper_bound + lower_bound`
+    ///           (choose `BIT` so `upper_bound + lower_bound < 2^BIT`). Since all checked
     ///           values lie in `[0, upper_bound + lower_bound]`, they cannot exceed `BIT + 1` bits.
     ///
     /// # Panics
@@ -388,7 +386,7 @@ fn test_eval_mod() {
     let poly4 = Polynomial::new([5, 3, 7]);
     let q = ModU128::new(17);
     let result4 = poly4.eval_mod(4, q);
-    assert(result4 as u64 < q.get_mod_field() as u64);
+    assert(result4 as u128 < q.get_mod_field() as u128);
 
     // Test 5: Compare with regular eval for small values
     let poly5 = Polynomial::new([1, 2, 1]);

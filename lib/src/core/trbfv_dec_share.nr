@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use crate::math::commitments::{
     compute_aggregated_shares_commitment, compute_dec_share_challenge_commitment,
     prepare_aggregated_shares_from_values_commitment_payload,
@@ -9,8 +15,6 @@ use crate::math::polynomial::Polynomial;
 pub struct Configs<let L: u32> {
     /// CRT moduli: [q_0, q_1, ..., q_{L-1}]
     pub qis: [Field; L],
-    /// Bound for decryption share coefficients
-    pub decryption_share_bound: Field,
     /// Bounds for r1 polynomials (modulus switching quotients) for each CRT basis
     pub r1_bounds: [Field; L],
     /// Bounds for r2 polynomials (cyclotomic reduction quotients) for each CRT basis
@@ -18,13 +22,8 @@ pub struct Configs<let L: u32> {
 }
 
 impl<let L: u32> Configs<L> {
-    pub fn new(
-        qis: [Field; L],
-        decryption_share_bound: Field,
-        r1_bounds: [Field; L],
-        r2_bounds: [Field; L],
-    ) -> Self {
-        Configs { qis, decryption_share_bound, r1_bounds, r2_bounds }
+    pub fn new(qis: [Field; L], r1_bounds: [Field; L], r2_bounds: [Field; L]) -> Self {
+        Configs { qis, r1_bounds, r2_bounds }
     }
 }
 
